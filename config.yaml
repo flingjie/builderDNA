@@ -1,0 +1,26 @@
+accounts:
+  - placeholder_username
+
+github:
+  token: ${GITHUB_TOKEN}
+
+llm:
+  provider: openai
+  model: gpt-4o
+  api_key: ${OPENAI_API_KEY}
+
+weights:
+  repo: 5.0
+  commit: 3.0
+  pr: 2.5
+  issue: 1.5
+  star: 1.0
+
+output:
+  dir: ./output
+  formats:
+    - markdown
+    - json
+
+compare:
+  enabled: true

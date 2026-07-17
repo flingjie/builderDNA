@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "builderdna"
+version = "0.1.0"
+description = "Analyze GitHub builders, extract tech DNA, and discover opportunities"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.0",
+    "httpx>=0.27",
+    "openai>=1.0",
+    "click>=8.0",
+    "rich>=13.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-httpx>=0.30",
+    "pytest-mock>=3.14",
+]
+
+[project.scripts]
+bldr-dna = "cli:main"
+
+[tool.setuptools.packages.find]
+include = ["models*", "collect*", "insight*", "opportunity*", "output*", "llm*"]
+exclude = ["snapshots*", "tests*", "output/*.md", "output/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

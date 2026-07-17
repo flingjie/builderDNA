@@ -1,0 +1,2 @@
+[console_scripts]
+bldr-dna = cli:main
