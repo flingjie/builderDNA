@@ -24,6 +24,7 @@ class LLMConfig(BaseModel):
     provider: str = Field(default="openai", description="LLM provider name")
     model: str = Field(default="gpt-4o", description="Model ID")
     api_key: str = Field(description="API key for the LLM provider")
+    base_url: str = Field(default="", description="Optional base URL for the LLM API endpoint")
 
 
 class WeightConfig(BaseModel):

@@ -57,6 +57,7 @@ class OpenAIClient:
         self,
         api_key: str,
         model: str = "gpt-4o",
+        base_url: str = "",
         retry_config: dict | None = None,
     ):
         """Initialize the OpenAI client.
@@ -64,9 +65,13 @@ class OpenAIClient:
         Args:
             api_key: OpenAI API key.
             model: Model ID to use.
+            base_url: Optional base URL override for the API endpoint.
             retry_config: Override default retry settings.
         """
-        self._client = OpenAI(api_key=api_key)
+        kwargs = {"api_key": api_key}
+        if base_url:
+            kwargs["base_url"] = base_url
+        self._client = OpenAI(**kwargs)
         self.model = model
         self.retry = retry_config or DEFAULT_RETRY_CONFIG
 
