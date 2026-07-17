@@ -6,7 +6,7 @@ github:
 
 llm:
   provider: openai
-  model: gpt-4o
+  model: deepseek-v4-pro
   api_key: ${OPENAI_API_KEY}
   base_url: ${LLM_BASE_URL}
 

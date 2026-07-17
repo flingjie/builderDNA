@@ -106,7 +106,13 @@ class OpenAIClient:
                     ],
                     temperature=0.3,
                 )
-                content = response.choices[0].message.content
+                msg = response.choices[0].message
+                if msg is not None and msg.content is not None:
+                    content = msg.content
+                else:
+                    # Some gateways return content in delta
+                    delta = getattr(response.choices[0], 'delta', None) or {}
+                    content = delta.get('content', '')
                 return self._parse_response(content, prompt, response_format)
             except APIError as e:
                 last_error = e
