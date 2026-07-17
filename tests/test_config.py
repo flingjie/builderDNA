@@ -13,7 +13,7 @@ from config import Config, load_config
 VALID_CONFIG = {
     "accounts": ["alice", "bob"],
     "github": {"token": "ghp_test123"},
-    "llm": {"provider": "openai", "model": "gpt-4o", "api_key": "sk-test"},
+    "llm": {"provider": "openai", "model": "gpt-4o", "api_key": "sk-test", "base_url": ""},
     "weights": {"repo": 5.0, "commit": 3.0, "pr": 2.5, "issue": 1.5, "star": 1.0},
     "output": {"dir": "./output", "formats": ["markdown", "json"]},
     "compare": {"enabled": True},
@@ -65,6 +65,14 @@ class TestLoadConfig:
     def test_loads_missing_file_raises(self):
         with pytest.raises(FileNotFoundError):
             load_config("nonexistent.yaml")
+
+
+    def test_default_base_url(self):
+        """base_url defaults to empty string when not specified."""
+        cfg_data = dict(VALID_CONFIG)
+        del cfg_data["llm"]["base_url"]
+        cfg = Config(**cfg_data)
+        assert cfg.llm.base_url == ""
 
 
 class TestConfigModel:

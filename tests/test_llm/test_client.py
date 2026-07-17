@@ -28,6 +28,39 @@ def _api_error(msg="test error"):
 
 
 class TestOpenAIClient:
+    def test_base_url_passed_to_openai(self, mocker):
+        """OpenAIClient passes base_url to the OpenAI constructor."""
+        mock_client_cls = mocker.patch("llm.client.OpenAI")
+        mock_client = mock_client_cls.return_value
+        mock_client.chat.completions.create.return_value = FakeResponse(
+            json.dumps({"items": []})
+        )
+
+        client = OpenAIClient(
+            api_key="sk-test",
+            model="gpt-4o",
+            base_url="https://custom.api.example.com/v1",
+        )
+        client.complete("prompt", response_format=dict)
+
+        mock_client_cls.assert_called_once_with(
+            api_key="sk-test",
+            base_url="https://custom.api.example.com/v1",
+        )
+
+    def test_empty_base_url_not_passed(self, mocker):
+        """Empty base_url is omitted from OpenAI constructor args."""
+        mock_client_cls = mocker.patch("llm.client.OpenAI")
+        mock_client = mock_client_cls.return_value
+        mock_client.chat.completions.create.return_value = FakeResponse(
+            json.dumps({"items": []})
+        )
+
+        client = OpenAIClient(api_key="sk-test", model="gpt-4o", base_url="")
+        client.complete("prompt", response_format=dict)
+
+        mock_client_cls.assert_called_once_with(api_key="sk-test")
+
     def test_complete_success(self, mocker):
         mock_client_cls = mocker.patch("llm.client.OpenAI")
         mock_client = mock_client_cls.return_value

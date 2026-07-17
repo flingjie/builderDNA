@@ -20,7 +20,11 @@ class Pipeline:
     def __init__(self, config: Config):
         self.config = config
         self.github = GitHubClient(token=config.github.token)
-        self.llm = OpenAIClient(api_key=config.llm.api_key, model=config.llm.model)
+        self.llm = OpenAIClient(
+            api_key=config.llm.api_key,
+            model=config.llm.model,
+            base_url=config.llm.base_url,
+        )
         self.store = SignalStore(Path("snapshots") / "builderdna.db")
 
     def run(self, compare: bool = False) -> dict[str, Any]:
