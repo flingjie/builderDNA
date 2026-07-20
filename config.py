@@ -46,6 +46,14 @@ class OutputConfig(BaseModel):
     )
 
 
+class CollectConfig(BaseModel):
+    """Data collection configuration."""
+
+    time_range_days: int = Field(
+        default=365, description="Only collect signals within this many days"
+    )
+
+
 class CompareConfig(BaseModel):
     """Incremental comparison configuration."""
 
@@ -60,6 +68,7 @@ class Config(BaseModel):
     llm: LLMConfig
     weights: WeightConfig = Field(default_factory=WeightConfig)
     output: OutputConfig = Field(default_factory=OutputConfig)
+    collect: CollectConfig = Field(default_factory=CollectConfig)
     compare: CompareConfig = Field(default_factory=CompareConfig)
 
 

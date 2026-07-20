@@ -60,15 +60,26 @@ class Pipeline:
         }
 
     def _collect_all(self, compare: bool = False) -> list:
+        from datetime import datetime, timezone, timedelta
+
         since = None
         if compare:
             last = self.store.get_last_snapshot()
             if last:
                 since = last["created_at"]
+
+        # Time range filter from config
+        if since is None and self.config.collect.time_range_days > 0:
+            since = (datetime.now(timezone.utc) - timedelta(days=self.config.collect.time_range_days)).isoformat()
+
         all_signals = []
         for account in self.config.accounts:
             try:
-                all_signals.extend(self._collect_for_account(account, since))
+                account_signals = self._collect_for_account(account, since)
+                # Filter by timestamp for repos/stars (commits already filtered via API `since`)
+                if since and self.config.collect.time_range_days > 0:
+                    account_signals = [s for s in account_signals if s.timestamp.isoformat() >= since]
+                all_signals.extend(account_signals)
             except Exception as e:
                 print(f"Warning: failed to collect for {account}: {e}")
                 continue
@@ -77,16 +88,8 @@ class Pipeline:
     def _collect_for_account(self, actor: str, since: str | None = None) -> list:
         raw_repos = self.github.get_repos(actor)
         raw_starred = self.github.get_starred(actor)
+        # commits temporarily disabled
         raw_commits: dict[str, list] = {}
-        for repo in raw_repos:
-            full_name = repo.get("full_name", "")
-            if full_name:
-                try:
-                    commits = self.github.get_commits(actor, full_name, since=since)
-                    if commits:
-                        raw_commits[full_name] = commits
-                except Exception:
-                    continue
         return map_all(
             raw_repos=raw_repos, raw_starred=raw_starred,
             raw_commits_by_repo=raw_commits, actor=actor,

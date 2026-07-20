@@ -24,5 +24,8 @@ output:
     - markdown
     - json
 
+collect:
+  time_range_days: 365
+
 compare:
   enabled: true
