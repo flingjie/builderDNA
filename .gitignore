@@ -4,3 +4,4 @@ __pycache__/
 snapshots/*.db
 output/
 .venv/
+builderdna.egg-info/

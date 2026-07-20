@@ -1,6 +1,0 @@
-collect
-insight
-llm
-models
-opportunity
-output
