@@ -106,7 +106,7 @@ BuilderDNA/
 ```bash
 git clone <repo-url>
 cd BuilderDNA
-pip install -e ".[dev]"
+uv sync --dev
 ```
 
 ### 配置
@@ -157,32 +157,32 @@ compare:
 
 ```bash
 # 完整分析
-python cli.py run
+uv run bldr-dna run
 
 # 强制不对比
-python cli.py run --no-compare
+uv run bldr-dna run --no-compare
 
 # 指定配置文件
-python cli.py run -c custom-config.yaml
+uv run bldr-dna run -c custom-config.yaml
 
 # 查看某个账号的信号
-python cli.py show <账号名>
+uv run bldr-dna show <账号名>
 
 # 查看历史快照
-python cli.py snapshots
+uv run bldr-dna snapshots
 
 # 对比两个快照
-python cli.py diff <snapshot1> <snapshot2>
+uv run bldr-dna diff <snapshot1> <snapshot2>
 
 # 账号关注价值评估
-python cli.py follow alice bob charlie
-python cli.py follow alice bob --top 5  # 只看前5名
+uv run bldr-dna follow alice bob charlie
+uv run bldr-dna follow alice bob --top 5  # 只看前5名
 ```
 
 ### 运行测试
 
 ```bash
-pytest tests/ -v
+uv run pytest tests/ -v
 ```
 
 ## 核心模型
