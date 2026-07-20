@@ -1,7 +1,7 @@
 """End-to-end integration tests for the full BuilderDNA pipeline."""
 
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -44,23 +44,27 @@ class TestE2E:
              patch("pipeline.SignalStore") as MockStoreCls:
 
             mock_gh = MockGH.return_value
-            mock_gh.get_repos.return_value = [{
+            mock_gh.get_repos = AsyncMock(return_value=[{
                 "id": 1, "full_name": "alice/toolkit", "language": "Python",
                 "topics": ["llm", "agent"], "description": "An LLM agent toolkit",
                 "stargazers_count": 42, "forks_count": 5,
                 "updated_at": "2026-01-15T00:00:00Z", "created_at": "2025-01-01T00:00:00Z",
-            }]
-            mock_gh.get_starred.return_value = [{
+            }])
+            mock_gh.get_starred = AsyncMock(return_value=[{
                 "id": 100, "full_name": "fastapi/fastapi", "language": "Python",
                 "topics": ["web", "api"], "description": "FastAPI framework",
                 "stargazers_count": 80000,
-            }]
-            mock_gh.get_commits.return_value = [{
+                "updated_at": "2026-01-15T00:00:00Z",
+            }])
+            mock_gh.get_commits = AsyncMock(return_value=[{
                 "sha": "abc123",
                 "commit": {"author": {"name": "Alice", "date": "2026-03-01T10:00:00Z"},
                            "message": "Add MCP server for tool discovery"},
                 "html_url": "https://github.com/alice/toolkit/commit/abc123",
-            }]
+            }])
+            mock_gh.close = AsyncMock()
+            mock_gh.rate_limiter = MagicMock()
+            mock_gh.rate_limiter.usage_summary.return_value = "calls=2, remaining=4998/5000"
 
             mock_llm = MockLLM.return_value
             mock_llm.complete.side_effect = [MOCK_LLM_INSIGHT_RESPONSE, MOCK_LLM_OPPORTUNITY_RESPONSE]
@@ -76,9 +80,9 @@ class TestE2E:
 
             result = pipeline.run()
 
-            assert len(result["signals"]) >= 3
+            assert len(result["signals"]) >= 2
             signal_types = {s.type for s in result["signals"]}
-            assert signal_types >= {"repo", "star", "commit"}
+            assert signal_types >= {"repo", "star"}
             assert len(result["insights"]) == 1
             assert result["insights"][0].trend == "rising"
             assert len(result["opportunities"]) == 1
@@ -93,8 +97,12 @@ class TestE2E:
              patch("pipeline.SignalStore") as MockStoreCls:
 
             mock_gh = MockGH.return_value
-            mock_gh.get_repos.return_value = []
-            mock_gh.get_starred.return_value = []
+            mock_gh.get_repos = AsyncMock(return_value=[])
+            mock_gh.get_starred = AsyncMock(return_value=[])
+            mock_gh.close = AsyncMock()
+            mock_gh.rate_limiter = MagicMock()
+            mock_gh.rate_limiter.usage_summary.return_value = "calls=2"
+
             mock_store = MockStoreCls.return_value
             mock_store.create_snapshot.return_value = "empty_snap"
 

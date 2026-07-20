@@ -51,6 +51,9 @@ follow_groups:
 
 github:
   token: ${GITHUB_TOKEN}
+  cache_dir: snapshots/cache
+  max_concurrent: 5
+  rate_limit_margin: 50
 
 llm:
   provider: openai

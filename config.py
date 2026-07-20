@@ -31,6 +31,10 @@ class GitHubConfig(BaseModel):
     """GitHub API configuration."""
 
     token: str = Field(description="GitHub Personal Access Token")
+    cache_dir: str = Field(default="snapshots/cache", description="Directory for HTTP cache")
+    max_concurrent: int = Field(default=5, ge=1, le=20, description="Max concurrent API requests")
+    rate_limit_margin: int = Field(default=50, ge=10, le=500,
+                                   description="Pause when remaining calls below this")
 
 
 class LLMConfig(BaseModel):

@@ -1,7 +1,7 @@
 """Tests for the Pipeline orchestrator."""
 
 from datetime import datetime, timezone
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -53,14 +53,15 @@ def sample_opportunities():
 class TestPipelineRun:
     def test_collect_phase(self, sample_config, sample_signals, sample_insights, sample_opportunities):
         pipeline = Pipeline(sample_config)
-        with patch.object(pipeline, "_collect_for_account") as mock_collect:
+        with patch.object(pipeline, "_collect_for_account", new=AsyncMock()) as mock_collect:
             mock_collect.return_value = sample_signals
             with patch.object(pipeline, "_run_understand") as mock_understand:
-                mock_understand.return_value = sample_insights
+                mock_understand.return_value = ([], sample_insights)
                 with patch.object(pipeline, "_run_recommend") as mock_recommend:
                     mock_recommend.return_value = sample_opportunities
                     with patch.object(pipeline.store, "create_snapshot", return_value="snap_001"):
-                        result = pipeline.run()
+                        with patch.object(pipeline.github, "close", AsyncMock()):
+                            result = pipeline.run()
         assert result["snapshot_id"] == "snap_001"
         assert len(result["signals"]) == 3
         assert len(result["insights"]) == 1

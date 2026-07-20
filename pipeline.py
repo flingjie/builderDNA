@@ -1,5 +1,6 @@
 """Pipeline — orchestrates the full Collect→Understand→Recommend flow."""
 
+import asyncio
 from pathlib import Path
 from typing import Any
 
@@ -19,7 +20,12 @@ class Pipeline:
 
     def __init__(self, config: Config):
         self.config = config
-        self.github = GitHubClient(token=config.github.token)
+        self.github = GitHubClient(
+            token=config.github.token,
+            cache_dir=config.github.cache_dir,
+            max_concurrent=config.github.max_concurrent,
+            rate_limit_margin=config.github.rate_limit_margin,
+        )
         self.llm = OpenAIClient(
             api_key=config.llm.api_key,
             model=config.llm.model,
@@ -28,38 +34,48 @@ class Pipeline:
         self.store = SignalStore(Path("snapshots") / "builderdna.db")
 
     def run(self, compare: bool = False) -> dict[str, Any]:
+        """Execute the full analysis pipeline (sync entry point)."""
+        return asyncio.run(self._run_async(compare))
+
+    async def _run_async(self, compare: bool = False) -> dict[str, Any]:
         """Execute the full analysis pipeline."""
         snapshot_id = self.store.create_snapshot(self.config.accounts)
 
-        # Phase 1: Collect
-        all_signals = self._collect_all(compare)
+        try:
+            # Phase 1: Collect (concurrent across accounts)
+            all_signals = await self._collect_all(compare)
 
-        if not all_signals:
-            return {"snapshot_id": snapshot_id, "signals": [], "clusters": [],
-                    "insights": [], "opportunities": [], "diff": None}
+            if not all_signals:
+                return {"snapshot_id": snapshot_id, "signals": [], "clusters": [],
+                        "insights": [], "opportunities": [], "diff": None}
 
-        self.store.insert_signals(all_signals, snapshot_id)
+            self.store.insert_signals(all_signals, snapshot_id)
 
-        # Phase 2: Understand
-        clusters, insights = self._run_understand(all_signals, compare, snapshot_id)
+            # Phase 2: Understand
+            clusters, insights = self._run_understand(all_signals, compare, snapshot_id)
 
-        # Phase 3: Recommend
-        opportunities = self._run_recommend(insights, snapshot_id)
+            # Phase 3: Recommend
+            opportunities = self._run_recommend(insights, snapshot_id)
 
-        # Diff
-        diff = None
-        if compare:
-            last = self.store.get_last_snapshot()
-            if last and last["id"] != snapshot_id:
-                diff = self._compute_diff(all_signals, last)
+            # Diff
+            diff = None
+            if compare:
+                last = self.store.get_last_snapshot()
+                if last and last["id"] != snapshot_id:
+                    diff = self._compute_diff(all_signals, last)
 
-        return {
-            "snapshot_id": snapshot_id, "signals": all_signals,
-            "clusters": clusters,
-            "insights": insights, "opportunities": opportunities, "diff": diff,
-        }
+            # Emit rate limit summary
+            print(f"[GitHub] {self.github.rate_limiter.usage_summary()}")
 
-    def _collect_all(self, compare: bool = False) -> list:
+            return {
+                "snapshot_id": snapshot_id, "signals": all_signals,
+                "clusters": clusters,
+                "insights": insights, "opportunities": opportunities, "diff": diff,
+            }
+        finally:
+            await self.github.close()
+
+    async def _collect_all(self, compare: bool = False) -> list:
         from datetime import datetime, timezone, timedelta
 
         since = None
@@ -72,22 +88,27 @@ class Pipeline:
         if since is None and self.config.collect.time_range_days > 0:
             since = (datetime.now(timezone.utc) - timedelta(days=self.config.collect.time_range_days)).isoformat()
 
-        all_signals = []
-        for account in self.config.accounts:
+        # Concurrent collection across accounts
+        async def collect_one(account: str) -> list:
             try:
-                account_signals = self._collect_for_account(account, since)
-                # Filter by timestamp for repos/stars (commits already filtered via API `since`)
+                account_signals = await self._collect_for_account(account, since)
+                # Filter by timestamp
                 if since and self.config.collect.time_range_days > 0:
                     account_signals = [s for s in account_signals if s.timestamp.isoformat() >= since]
-                all_signals.extend(account_signals)
+                return account_signals
             except Exception as e:
                 print(f"Warning: failed to collect for {account}: {e}")
-                continue
+                return []
+
+        results = await asyncio.gather(*[collect_one(a) for a in self.config.accounts])
+        all_signals = []
+        for r in results:
+            all_signals.extend(r)
         return all_signals
 
-    def _collect_for_account(self, actor: str, since: str | None = None) -> list:
-        raw_repos = self.github.get_repos(actor)
-        raw_starred = self.github.get_starred(actor)
+    async def _collect_for_account(self, actor: str, since: str | None = None) -> list:
+        raw_repos = await self.github.get_repos(actor)
+        raw_starred = await self.github.get_starred(actor)
         # commits temporarily disabled
         raw_commits: dict[str, list] = {}
         return map_all(

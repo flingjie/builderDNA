@@ -1,5 +1,6 @@
 """BuilderDNA CLI entry point."""
 
+import asyncio
 import sys
 from pathlib import Path
 
@@ -129,7 +130,12 @@ def follow(accounts: tuple[str], config: str, top: int, from_config: bool, diff:
         console.print("[red]请提供账号列表，或使用 --from-config[/red]")
         return
 
-    gh = GitHubClient(token=cfg.github.token)
+    gh = GitHubClient(
+        token=cfg.github.token,
+        cache_dir=cfg.github.cache_dir,
+        max_concurrent=cfg.github.max_concurrent,
+        rate_limit_margin=cfg.github.rate_limit_margin,
+    )
 
     if grouped_mode:
         _run_grouped(gh, groups, store, top, diff)
@@ -137,29 +143,40 @@ def follow(accounts: tuple[str], config: str, top: int, from_config: bool, diff:
         _run_flat(gh, accounts, top)
 
 
+async def _fetch_metrics_async(gh: GitHubClient, actors: list[str]) -> list[dict]:
+    """Fetch stars and followers for a list of actors concurrently.
+
+    Uses Search API for total stars (1 call) instead of paginating all repos.
+    """
+
+    async def fetch_one(actor: str) -> dict:
+        try:
+            profile_task = gh.get_user(actor)
+            stars_task = gh.get_total_stars(actor)
+
+            profile, (total_stars, _repo_count) = await asyncio.gather(
+                profile_task, stars_task
+            )
+
+            if profile is None:
+                return {"actor": actor, "stars": 0, "followers": 0,
+                        "error": f"账号 {actor} 不存在 (404)"}
+
+            return {
+                "actor": actor,
+                "stars": total_stars,
+                "followers": profile.get("followers", 0),
+                "error": "",
+            }
+        except Exception as e:
+            return {"actor": actor, "stars": 0, "followers": 0, "error": str(e)}
+
+    return await asyncio.gather(*[fetch_one(a) for a in actors])
+
+
 def _fetch_metrics(gh, actors: list[str]) -> list[dict]:
-    """Fetch stars and followers for a list of actors."""
-    metrics = []
-    with console.status("[bold green]Fetching account data...[/bold green]") as status:
-        for actor in actors:
-            status.update(f"[bold green]Fetching {actor}...[/bold green]")
-            error = ""
-            stars = 0
-            followers = 0
-            try:
-                profile = gh.get_user(actor)
-                if profile is None:
-                    error = f"账号 {actor} 不存在 (404)"
-                else:
-                    followers = profile.get("followers", 0)
-                    repos = gh.get_repos(actor)
-                    stars = sum(r.get("stargazers_count", 0) for r in repos)
-            except Exception as e:
-                error = str(e)
-            metrics.append({
-                "actor": actor, "stars": stars, "followers": followers, "error": error,
-            })
-    return metrics
+    """Sync wrapper for _fetch_metrics_async."""
+    return asyncio.run(_fetch_metrics_async(gh, actors))
 
 
 def _run_flat(gh, accounts: list[str], top: int) -> None:
@@ -185,8 +202,9 @@ def _run_grouped(gh, groups: dict[str, list[str]], store, top: int, show_diff: b
                 seen.add(a)
                 all_actors.append(a)
 
-    # Fetch once
-    metrics_map = {m["actor"]: m for m in _fetch_metrics(gh, all_actors)}
+    # Fetch all metrics concurrently
+    with console.status("[bold green]Fetching account data...[/bold green]"):
+        metrics_map = {m["actor"]: m for m in _fetch_metrics(gh, all_actors)}
 
     # Build per-group metrics
     group_metrics: dict[str, list[dict]] = {}
@@ -207,7 +225,11 @@ def _run_grouped(gh, groups: dict[str, list[str]], store, top: int, show_diff: b
         else:
             console.print("[yellow]暂无历史快照，无法对比趋势[/yellow]")
 
+    # Close client
+    asyncio.run(gh.close())
+
     _render_grouped_table(results, top, show_diff, snap_id)
+    print(f"[GitHub] {gh.rate_limiter.usage_summary()}")
 
 
 def _render_grouped_table(results: list, top: int, show_diff: bool, snap_id: str) -> None:
