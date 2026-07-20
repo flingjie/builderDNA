@@ -2,6 +2,7 @@ __pycache__/
 *.pyc
 .env
 snapshots/*.db
+snapshots/cache/
 output/
 .venv/
 builderdna.egg-info/
