@@ -24,15 +24,15 @@ def build_classification_prompt(
 
     previous_text = ""
     if previous_insights:
-        previous_text = "\nPrevious analysis insights:\n"
+        previous_text = "\n前次分析洞察:\n"
         for pi in previous_insights:
             previous_text += (
-                f"- Tags: {pi['tags']}, Summary: {pi['summary']}, "
-                f"Trend: {pi['trend']}, Strength: {pi['strength']}\n"
+                f"- 标签: {pi['tags']}, 摘要: {pi['summary']}, "
+                f"趋势: {pi['trend']}, 强度: {pi['strength']}\n"
             )
         previous_text += (
-            "\nCompare current clusters with previous insights. "
-            "Update trend to 'rising', 'stable', or 'fading' based on changes.\n"
+            "\n请对比当前聚类与历史洞察，"
+            "根据变化将趋势更新为 'rising'（上升）、'stable'（稳定）或 'fading'（衰退）。\n"
         )
 
     return f"""Analyze the following technical activity data for builder '{actor}'.
@@ -43,13 +43,14 @@ Quantitative signal clusters:
 
 Return a JSON object with an 'insights' array. For each cluster, generate one insight:
 - id: "in_NNN" (sequential)
-- tags: array of technology labels (lowercase, e.g. "llm", "agent", "python")
-- summary: one sentence describing the builder's focus in this area
+- tags: array of technology labels (use lowercase English keywords, e.g. "llm", "agent", "python", "kubernetes")
+- summary: one sentence in CHINESE describing the builder's focus and expertise in this area (use Chinese, be specific and vivid)
 - strength: the cluster's total_weight
 - trend: "rising" if growth_rate > 0.5, "stable" if 0.2-0.5, "fading" if < 0.2
 - signal_count: number of signals
-- evidence: array of key references (repo names, etc.)
+- evidence: array of key references in CHINESE context (repo names can stay English)
 
+IMPORTANT: summary and evidence MUST be written in Chinese.
 Respond with ONLY valid JSON, no markdown fences."""
 
 
@@ -57,9 +58,9 @@ def build_fallback_insights(clusters: list[SignalCluster], actor: str) -> list[I
     """Generate rule-based insights when LLM is unavailable."""
     insights: list[Insight] = []
     for i, c in enumerate(clusters):
-        topic_str = ", ".join(c.topics[:5]) if c.topics else "general development"
-        lang_str = f" (using {', '.join(c.languages)})" if c.languages else ""
-        summary = f"{actor} focuses on {topic_str}{lang_str}"
+        topic_str = ", ".join(c.topics[:5]) if c.topics else "通用开发"
+        lang_str = f"（使用 {', '.join(c.languages)}）" if c.languages else ""
+        summary = f"{actor} 重点关注 {topic_str} 领域{lang_str}"
         trend = "stable"
         if c.growth_rate > 0.5:
             trend = "rising"

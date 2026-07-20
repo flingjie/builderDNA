@@ -24,13 +24,14 @@ Insights:
 
 Return a JSON object with an 'opportunities' array. For each:
 - id: "op_NNN" (sequential)
-- title: concise opportunity name
-- pain_point: the core problem being solved
+- title: concise opportunity name in CHINESE (简短的中文标题)
+- pain_point: the core problem being solved, in CHINESE (中文描述核心痛点)
 - demand_score: 1-5 (how much demand exists)
 - competition_score: 1-5 (how much existing competition; lower = less competition)
-- recommended_action: concrete next step suggestion
+- recommended_action: concrete next step suggestion in CHINESE (中文建议)
 - source_insights: array of the EXACT Insight IDs (copy from "Insight ID:" above) that support this
 
+IMPORTANT: title, pain_point, and recommended_action MUST be written in Chinese.
 Respond with ONLY valid JSON, no markdown fences."""
 
 
@@ -40,10 +41,10 @@ def build_fallback_opportunities(insights: list[Insight]) -> list[Opportunity]:
     for i, ins in enumerate(insights):
         opportunities.append(Opportunity(
             id=f"op_fallback_{i+1}",
-            title=f"Tooling for {', '.join(ins.tags[:3])}",
-            pain_point=f"Builders investing in {', '.join(ins.tags[:3])} may need better tooling",
+            title=f"{', '.join(ins.tags[:3])} 领域工具",
+            pain_point=f"在 {', '.join(ins.tags[:3])} 领域投入较多的开发者可能需要更好的工具支持",
             demand_score=3.0, competition_score=3.0, gap_score=1.0,
-            recommended_action="Explore further", source_insights=[ins.id],
+            recommended_action="进一步探索该方向", source_insights=[ins.id],
         ))
     return opportunities
 

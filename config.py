@@ -1,12 +1,27 @@
 """Configuration system for BuilderDNA.
 
 Loads config.yaml with environment variable substitution (${VAR} syntax).
+Auto-loads .env file if present.
 """
 
 import os
 import re
 from pathlib import Path
 from typing import Literal
+
+
+def _load_dotenv(path: Path) -> None:
+    """Load key=value pairs from a .env file into os.environ."""
+    if not path.exists():
+        return
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith('#') or '=' not in line:
+            continue
+        key, _, val = line.partition('=')
+        key, val = key.strip(), val.strip().strip('"').strip("'")
+        if key not in os.environ:
+            os.environ[key] = val
 
 import yaml
 from pydantic import BaseModel, Field
@@ -64,6 +79,12 @@ class Config(BaseModel):
     """Root configuration for BuilderDNA."""
 
     accounts: list[str] = Field(description="GitHub accounts to analyze")
+    follow_accounts: list[str] = Field(
+        default_factory=list, description="GitHub accounts recommended to follow (flat)"
+    )
+    follow_groups: dict[str, list[str]] = Field(
+        default_factory=dict, description="Follow accounts grouped by domain"
+    )
     github: GitHubConfig
     llm: LLMConfig
     weights: WeightConfig = Field(default_factory=WeightConfig)

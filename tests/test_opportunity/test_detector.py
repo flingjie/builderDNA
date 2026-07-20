@@ -39,7 +39,7 @@ class TestDetect:
         )]
         ops = detect(insights, mock_llm)
         assert len(ops) >= 1
-        assert ops[0].recommended_action == "Explore further"
+        assert ops[0].recommended_action == "进一步探索该方向"
 
     def test_fallback_creates_minimal_ops(self):
         insights = [Insight(

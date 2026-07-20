@@ -58,6 +58,21 @@ class GitHubClient:
         """
         return self._paginate(f"/users/{actor}/repos")
 
+    def get_user(self, actor: str) -> dict[str, Any] | None:
+        """Fetch a GitHub user's profile.
+
+        Args:
+            actor: GitHub username.
+
+        Returns:
+            Raw user dict from GitHub API. None if user not found (404).
+
+        Raises:
+            httpx.HTTPStatusError: On 401 (bad token).
+        """
+        resp = self._request_with_retry("GET", f"/users/{actor}")
+        return resp.json() if resp is not None else None
+
     def get_starred(self, actor: str) -> list[dict[str, Any]]:
         """Fetch repositories starred by the actor.
 

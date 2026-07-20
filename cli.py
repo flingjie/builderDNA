@@ -5,6 +5,8 @@ from pathlib import Path
 
 import click
 from rich.console import Console
+from rich.table import Table
+from rich.text import Text
 
 from config import load_config
 from pipeline import Pipeline
@@ -103,30 +105,196 @@ def snapshots():
 
 
 @main.command()
-@click.argument("snapshot_id_1")
-@click.argument("snapshot_id_2")
-def diff(snapshot_id_1: str, snapshot_id_2: str):
-    """Compare two snapshots by ID."""
-    from collect.store import SignalStore
-    from rich.table import Table
-    store = SignalStore(Path("snapshots") / "builderdna.db")
-    snap1 = store.get_snapshot(snapshot_id_1)
-    snap2 = store.get_snapshot(snapshot_id_2)
+@click.argument("accounts", nargs=-1)
+@click.option("--config", "-c", default=DEFAULT_CONFIG, help="Path to config.yaml")
+@click.option("--top", "-n", default=0, help="Show only top N results per group")
+@click.option("--from-config", is_flag=True, help="Read groups from config.yaml follow_groups")
+@click.option("--diff", is_flag=True, help="Show trend vs last snapshot")
+def follow(accounts: tuple[str], config: str, top: int, from_config: bool, diff: bool):
+    """Evaluate GitHub ACCOUNTS for follow-worthiness by stars and followers."""
+    from collect.github.client import GitHubClient
+    from follow.store import FollowStore
 
-    if not snap1:
-        console.print(f"[red]Snapshot not found: {snapshot_id_1}[/red]"); sys.exit(1)
-    if not snap2:
-        console.print(f"[red]Snapshot not found: {snapshot_id_2}[/red]"); sys.exit(1)
+    cfg = load_config(Path(config))
+    store = FollowStore()
 
-    table = Table(title=f"Diff: {snapshot_id_1} vs {snapshot_id_2}")
-    table.add_column("Metric"); table.add_column(snapshot_id_1)
-    table.add_column(snapshot_id_2); table.add_column("Change")
-    for metric in ["signal_count", "insight_count", "opportunity_count"]:
-        v1 = snap1.get(metric, 0); v2 = snap2.get(metric, 0)
-        change = v2 - v1
-        change_str = f"+{change}" if change > 0 else str(change)
-        table.add_row(metric.replace("_", " ").title(), str(v1), str(v2), change_str)
+    # Determine account list and grouping mode
+    grouped_mode = False
+    if from_config and cfg.follow_groups:
+        grouped_mode = True
+        groups = cfg.follow_groups
+    elif from_config and cfg.follow_accounts:
+        accounts = tuple(cfg.follow_accounts)
+    elif not accounts:
+        console.print("[red]请提供账号列表，或使用 --from-config[/red]")
+        return
+
+    gh = GitHubClient(token=cfg.github.token)
+
+    if grouped_mode:
+        _run_grouped(gh, groups, store, top, diff)
+    else:
+        _run_flat(gh, accounts, top)
+
+
+def _fetch_metrics(gh, actors: list[str]) -> list[dict]:
+    """Fetch stars and followers for a list of actors."""
+    metrics = []
+    with console.status("[bold green]Fetching account data...[/bold green]") as status:
+        for actor in actors:
+            status.update(f"[bold green]Fetching {actor}...[/bold green]")
+            error = ""
+            stars = 0
+            followers = 0
+            try:
+                profile = gh.get_user(actor)
+                if profile is None:
+                    error = f"账号 {actor} 不存在 (404)"
+                else:
+                    followers = profile.get("followers", 0)
+                    repos = gh.get_repos(actor)
+                    stars = sum(r.get("stargazers_count", 0) for r in repos)
+            except Exception as e:
+                error = str(e)
+            metrics.append({
+                "actor": actor, "stars": stars, "followers": followers, "error": error,
+            })
+    return metrics
+
+
+def _run_flat(gh, accounts: list[str], top: int) -> None:
+    """Run flat (non-grouped) evaluation."""
+    from follow.scorer import score
+    metrics = _fetch_metrics(gh, list(accounts))
+    results = score(metrics)
+    if top > 0:
+        results = results[:top]
+    _render_follow_table(results)
+
+
+def _run_grouped(gh, groups: dict[str, list[str]], store, top: int, show_diff: bool) -> None:
+    """Run grouped evaluation with optional trend diff."""
+    from follow.scorer import score_grouped, apply_delta
+
+    # Collect all unique actors
+    all_actors: list[str] = []
+    seen: set[str] = set()
+    for actors in groups.values():
+        for a in actors:
+            if a not in seen:
+                seen.add(a)
+                all_actors.append(a)
+
+    # Fetch once
+    metrics_map = {m["actor"]: m for m in _fetch_metrics(gh, all_actors)}
+
+    # Build per-group metrics
+    group_metrics: dict[str, list[dict]] = {}
+    for group_name, actors in groups.items():
+        group_metrics[group_name] = [metrics_map[a] for a in actors]
+
+    # Score
+    results = score_grouped(group_metrics)
+
+    # Save snapshot
+    snap_id = store.save(results)
+
+    # Apply delta if requested
+    if show_diff:
+        prev = store.get_previous(snap_id)
+        if prev:
+            results = apply_delta(results, prev)
+        else:
+            console.print("[yellow]暂无历史快照，无法对比趋势[/yellow]")
+
+    _render_grouped_table(results, top, show_diff, snap_id)
+
+
+def _render_grouped_table(results: list, top: int, show_diff: bool, snap_id: str) -> None:
+    """Render grouped follow results."""
+    console.print()
+    console.print(Text("GitHub 账号关注价值评估（分组）", style="bold white on blue"))
+    console.print(f"  快照: {snap_id}")
+    if show_diff:
+        console.print("  🔥↑ 涨幅≥10  📉↓ 跌幅≥5")
+    console.print()
+
+    for grp in results:
+        accounts = grp.accounts
+        if top > 0:
+            accounts = accounts[:top]
+
+        # Group header
+        console.print(Text(f"▸ {grp.group_name}", style="bold cyan"))
+        console.print()
+
+        table = Table(show_header=True, box=None, padding=(0, 1))
+        table.add_column("#", justify="right")
+        table.add_column("账号")
+        table.add_column("Stars", justify="right")
+        table.add_column("Followers", justify="right")
+        table.add_column("综合分", justify="right")
+        if show_diff:
+            table.add_column("趋势")
+        table.add_column("建议")
+
+        for i, a in enumerate(accounts, 1):
+            star_str = f"{a.total_stars:,}" if a.total_stars > 0 and not a.error else "-"
+            follower_str = f"{a.followers:,}" if a.followers > 0 and not a.error else "-"
+            score_color = "green" if a.composite >= 60 else "yellow" if a.composite >= 30 else "red"
+            rating = a.rating
+            if a.error:
+                rating = f"❌ {a.error[:30]}"
+            row = [
+                str(i), a.actor, star_str, follower_str,
+                f"[{score_color}]{a.composite:.1f}[/{score_color}]",
+            ]
+            if show_diff and hasattr(a, 'trend'):
+                trend = a.trend
+                if a.delta != 0 and trend:
+                    trend_color = "green" if a.delta > 0 else "red"
+                    trend_str = f"[{trend_color}]{trend} {a.delta:+.1f}[/{trend_color}]"
+                else:
+                    trend_str = trend or "-"
+                row.append(trend_str)
+            row.append(rating)
+            table.add_row(*row)
+
+        console.print(table)
+        console.print()
+
+    console.print("评分规则: Stars 30% + Followers 70%  |  组内独立归一化  |  ≥60 值得  |  30-59 观望  |  <30 暂不")
+
+
+def _render_follow_table(results: list) -> None:
+    """Render flat follow-worthiness results as a Rich table."""
+    console.print()
+    console.print(Text("GitHub 账号关注价值评估", style="bold white on blue"))
+    console.print()
+
+    table = Table(show_header=True, box=None, padding=(0, 1))
+    table.add_column("#", justify="right")
+    table.add_column("账号")
+    table.add_column("Stars", justify="right")
+    table.add_column("Followers", justify="right")
+    table.add_column("综合分", justify="right")
+    table.add_column("建议")
+
+    for i, r in enumerate(results, 1):
+        star_str = f"{r.total_stars:,}" if r.total_stars > 0 and not r.error else "-"
+        follower_str = f"{r.followers:,}" if r.followers > 0 and not r.error else "-"
+        score_color = "green" if r.composite >= 60 else "yellow" if r.composite >= 30 else "red"
+        rating = r.rating
+        if r.error:
+            rating = f"❌ {r.error[:30]}"
+        table.add_row(
+            str(i), r.actor, star_str, follower_str,
+            f"[{score_color}]{r.composite:.1f}[/{score_color}]", rating,
+        )
+
     console.print(table)
+    console.print()
+    console.print("评分规则: Stars 30% + Followers 70%  |  ≥60 值得  |  30-59 观望  |  <30 暂不")
 
 
 if __name__ == "__main__":
