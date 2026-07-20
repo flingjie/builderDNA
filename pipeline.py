@@ -35,13 +35,13 @@ class Pipeline:
         all_signals = self._collect_all(compare)
 
         if not all_signals:
-            return {"snapshot_id": snapshot_id, "signals": [], "insights": [],
-                    "opportunities": [], "diff": None}
+            return {"snapshot_id": snapshot_id, "signals": [], "clusters": [],
+                    "insights": [], "opportunities": [], "diff": None}
 
         self.store.insert_signals(all_signals, snapshot_id)
 
         # Phase 2: Understand
-        insights = self._run_understand(all_signals, compare, snapshot_id)
+        clusters, insights = self._run_understand(all_signals, compare, snapshot_id)
 
         # Phase 3: Recommend
         opportunities = self._run_recommend(insights, snapshot_id)
@@ -55,6 +55,7 @@ class Pipeline:
 
         return {
             "snapshot_id": snapshot_id, "signals": all_signals,
+            "clusters": clusters,
             "insights": insights, "opportunities": opportunities, "diff": diff,
         }
 
@@ -93,7 +94,7 @@ class Pipeline:
             commit=self.config.weights.commit,
         )
 
-    def _run_understand(self, signals: list, compare: bool, snapshot_id: str) -> list:
+    def _run_understand(self, signals: list, compare: bool, snapshot_id: str) -> tuple[list, list]:
         clusters = aggregate(signals)
         self.store.insert_signal_clusters([c.model_dump() for c in clusters], snapshot_id)
         previous = None
@@ -104,7 +105,7 @@ class Pipeline:
         actor = self.config.accounts[0] if self.config.accounts else "unknown"
         insights = classify(clusters, self.llm, actor, previous)
         self.store.insert_insights([i.model_dump() for i in insights], snapshot_id)
-        return insights
+        return clusters, insights
 
     def _run_recommend(self, insights: list, snapshot_id: str) -> list:
         if not insights:

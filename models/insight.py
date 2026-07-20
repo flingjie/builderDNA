@@ -22,6 +22,10 @@ class Insight(BaseModel):
         default_factory=list,
         description="Key evidence: repo names, commit message excerpts",
     )
+    source_cluster_id: str = Field(
+        default="",
+        description="ID of the SignalCluster that generated this insight",
+    )
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
         description="When this insight was generated",

@@ -37,28 +37,30 @@ CREATE TABLE IF NOT EXISTS signals (
 );
 
 CREATE TABLE IF NOT EXISTS signal_clusters (
-    id TEXT PRIMARY KEY,
+    id TEXT,
     snapshot_id TEXT REFERENCES snapshots(id),
     topics TEXT,
     languages TEXT,
     total_weight REAL,
     time_span_days INTEGER,
-    growth_rate REAL
+    growth_rate REAL,
+    PRIMARY KEY (id, snapshot_id)
 );
 
 CREATE TABLE IF NOT EXISTS insights (
-    id TEXT PRIMARY KEY,
+    id TEXT,
     snapshot_id TEXT REFERENCES snapshots(id),
     tags TEXT,
     summary TEXT,
     strength REAL,
     trend TEXT,
     signal_count INTEGER,
-    evidence TEXT
+    evidence TEXT,
+    PRIMARY KEY (id, snapshot_id)
 );
 
 CREATE TABLE IF NOT EXISTS opportunities (
-    id TEXT PRIMARY KEY,
+    id TEXT,
     snapshot_id TEXT REFERENCES snapshots(id),
     title TEXT,
     pain_point TEXT,
@@ -66,7 +68,8 @@ CREATE TABLE IF NOT EXISTS opportunities (
     competition_score REAL,
     gap_score REAL,
     recommended_action TEXT,
-    source_insights TEXT
+    source_insights TEXT,
+    PRIMARY KEY (id, snapshot_id)
 );
 """
 

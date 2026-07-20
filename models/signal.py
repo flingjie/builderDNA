@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from typing import Any
+from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
@@ -35,6 +36,10 @@ class SignalCluster(BaseModel):
     Internal-only — not exposed to output. Feeds into L2 Insight generation.
     """
 
+    id: str = Field(
+        default_factory=lambda: f"cluster_{uuid4().hex[:12]}",
+        description="Unique cluster identifier",
+    )
     signals: list[str] = Field(description="Signal IDs participating in this cluster")
     topics: list[str] = Field(description="Union of all topics across signals")
     languages: list[str] = Field(description="Union of all languages across signals")
@@ -42,4 +47,12 @@ class SignalCluster(BaseModel):
     time_span_days: int = Field(description="Days between earliest and latest signal")
     growth_rate: float = Field(
         description="Recent 30-day weight / total weight. 0.0 to 1.0"
+    )
+    actor_breakdown: dict[str, int] = Field(
+        default_factory=dict,
+        description="Signal count per GitHub account, e.g. {'flingjie': 300}",
+    )
+    top_repos: list[str] = Field(
+        default_factory=list,
+        description="Top 5 repo full_names by signal count in this cluster",
     )

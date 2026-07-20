@@ -102,10 +102,21 @@ def aggregate(signals: list[Signal], window_days: int = RECENT_WINDOW_DAYS) -> l
             )
             growth_rate = recent_weight / total_weight
 
+        # Actor breakdown
+        actor_count: dict[str, int] = defaultdict(int)
+        repo_count: dict[str, int] = defaultdict(int)
+        for s in cluster_signals:
+            actor_count[s.actor] += 1
+            repo = s.meta.get("repo", "") or s.target
+            if repo:
+                repo_count[repo] += 1
+        top_repos = [r for r, _ in sorted(repo_count.items(), key=lambda x: -x[1])[:5]]
+
         result.append(SignalCluster(
             signals=signal_ids, topics=sorted(all_topics),
             languages=sorted(all_languages), total_weight=total_weight,
             time_span_days=time_span, growth_rate=round(growth_rate, 3),
+            actor_breakdown=dict(actor_count), top_repos=top_repos,
         ))
 
     result.sort(key=lambda c: c.total_weight, reverse=True)

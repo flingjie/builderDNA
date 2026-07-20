@@ -13,7 +13,7 @@ def build_detection_prompt(insights: list[Insight]) -> str:
     insight_lines = []
     for i, ins in enumerate(insights):
         insight_lines.append(
-            f"Insight {i+1}:\n  Tags: {ins.tags}\n  Summary: {ins.summary}\n"
+            f"Insight ID: {ins.id}\n  Tags: {ins.tags}\n  Summary: {ins.summary}\n"
             f"  Strength: {ins.strength}\n  Trend: {ins.trend}\n"
             f"  Signal Count: {ins.signal_count}\n  Evidence: {ins.evidence}"
         )
@@ -29,7 +29,7 @@ Return a JSON object with an 'opportunities' array. For each:
 - demand_score: 1-5 (how much demand exists)
 - competition_score: 1-5 (how much existing competition; lower = less competition)
 - recommended_action: concrete next step suggestion
-- source_insights: array of insight IDs that support this
+- source_insights: array of the EXACT Insight IDs (copy from "Insight ID:" above) that support this
 
 Respond with ONLY valid JSON, no markdown fences."""
 

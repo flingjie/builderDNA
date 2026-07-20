@@ -1,5 +1,6 @@
 accounts:
-  - placeholder_username
+  - flingjie
+  - iFurySt
 
 github:
   token: ${GITHUB_TOKEN}

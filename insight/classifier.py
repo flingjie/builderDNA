@@ -69,6 +69,7 @@ def build_fallback_insights(clusters: list[SignalCluster], actor: str) -> list[I
             id=f"in_fallback_{i+1}", tags=c.topics[:5], summary=summary,
             strength=c.total_weight, trend=trend,
             signal_count=len(c.signals), evidence=[],
+            source_cluster_id=c.id,
         ))
     return insights
 
@@ -88,13 +89,15 @@ def classify(
         return build_fallback_insights(clusters, actor)
 
     insights: list[Insight] = []
-    for raw in raw_insights:
+    for i, raw in enumerate(raw_insights):
+        cluster_id = clusters[i].id if i < len(clusters) else ""
         insights.append(Insight(
             id=raw.get("id", f"in_{len(insights)+1}"),
             tags=raw.get("tags", []), summary=raw.get("summary", ""),
             strength=raw.get("strength", 0.0), trend=raw.get("trend", "stable"),
             signal_count=raw.get("signal_count", 0),
             evidence=raw.get("evidence", []),
+            source_cluster_id=cluster_id,
             created_at=datetime.now(timezone.utc),
         ))
     return insights
