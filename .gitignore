@@ -2,6 +2,5 @@ __pycache__/
 *.pyc
 .env
 snapshots/*.db
-output/*.md
-output/*.json
+output/
 .venv/
