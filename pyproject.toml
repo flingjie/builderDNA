@@ -33,3 +33,6 @@ exclude = ["snapshots*", "tests*", "output/*.md", "output/*.json"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+
+[tool.uv]
+index-url = "https://pypi.tuna.tsinghua.edu.cn/simple"
