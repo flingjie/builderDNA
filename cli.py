@@ -10,6 +10,7 @@ from rich.table import Table
 from rich.text import Text
 
 from config import load_config
+from collect.github.client import GitHubClient
 from pipeline import Pipeline
 from output.cli import render as render_cli
 from output.markdown import write_markdown
@@ -113,7 +114,6 @@ def snapshots():
 @click.option("--diff", is_flag=True, help="Show trend vs last snapshot")
 def follow(accounts: tuple[str], config: str, top: int, from_config: bool, diff: bool):
     """Evaluate GitHub ACCOUNTS for follow-worthiness by stars and followers."""
-    from collect.github.client import GitHubClient
     from follow.store import FollowStore
 
     cfg = load_config(Path(config))

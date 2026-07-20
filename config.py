@@ -26,6 +26,9 @@ def _load_dotenv(path: Path) -> None:
 import yaml
 from pydantic import BaseModel, Field
 
+# Auto-load .env file at import time
+_load_dotenv(Path(".env"))
+
 
 class GitHubConfig(BaseModel):
     """GitHub API configuration."""

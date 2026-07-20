@@ -275,11 +275,16 @@ class GitHubClient:
 
     @staticmethod
     def _build_cached_response(body: str, headers: dict) -> httpx.Response:
-        """Build an httpx.Response from cached data."""
+        """Build an httpx.Response from cached data.
+
+        Drop Content-Encoding headers since the cached body is already decoded.
+        """
         request = httpx.Request("GET", "https://api.github.com/")
+        clean_headers = {k: v for k, v in headers.items()
+                         if k.lower() not in ("content-encoding", "transfer-encoding")}
         return httpx.Response(
             status_code=200,
-            headers=headers,
+            headers=clean_headers,
             content=body.encode(),
             request=request,
         )
