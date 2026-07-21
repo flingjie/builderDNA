@@ -92,6 +92,9 @@ class Config(BaseModel):
     follow_groups: dict[str, list[str]] = Field(
         default_factory=dict, description="Follow accounts grouped by domain"
     )
+    domains: dict[str, dict] = Field(
+        default_factory=dict, description="Radar domain configurations (e.g. agent.topics)"
+    )
     github: GitHubConfig
     llm: LLMConfig
     weights: WeightConfig = Field(default_factory=WeightConfig)
