@@ -91,3 +91,24 @@ domains:
       - agent-framework
       - tool-calling
       - multi-agent
+
+discovery:
+  enabled: true
+  schedule: "weekly"
+  max_results: 100
+  min_stars: 100
+  lookback_days: 30
+  language_filter:
+    exclude:
+      - JavaScript
+      - CSS
+      - HTML
+      - PHP
+      - Ruby
+    include:
+      - Python
+      - TypeScript
+      - Rust
+      - Go
+      - C++
+      - Jupyter Notebook

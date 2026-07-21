@@ -82,6 +82,23 @@ class CompareConfig(BaseModel):
     enabled: bool = Field(default=True, description="Enable incremental comparison")
 
 
+class DiscoveryConfig(BaseModel):
+    """Auto-discovery configuration."""
+
+    enabled: bool = Field(default=True, description="Enable auto theme discovery")
+    schedule: str = Field(default="weekly", description="Run frequency: weekly | daily")
+    max_results: int = Field(default=100, ge=10, le=500, description="Max repos per broad search")
+    language_filter: dict = Field(
+        default_factory=lambda: {
+            "exclude": ["JavaScript", "CSS", "HTML", "PHP", "Ruby"],
+            "include": ["Python", "TypeScript", "Rust", "Go", "C++", "Jupyter Notebook"],
+        },
+        description="Language filter: include mode filters to these languages"
+    )
+    min_stars: int = Field(default=100, ge=10, description="Minimum stars for broad search")
+    lookback_days: int = Field(default=30, ge=7, le=90, description="Only repos created within N days")
+
+
 class Config(BaseModel):
     """Root configuration for BuilderDNA."""
 
@@ -101,6 +118,7 @@ class Config(BaseModel):
     output: OutputConfig = Field(default_factory=OutputConfig)
     collect: CollectConfig = Field(default_factory=CollectConfig)
     compare: CompareConfig = Field(default_factory=CompareConfig)
+    discovery: DiscoveryConfig = Field(default_factory=DiscoveryConfig)
 
 
 _ENV_VAR_RE = re.compile(r"\$\{(\w+)\}")
