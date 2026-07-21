@@ -112,3 +112,27 @@ discovery:
       - Go
       - C++
       - Jupyter Notebook
+
+vendors:
+  domestic:
+    - deepseek-ai
+    - QwenLM
+    - THUDM
+    - MoonshotAI
+    - 01-ai
+    - baichuan-inc
+    - MiniMax
+    - Tencent-Hunyuan
+  overseas:
+    - anthropics
+    - langchain-ai
+    - NousResearch
+    - browser-use
+    - crewAIInc
+    - vllm-project
+    - sgl-project
+    - modelcontextprotocol
+    - Significant-Gravitas
+    - firecrawl
+    - infiniflow
+    - langflow-ai

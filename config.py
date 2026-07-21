@@ -99,6 +99,13 @@ class DiscoveryConfig(BaseModel):
     lookback_days: int = Field(default=30, ge=7, le=90, description="Only repos created within N days")
 
 
+class VendorConfig(BaseModel):
+    """Vendor tracking configuration."""
+
+    domestic: list[str] = Field(default_factory=list, description="Domestic vendor GitHub orgs")
+    overseas: list[str] = Field(default_factory=list, description="Overseas vendor GitHub orgs")
+
+
 class Config(BaseModel):
     """Root configuration for BuilderDNA."""
 
@@ -119,6 +126,7 @@ class Config(BaseModel):
     collect: CollectConfig = Field(default_factory=CollectConfig)
     compare: CompareConfig = Field(default_factory=CompareConfig)
     discovery: DiscoveryConfig = Field(default_factory=DiscoveryConfig)
+    vendors: VendorConfig = Field(default_factory=VendorConfig)
 
 
 _ENV_VAR_RE = re.compile(r"\$\{(\w+)\}")
