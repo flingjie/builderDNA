@@ -107,6 +107,64 @@ def snapshots():
 
 
 @main.command()
+@click.argument("domain")
+@click.option("--window", "-w", default=60, help="Time window in days")
+@click.option("--refresh/--no-refresh", default=False, help="Force refresh data")
+@click.option("--web/--no-web", default=True, help="Start web server")
+def radar(domain: str, window: int, refresh: bool, web: bool):
+    """Run Trend Radar analysis for a DOMAIN (e.g. 'agent')."""
+    from backend.dependencies import get_github_client, get_domain_config
+    from backend.store.trend_store import TrendStore
+    from backend.engine.radar import run_radar
+
+    client = get_github_client()
+    store = TrendStore()
+    domain_config = get_domain_config(domain)
+    domain_config.window_days = window
+
+    with console.status(f"[bold green]Scanning {domain}...[/bold green]"):
+        snapshot = asyncio.run(run_radar(client, domain_config, store))
+        asyncio.run(client.close())
+
+    # Terminal summary
+    console.print()
+    console.print(Text(f" BuilderDNA Radar · {domain_config.name} ", style="bold white on blue"))
+    console.print(f" {snapshot.created_at.strftime('%Y-%m-%d')} · Last {window} Days")
+    console.print("─" * 40)
+    console.print()
+
+    # Top 3 topics
+    console.print("[bold]\U0001f525 Top Trends[/bold]\n")
+    for i, t in enumerate(snapshot.topics[:3], 1):
+        emoji = {"accelerating": "\U0001f680", "emerging": "↑", "mainstream": "→", "declining": "↓"}
+        color = {"accelerating": "green", "emerging": "yellow", "mainstream": "dim", "declining": "red"}
+        score_color = color.get(t.stage, "white")
+        console.print(
+            f" {i:>2}  {t.topic:<25} [{score_color}]{t.growth_velocity:>5.0f}[/{score_color}]  "
+            f"{emoji.get(t.stage, '')} {t.stage}"
+        )
+
+    # Emerging signals
+    console.print()
+    console.print("[bold]\U0001f4c8 Emerging Signals[/bold]\n")
+    for t in snapshot.topics:
+        if t.stage in ("accelerating", "emerging"):
+            console.print(f" {emoji.get(t.stage, '↑')} {t.topic:<25} +{t.evidence_count} repos")
+
+    # GitHub stats
+    console.print()
+    console.print(f"[GitHub] {client.rate_limiter.usage_summary()}")
+
+    # Web
+    if web:
+        console.print("\n[bold green]\U0001f4ca Starting web dashboard...[/bold green]")
+        console.print("   Open http://localhost:8000\n")
+        # Start FastAPI server (blocking)
+        import uvicorn
+        uvicorn.run("backend.main:app", host="0.0.0.0", port=8000)
+
+
+@main.command()
 @click.argument("accounts", nargs=-1)
 @click.option("--config", "-c", default=DEFAULT_CONFIG, help="Path to config.yaml")
 @click.option("--top", "-n", default=0, help="Show only top N results per group")
