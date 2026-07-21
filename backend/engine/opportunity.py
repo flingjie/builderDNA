@@ -179,6 +179,14 @@ async def run_opportunity_engine(
     """
     cards = await generate_opportunities(trend_snapshot, pain_snapshot, llm)
 
+    # Attach cross-signal validation to each card
+    from backend.engine.validation import validate_opportunity
+    for card in cards:
+        try:
+            card.validation = validate_opportunity(card, trend_snapshot, pain_snapshot)
+        except Exception:
+            card.validation = None
+
     snapshot = OpportunitySnapshot(
         domain=trend_snapshot.domain,
         cards=cards,
