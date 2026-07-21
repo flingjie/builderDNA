@@ -4,8 +4,6 @@ Runs independently of the fixed-topic Radar pipeline. Uses broad search (no
 predefined topic keywords) to find new repos, clusters them via LLM, and
 rates each cluster's heat.
 """
-import asyncio
-import math
 from datetime import datetime, timezone, timedelta
 
 from config import Config
@@ -129,7 +127,10 @@ async def run_discovery(client, config: Config, llm, store: DiscoveryStore) -> D
 
     if not raw_repos:
         snapshot = DiscoverySnapshot(domain="global", window_days=config.discovery.lookback_days)
-        store.save(snapshot)
+        try:
+            store.save(snapshot)
+        except Exception:
+            pass
         return snapshot
 
     # Step 2: Enrich repos with velocity data (for LLM consumption)
@@ -179,5 +180,8 @@ async def run_discovery(client, config: Config, llm, store: DiscoveryStore) -> D
         window_days=config.discovery.lookback_days,
         themes=themes,
     )
-    store.save(snapshot)
+    try:
+        store.save(snapshot)
+    except Exception:
+        pass
     return snapshot
