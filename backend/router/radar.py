@@ -5,7 +5,10 @@ from backend.dependencies import get_github_client, get_domain_config
 from backend.store.trend_store import TrendStore
 from backend.store.pain_store import PainStore
 from backend.store.opportunity_store import OpportunityStore
-from backend.engine.radar import run_radar
+from backend.store.discovery_store import DiscoveryStore
+from backend.engine.discovery import run_discovery
+from llm.client import OpenAIClient
+from backend.dependencies import get_config
 
 router = APIRouter(prefix="/api")
 
@@ -71,6 +74,57 @@ async def trends(
     raise HTTPException(
         status_code=404, detail=f"Topic '{topic}' not found"
     )
+
+
+@router.get("/explorer")
+async def explorer(
+    domain: str = Query("agent", description="Domain to cross-reference for known topics"),
+    window: int = Query(30, description="Lookback window in days"),
+    refresh: bool = Query(False, description="Force re-run discovery"),
+):
+    """Get auto-discovered emerging themes from the discovery engine."""
+    from backend.dependencies import get_config
+    from backend.store.discovery_store import DiscoveryStore
+    from backend.engine.discovery import run_discovery
+    from llm.client import OpenAIClient
+
+    store = DiscoveryStore()
+    cfg = get_config()
+    cfg.discovery.lookback_days = window
+
+    client = get_github_client()
+    try:
+        if refresh:
+            llm_client = OpenAIClient(
+                api_key=cfg.llm.api_key,
+                model=cfg.llm.model,
+                base_url=cfg.llm.base_url,
+            )
+            snapshot = await run_discovery(client, cfg, llm_client, store)
+        else:
+            snapshot = store.get_latest("global")
+            if snapshot is None:
+                llm_client = OpenAIClient(
+                    api_key=cfg.llm.api_key,
+                    model=cfg.llm.model,
+                    base_url=cfg.llm.base_url,
+                )
+                snapshot = await run_discovery(client, cfg, llm_client, store)
+
+        if snapshot is None:
+            return {"domain": "global", "snapshot_id": "", "generated_at": "", "window_days": window, "themes": []}
+
+        return {
+            "domain": snapshot.domain,
+            "snapshot_id": snapshot.id,
+            "generated_at": snapshot.created_at.isoformat(),
+            "window_days": snapshot.window_days,
+            "themes": [t.model_dump() for t in snapshot.themes],
+        }
+    except Exception:
+        return {"domain": "global", "snapshot_id": "", "generated_at": "", "window_days": window, "themes": []}
+    finally:
+        await client.close()
 
 
 @router.get("/pain")

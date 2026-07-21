@@ -38,3 +38,9 @@ def get_domain_config(domain: str):
         )
     # Fallback: treat domain as topic list from config
     return DomainConfig(name=domain, topics=[domain])
+
+
+def get_discovery_store() -> "DiscoveryStore":
+    from backend.store.discovery_store import DiscoveryStore
+
+    return DiscoveryStore()
