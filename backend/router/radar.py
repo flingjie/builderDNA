@@ -4,6 +4,7 @@ from fastapi import APIRouter, Query, HTTPException
 from backend.dependencies import get_github_client, get_domain_config
 from backend.store.trend_store import TrendStore
 from backend.store.pain_store import PainStore
+from backend.store.opportunity_store import OpportunityStore
 from backend.engine.radar import run_radar
 
 router = APIRouter(prefix="/api")
@@ -79,3 +80,30 @@ async def pain(domain: str = Query(...)):
     if snapshot is None:
         raise HTTPException(status_code=404, detail=f"No pain data for domain '{domain}'")
     return snapshot.model_dump()
+
+
+@router.get("/opportunities")
+async def opportunities(domain: str = Query("agent")):
+    """Get latest opportunity cards for a domain."""
+    store = OpportunityStore()
+    snapshot = store.get_latest(domain)
+    if snapshot is None:
+        return {"cards": []}
+    return {"cards": [c.model_dump() for c in snapshot.cards]}
+
+
+@router.get("/evidence/{opportunity_id}")
+async def evidence(opportunity_id: str, domain: str = Query("agent")):
+    """Get detailed evidence for a specific opportunity."""
+    store = OpportunityStore()
+    snapshot = store.get_latest(domain)
+    if snapshot is None:
+        raise HTTPException(status_code=404, detail="No opportunity data")
+
+    for card in snapshot.cards:
+        if card.id == opportunity_id:
+            return {
+                "card": card.model_dump(),
+                "evidence": card.evidence.model_dump(),
+            }
+    raise HTTPException(status_code=404, detail=f"Opportunity '{opportunity_id}' not found")

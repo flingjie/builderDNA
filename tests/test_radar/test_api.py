@@ -49,3 +49,15 @@ class TestRadarAPI:
         """Pain endpoint should return 200 or 404."""
         resp = client.get("/api/pain?domain=agent")
         assert resp.status_code in (200, 404)
+
+    def test_opportunities_endpoint(self, client):
+        """Opportunities endpoint should return cards structure."""
+        resp = client.get("/api/opportunities?domain=agent")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "cards" in data
+
+    def test_evidence_endpoint_not_found(self, client):
+        """Evidence endpoint should return 404 for nonexistent opportunity."""
+        resp = client.get("/api/evidence/nonexistent?domain=agent")
+        assert resp.status_code == 404
