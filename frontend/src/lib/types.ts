@@ -79,3 +79,23 @@ export interface RadarResponse {
   rate_limit: { calls: number };
   topics: TopicTrend[];
 }
+
+export interface DiscoveredTheme {
+  topic: string;
+  description: string;
+  repo_count: number;
+  avg_stars: number;
+  velocity: number;
+  stage: "emerging" | "accelerating" | "stable" | "cooling";
+  sample_repos: string[];
+  is_new: boolean;
+  suggested_as_topic: boolean;
+}
+
+export interface ExplorerResponse {
+  domain: string;
+  snapshot_id: string;
+  generated_at: string;
+  window_days: number;
+  themes: DiscoveredTheme[];
+}

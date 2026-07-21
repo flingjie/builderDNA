@@ -1,4 +1,4 @@
-import type { PainResponse, RadarResponse } from "./types";
+import type { ExplorerResponse, PainResponse, RadarResponse } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -11,6 +11,18 @@ export async function fetchRadar(
   if (refresh) params.set("refresh", "true");
   const res = await fetch(`${API_BASE}/api/radar?${params}`);
   if (!res.ok) throw new Error(`Radar fetch failed: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchExplorer(
+  domain: string = "agent",
+  window: number = 30,
+  refresh: boolean = false
+): Promise<ExplorerResponse> {
+  const params = new URLSearchParams({ domain, window: String(window) });
+  if (refresh) params.set("refresh", "true");
+  const res = await fetch(`${API_BASE}/api/explorer?${params}`);
+  if (!res.ok) return { domain: "global", snapshot_id: "", generated_at: "", window_days: window, themes: [] };
   return res.json();
 }
 

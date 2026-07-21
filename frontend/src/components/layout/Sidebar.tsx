@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 const navItems = [
   { href: "/", label: "Executive Radar" },
   { href: "/trends", label: "Trend Landscape" },
+  { href: "/explorer", label: "Theme Explorer" },
   { href: "/opportunities", label: "Opportunity Map" },
 ];
 
