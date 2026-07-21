@@ -1,31 +1,16 @@
 """FastAPI dependency injection."""
-import os
 from functools import lru_cache
+from pathlib import Path
 
 from collect.github.client import GitHubClient
-from config import load_config, Config
+from config import load_config, Config, _load_dotenv
 
 
 @lru_cache()
 def get_config() -> Config:
     """Load config once and cache."""
-    _load_dotenv()
+    _load_dotenv(Path(".env"))
     return load_config("config.yaml")
-
-
-def _load_dotenv():
-    from pathlib import Path
-    env_file = Path(".env")
-    if not env_file.exists():
-        return
-    for line in env_file.read_text().splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, _, val = line.partition("=")
-        key, val = key.strip(), val.strip().strip('"').strip("'")
-        if key not in os.environ:
-            os.environ[key] = val
 
 
 def get_github_client() -> GitHubClient:

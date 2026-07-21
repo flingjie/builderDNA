@@ -180,55 +180,47 @@ async def run_radar(client, domain_config: DomainConfig, store) -> TrendSnapshot
     )
     store.save(snapshot)
 
-    # ── Phase 2: Pain Mining on top trend repos ──
+    # ── Phase 2 + 3: Pain Mining + Opportunity Intelligence ──
     top_repos: list[str] = []
     seen_repos: set[str] = set()
-    for topic in all_topics[:3]:  # top 3 topics
-        for repo in topic.top_repos[:2]:  # top 2 repos per topic
+    for topic in all_topics[:3]:
+        for repo in topic.top_repos[:2]:
             if repo.full_name not in seen_repos:
                 seen_repos.add(repo.full_name)
                 top_repos.append(repo.full_name)
-    top_repos = top_repos[:5]  # cap at 5
+    top_repos = top_repos[:5]
 
     if top_repos:
-        try:
-            from backend.engine.pain import run_pain_mining
-            from backend.store.pain_store import PainStore
-            from llm.client import OpenAIClient
-            from config import load_config
-
-            cfg = load_config("config.yaml")
-            llm_client = OpenAIClient(
-                api_key=cfg.llm.api_key,
-                model=cfg.llm.model,
-                base_url=cfg.llm.base_url,
-            )
-            pain_store = PainStore()
-            await run_pain_mining(client, top_repos, llm_client, pain_store)
-        except Exception as e:
-            print(f"[Pain Mining] Skipped: {e}")
-
-    # ── Phase 3: Opportunity Intelligence ──
-    try:
+        import traceback
+        from backend.engine.pain import run_pain_mining
         from backend.engine.opportunity import run_opportunity_engine
-        from backend.store.opportunity_store import OpportunityStore
         from backend.store.pain_store import PainStore
+        from backend.store.opportunity_store import OpportunityStore
         from llm.client import OpenAIClient
         from config import load_config
 
-        trend_snapshot = store.get_latest(domain_config.name)
-        pain_snapshot = PainStore().get_latest(domain_config.name)
+        cfg = load_config("config.yaml")
+        llm_client = OpenAIClient(
+            api_key=cfg.llm.api_key,
+            model=cfg.llm.model,
+            base_url=cfg.llm.base_url,
+        )
 
-        if trend_snapshot and pain_snapshot:
-            cfg = load_config("config.yaml")
-            llm_client = OpenAIClient(
-                api_key=cfg.llm.api_key,
-                model=cfg.llm.model,
-                base_url=cfg.llm.base_url,
-            )
-            opp_store = OpportunityStore()
-            await run_opportunity_engine(trend_snapshot, pain_snapshot, llm_client, opp_store)
-    except Exception as e:
-        print(f"[Opportunity] Skipped: {e}")
+        # Phase 2: Pain Mining
+        try:
+            pain_store = PainStore()
+            await run_pain_mining(client, top_repos, llm_client, pain_store)
+        except Exception:
+            print(f"[Pain Mining] Failed:\n{traceback.format_exc()}")
+
+        # Phase 3: Opportunity Intelligence
+        try:
+            trend_snapshot = store.get_latest(domain_config.name)
+            pain_snapshot = PainStore().get_latest(domain_config.name)
+            if trend_snapshot and pain_snapshot:
+                opp_store = OpportunityStore()
+                await run_opportunity_engine(trend_snapshot, pain_snapshot, llm_client, opp_store)
+        except Exception:
+            print(f"[Opportunity] Failed:\n{traceback.format_exc()}")
 
     return snapshot

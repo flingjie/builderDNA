@@ -41,13 +41,12 @@ async def fetch_issues(client, repo: str, max_issues: int = 20) -> list[dict]:
             # Skip pull requests, only want issues
             continue
 
-        # Count participants: issue author + commenters (approximate via comments count)
+        # Estimate unique participants: author + min(comments, 5) as upper bound
+        # A single person posting N comments is 1 participant, not N
         comments = issue.get("comments", 0)
+        participants = 1 + min(comments, 5)
         user = issue.get("user", {})
         user_login = user.get("login", "") if isinstance(user, dict) else "unknown"
-
-        # Approximate participants: author + commenters (comments + 1 since we count author)
-        participants = 1 + comments
 
         extracted.append({
             "repo": repo,
@@ -231,42 +230,6 @@ Return JSON: {{"clusters": [{{"title": "≤5 words", "root_cause": "1 sentence w
         )
 
     return result
-
-
-def _build_pain_issue_prompt(issues: list[dict]) -> str:
-    """Build the prompt for scoring issues."""
-    issues_list = []
-    for issue in issues:
-        repo = issue.get("repo", "")
-        num = issue.get("issue_number", 0)
-        title = issue.get("title", "")[:100]
-        body = issue.get("body", "")[:200]
-        issues_list.append(f"#{num} [{repo}] {title}: {body}")
-    return f"""Rate the pain level (1-5) of each GitHub issue below.
-5 = critical, blocking production, no workaround. 3 = annoying, slows development. 1 = minor, cosmetic.
-Be strict — most issues should be 2-3.
-
-Issues:
-{chr(10).join(issues_list)}
-
-Return JSON: {{"scores": [{{"issue_number": N, "score": S, "key_phrase": "brief pain phrase"}}, ...]}}
-"""
-
-
-def _build_cluster_prompt(issues: list[PainIssue]) -> str:
-    """Build the prompt for clustering issues."""
-    issues_list = []
-    for issue in issues:
-        title = issue.title[:80]
-        score = int(issue.pain_score) if issue.pain_score < 5 else 5
-        issues_list.append(f"#{issue.issue_number} [score={score}]: {title}")
-    return f"""Group these developer pain points into 3-5 patterns. Each pattern = a recurring pain.
-
-Issues (with scores):
-{chr(10).join(issues_list)}
-
-Return JSON: {{"clusters": [{{"title": "≤5 words", "root_cause": "1 sentence why", "issue_numbers": [N,N], "severity": avg_score}}]}}
-"""
 
 
 async def run_pain_mining(client, top_repos: list[str], llm, store) -> PainSnapshot:

@@ -122,9 +122,13 @@ def radar(domain: str, window: int, refresh: bool, web: bool):
     domain_config = get_domain_config(domain)
     domain_config.window_days = window
 
+    async def _run_radar():
+        snapshot = await run_radar(client, domain_config, store)
+        await client.close()
+        return snapshot
+
     with console.status(f"[bold green]Scanning {domain}...[/bold green]"):
-        snapshot = asyncio.run(run_radar(client, domain_config, store))
-        asyncio.run(client.close())
+        snapshot = asyncio.run(_run_radar())
 
     # Terminal summary
     console.print()

@@ -3,8 +3,6 @@ import pytest
 from unittest.mock import MagicMock, AsyncMock
 
 from backend.engine.pain import (
-    _build_pain_issue_prompt,
-    _build_cluster_prompt,
     _compute_pain_score,
     _issue_to_pain_issue,
     fetch_issues,
@@ -146,7 +144,7 @@ class TestFetchIssues:
         assert result[0]["issue_number"] == 1
         assert result[0]["title"] == "Crash on startup"
         assert result[0]["comments"] == 10
-        assert result[0]["participants"] == 11  # 1 + comments
+        assert result[0]["participants"] == 6  # 1 + min(10, 5)
         assert result[0]["labels"] == ["bug", "critical"]
 
     @pytest.mark.asyncio
@@ -329,28 +327,6 @@ class TestClusterPains:
         assert len(result) == 1
         assert result[0].frequency == 0  # No matching issues
         assert result[0].affected_repos == []
-
-
-class TestBuildPrompts:
-    def test_build_score_prompt(self):
-        """Build scoring prompt correctly."""
-        issues = [
-            {"repo": "a/b", "issue_number": 1, "title": "Crash", "body": "Long body text" * 20},
-        ]
-        prompt = _build_pain_issue_prompt(issues)
-        assert "Rate the pain level (1-5)" in prompt
-        assert "#1 [a/b]" in prompt
-        assert "Crash" in prompt
-
-    def test_build_cluster_prompt(self):
-        """Build clustering prompt correctly."""
-        issues = [
-            PainIssue(repo="a/b", issue_number=1, title="Crash", pain_score=4.5, labels=[]),
-        ]
-        prompt = _build_cluster_prompt(issues)
-        assert "Group these developer pain points" in prompt
-        assert "#1 [score=4]" in prompt
-        assert "Crash" in prompt
 
 
 class TestRunPainMining:

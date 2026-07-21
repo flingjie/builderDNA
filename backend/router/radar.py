@@ -42,7 +42,7 @@ async def radar(
             "snapshot_id": snapshot.id,
             "generated_at": snapshot.created_at.isoformat(),
             "window_days": snapshot.window_days,
-            "rate_limit": {"calls": client.rate_limiter._total_calls},
+            "rate_limit": {"summary": client.rate_limiter.usage_summary()},
             "topics": [t.model_dump() for t in snapshot.topics],
         }
     except NotImplementedError:
