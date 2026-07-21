@@ -137,17 +137,24 @@ def aggregate_topic(repos: list[RepoTrend], topic: str) -> TopicTrend:
 async def collect_topic_data(client, topic: str, max_results: int = 30) -> list[dict]:
     """Fetch repos for a topic from GitHub Search API.
 
-    Returns list of raw repo dicts with stars, forks, created_at, etc.
+    Limited to 1 page (30 results) to avoid hitting GitHub Search API's
+    secondary rate limit (30 req/min) and 1000-result cap.
     """
-    params = {
-        "q": f"topic:{topic}",
-        "sort": "stars",
-        "order": "desc",
-        "per_page": str(max_results),
-    }
     try:
-        results = await client._paginate("/search/repositories", extra_params=params)
-        return results
+        # Use client._request directly to avoid deep pagination on search API
+        params: dict[str, str] = {
+            "q": f"topic:{topic}",
+            "sort": "stars",
+            "order": "desc",
+            "per_page": str(max_results),
+        }
+        resp = await client._request("GET", "/search/repositories", params=params)
+        if resp is None:
+            return []
+        data = resp.json()
+        if isinstance(data, dict) and "items" in data:
+            return data["items"]
+        return data if isinstance(data, list) else []
     except Exception:
         return []
 
