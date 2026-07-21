@@ -3,6 +3,7 @@ from fastapi import APIRouter, Query, HTTPException
 
 from backend.dependencies import get_github_client, get_domain_config
 from backend.store.trend_store import TrendStore
+from backend.store.pain_store import PainStore
 from backend.engine.radar import run_radar
 
 router = APIRouter(prefix="/api")
@@ -69,3 +70,12 @@ async def trends(
     raise HTTPException(
         status_code=404, detail=f"Topic '{topic}' not found"
     )
+
+
+@router.get("/pain")
+async def pain(domain: str = Query(...)):
+    store = PainStore()
+    snapshot = store.get_latest(domain)
+    if snapshot is None:
+        raise HTTPException(status_code=404, detail=f"No pain data for domain '{domain}'")
+    return snapshot.model_dump()

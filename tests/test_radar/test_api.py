@@ -44,3 +44,8 @@ class TestRadarAPI:
         """Health endpoint should reject POST."""
         resp = client.post("/api/health")
         assert resp.status_code == 405
+
+    def test_pain_endpoint(self, client):
+        """Pain endpoint should return 200 or 404."""
+        resp = client.get("/api/pain?domain=agent")
+        assert resp.status_code in (200, 404)
