@@ -174,23 +174,25 @@ async def _fetch_metrics_async(gh: GitHubClient, actors: list[str]) -> list[dict
     return await asyncio.gather(*[fetch_one(a) for a in actors])
 
 
-def _fetch_metrics(gh, actors: list[str]) -> list[dict]:
-    """Sync wrapper for _fetch_metrics_async."""
-    return asyncio.run(_fetch_metrics_async(gh, actors))
-
-
-def _run_flat(gh, accounts: list[str], top: int) -> None:
-    """Run flat (non-grouped) evaluation."""
+async def _run_flat_async(gh, accounts: list[str], top: int) -> None:
+    """Run flat (non-grouped) evaluation (async core)."""
     from follow.scorer import score
-    metrics = _fetch_metrics(gh, list(accounts))
+    metrics = await _fetch_metrics_async(gh, list(accounts))
     results = score(metrics)
     if top > 0:
         results = results[:top]
+    await gh.close()
     _render_follow_table(results)
+    print(f"[GitHub] {gh.rate_limiter.usage_summary()}")
 
 
-def _run_grouped(gh, groups: dict[str, list[str]], store, top: int, show_diff: bool) -> None:
-    """Run grouped evaluation with optional trend diff."""
+def _run_flat(gh, accounts: list[str], top: int) -> None:
+    """Sync entry for flat evaluation."""
+    asyncio.run(_run_flat_async(gh, accounts, top))
+
+
+async def _run_grouped_async(gh, groups: dict[str, list[str]], store, top: int, show_diff: bool) -> None:
+    """Run grouped evaluation with optional trend diff (async core)."""
     from follow.scorer import score_grouped, apply_delta
 
     # Collect all unique actors
@@ -203,8 +205,9 @@ def _run_grouped(gh, groups: dict[str, list[str]], store, top: int, show_diff: b
                 all_actors.append(a)
 
     # Fetch all metrics concurrently
-    with console.status("[bold green]Fetching account data...[/bold green]"):
-        metrics_map = {m["actor"]: m for m in _fetch_metrics(gh, all_actors)}
+    console.status("[bold green]Fetching account data...[/bold green]")
+    metrics = await _fetch_metrics_async(gh, all_actors)
+    metrics_map = {m["actor"]: m for m in metrics}
 
     # Build per-group metrics
     group_metrics: dict[str, list[dict]] = {}
@@ -226,10 +229,15 @@ def _run_grouped(gh, groups: dict[str, list[str]], store, top: int, show_diff: b
             console.print("[yellow]暂无历史快照，无法对比趋势[/yellow]")
 
     # Close client
-    asyncio.run(gh.close())
+    await gh.close()
 
     _render_grouped_table(results, top, show_diff, snap_id)
     print(f"[GitHub] {gh.rate_limiter.usage_summary()}")
+
+
+def _run_grouped(gh, groups: dict[str, list[str]], store, top: int, show_diff: bool) -> None:
+    """Sync entry for grouped evaluation."""
+    asyncio.run(_run_grouped_async(gh, groups, store, top, show_diff))
 
 
 def _render_grouped_table(results: list, top: int, show_diff: bool, snap_id: str) -> None:
