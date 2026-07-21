@@ -10,7 +10,7 @@ const stageConfig: Record<string, { emoji: string; color: string }> = {
   declining: { emoji: "↓", color: "bg-red-500/10 text-red-400" },
 };
 
-export function RadarCard({ topic }: { topic: TopicTrend }) {
+export function RadarCard({ topic, vendorCount }: { topic: TopicTrend; vendorCount?: number }) {
   const cfg = stageConfig[topic.stage] || stageConfig.mainstream;
 
   return (
@@ -21,6 +21,11 @@ export function RadarCard({ topic }: { topic: TopicTrend }) {
             <div className="flex items-center gap-2 mb-1">
               <span className="text-lg font-semibold">{topic.topic}</span>
               <Badge className={cfg.color}>{topic.stage}</Badge>
+              {vendorCount != null && vendorCount > 0 && (
+                <Badge variant="outline" className="text-xs text-zinc-500">
+                  {vendorCount} vendor{vendorCount > 1 ? "s" : ""}
+                </Badge>
+              )}
             </div>
             <div className="text-sm text-zinc-500">
               {topic.evidence_count} repos &middot; {topic.growth_velocity.toFixed(1)} stars/day
