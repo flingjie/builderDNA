@@ -5,6 +5,14 @@ export interface OpportunityEvidence {
   key_repos: string[];
 }
 
+export interface ValidationResult {
+  demand_score: number;
+  supply_score: number;
+  adoption_score: number;
+  confidence: "high" | "medium" | "low";
+  summary: string;
+}
+
 export interface OpportunityCard {
   id: string;
   title: string;
@@ -16,6 +24,7 @@ export interface OpportunityCard {
   mvp: string;
   score: number;
   risk: "low" | "medium" | "high";
+  validation?: ValidationResult | null;
 }
 
 export interface PainIssue {

@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ArrowUp, AlertTriangle, Sparkles, Lightbulb, Target } from "lucide-react";
 import type { OpportunityCard as OpportunityCardType } from "@/lib/types";
+import { ValidationBadge } from "./ValidationBadge";
 
 function scoreColor(score: number): string {
   if (score >= 8) return "bg-emerald-500/10 text-emerald-400";
@@ -58,6 +59,7 @@ export function OpportunityCard({ card }: { card: OpportunityCardType }) {
               <Badge className={riskColor(card.risk)}>
                 {card.risk} risk
               </Badge>
+              <ValidationBadge validation={card.validation} />
             </div>
           </div>
         </div>
