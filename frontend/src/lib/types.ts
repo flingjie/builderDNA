@@ -1,3 +1,23 @@
+export interface OpportunityEvidence {
+  trends: string[];
+  pain_clusters: string[];
+  key_issues: string[];
+  key_repos: string[];
+}
+
+export interface OpportunityCard {
+  id: string;
+  title: string;
+  why_now: string;
+  problem: string;
+  evidence: OpportunityEvidence;
+  existing_solutions: string[];
+  gap: string;
+  mvp: string;
+  score: number;
+  risk: "low" | "medium" | "high";
+}
+
 export interface PainIssue {
   repo: string;
   issue_number: number;

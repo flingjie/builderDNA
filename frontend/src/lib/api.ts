@@ -20,6 +20,18 @@ export async function fetchPain(domain: string = "agent"): Promise<PainResponse>
   return res.json();
 }
 
+export async function fetchOpportunities(domain: string = "agent") {
+  const res = await fetch(`${API_BASE}/api/opportunities?domain=${domain}`);
+  if (!res.ok) return { cards: [] };
+  return res.json();
+}
+
+export async function fetchEvidence(id: string, domain: string = "agent") {
+  const res = await fetch(`${API_BASE}/api/evidence/${id}?domain=${domain}`);
+  if (!res.ok) throw new Error("Not found");
+  return res.json();
+}
+
 export async function fetchHealth(): Promise<{ status: string }> {
   const res = await fetch(`${API_BASE}/api/health`);
   return res.json();
