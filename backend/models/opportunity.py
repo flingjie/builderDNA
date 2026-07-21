@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from typing import Literal
 from uuid import uuid4
 
+from backend.models.validation import ValidationResult
 from pydantic import BaseModel, Field
 
 
@@ -23,6 +24,7 @@ class OpportunityCard(BaseModel):
     gap: str = ""
     mvp: str = ""
     score: float = 0.0
+    validation: ValidationResult | None = Field(default=None, description="Cross-signal demand validation")
     risk: Literal["low", "medium", "high"] = "medium"
 
 
