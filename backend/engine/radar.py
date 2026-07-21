@@ -179,4 +179,33 @@ async def run_radar(client, domain_config: DomainConfig, store) -> TrendSnapshot
         topics=all_topics,
     )
     store.save(snapshot)
+
+    # ── Phase 2: Pain Mining on top trend repos ──
+    top_repos: list[str] = []
+    seen_repos: set[str] = set()
+    for topic in all_topics[:3]:  # top 3 topics
+        for repo in topic.top_repos[:2]:  # top 2 repos per topic
+            if repo.full_name not in seen_repos:
+                seen_repos.add(repo.full_name)
+                top_repos.append(repo.full_name)
+    top_repos = top_repos[:5]  # cap at 5
+
+    if top_repos:
+        try:
+            from backend.engine.pain import run_pain_mining
+            from backend.store.pain_store import PainStore
+            from llm.client import OpenAIClient
+            from config import load_config
+
+            cfg = load_config("config.yaml")
+            llm_client = OpenAIClient(
+                api_key=cfg.llm.api_key,
+                model=cfg.llm.model,
+                base_url=cfg.llm.base_url,
+            )
+            pain_store = PainStore()
+            await run_pain_mining(client, top_repos, llm_client, pain_store)
+        except Exception as e:
+            print(f"[Pain Mining] Skipped: {e}")
+
     return snapshot
