@@ -1,4 +1,4 @@
-import type { ExplorerResponse, PainResponse, RadarResponse } from "./types";
+import type { ExplorerResponse, PainResponse, RadarResponse, VendorProfile, VendorDiff } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -46,5 +46,24 @@ export async function fetchEvidence(id: string, domain: string = "agent") {
 
 export async function fetchHealth(): Promise<{ status: string }> {
   const res = await fetch(`${API_BASE}/api/health`);
+  return res.json();
+}
+
+export async function fetchVendors(tag?: string): Promise<{ profiles: VendorProfile[]; count: number }> {
+  const params = tag ? `?tag=${tag}` : "";
+  const res = await fetch(`${API_BASE}/api/vendors${params}`);
+  if (!res.ok) return { profiles: [], count: 0 };
+  return res.json();
+}
+
+export async function fetchVendorDetail(name: string): Promise<VendorProfile> {
+  const res = await fetch(`${API_BASE}/api/vendors/${name}`);
+  if (!res.ok) throw new Error("Vendor not found");
+  return res.json();
+}
+
+export async function fetchCompare(): Promise<{ diffs: VendorDiff[] }> {
+  const res = await fetch(`${API_BASE}/api/compare`);
+  if (!res.ok) return { diffs: [] };
   return res.json();
 }

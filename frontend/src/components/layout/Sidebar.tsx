@@ -7,6 +7,7 @@ const navItems = [
   { href: "/", label: "Executive Radar" },
   { href: "/trends", label: "Trend Landscape" },
   { href: "/explorer", label: "Theme Explorer" },
+  { href: "/vendors", label: "Vendor Radar" },
   { href: "/opportunities", label: "Opportunity Map" },
 ];
 

@@ -99,3 +99,36 @@ export interface ExplorerResponse {
   window_days: number;
   themes: DiscoveredTheme[];
 }
+
+export interface VendorDirection {
+  topic: string;
+  intensity: number;
+  trend: "↑" | "→" | "↓";
+}
+
+export interface VendorSignal {
+  type: string;
+  repo: string;
+  timestamp: string;
+}
+
+export interface VendorProfile {
+  name: string;
+  display_name: string;
+  accounts: string[];
+  tags: string[];
+  comparison_group: string;
+  active_directions: VendorDirection[];
+  recent_signals: VendorSignal[];
+  total_public_repos: number;
+  total_stars: number;
+}
+
+export interface VendorDiff {
+  dimension: string;
+  domestic_summary: string;
+  overseas_summary: string;
+  common_patterns: string;
+  domestic_vendors: string[];
+  overseas_vendors: string[];
+}
