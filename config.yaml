@@ -79,3 +79,15 @@ collect:
 
 compare:
   enabled: true
+
+domains:
+  agent:
+    topics:
+      - mcp
+      - langchain
+      - agent-protocol
+      - llm
+      - rag
+      - agent-framework
+      - tool-calling
+      - multi-agent
