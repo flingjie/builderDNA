@@ -1,4 +1,32 @@
-/* Types matching backend models from backend/models/trend.py */
+export interface PainIssue {
+  repo: string;
+  issue_number: number;
+  title: string;
+  body: string;
+  comments: number;
+  participants: number;
+  pain_score: number;
+  labels: string[];
+  url: string;
+}
+
+export interface PainCluster {
+  id: string;
+  title: string;
+  severity: number;
+  frequency: number;
+  description: string;
+  evidence: PainIssue[];
+  affected_repos: string[];
+}
+
+export interface PainResponse {
+  id: string;
+  domain: string;
+  clusters: PainCluster[];
+  issue_count: number;
+  repos_analyzed: string[];
+}
 
 export interface RepoTrend {
   full_name: string;

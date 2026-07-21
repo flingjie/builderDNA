@@ -1,4 +1,4 @@
-import type { RadarResponse } from "./types";
+import type { PainResponse, RadarResponse } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -11,6 +11,12 @@ export async function fetchRadar(
   if (refresh) params.set("refresh", "true");
   const res = await fetch(`${API_BASE}/api/radar?${params}`);
   if (!res.ok) throw new Error(`Radar fetch failed: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchPain(domain: string = "agent"): Promise<PainResponse> {
+  const res = await fetch(`${API_BASE}/api/pain?domain=${domain}`);
+  if (!res.ok) return { clusters: [], issue_count: 0, repos_analyzed: [], id: "", domain };
   return res.json();
 }
 
