@@ -208,4 +208,27 @@ async def run_radar(client, domain_config: DomainConfig, store) -> TrendSnapshot
         except Exception as e:
             print(f"[Pain Mining] Skipped: {e}")
 
+    # ── Phase 3: Opportunity Intelligence ──
+    try:
+        from backend.engine.opportunity import run_opportunity_engine
+        from backend.store.opportunity_store import OpportunityStore
+        from backend.store.pain_store import PainStore
+        from llm.client import OpenAIClient
+        from config import load_config
+
+        trend_snapshot = store.get_latest(domain_config.name)
+        pain_snapshot = PainStore().get_latest(domain_config.name)
+
+        if trend_snapshot and pain_snapshot:
+            cfg = load_config("config.yaml")
+            llm_client = OpenAIClient(
+                api_key=cfg.llm.api_key,
+                model=cfg.llm.model,
+                base_url=cfg.llm.base_url,
+            )
+            opp_store = OpportunityStore()
+            await run_opportunity_engine(trend_snapshot, pain_snapshot, llm_client, opp_store)
+    except Exception as e:
+        print(f"[Opportunity] Skipped: {e}")
+
     return snapshot
