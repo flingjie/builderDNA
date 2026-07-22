@@ -20,6 +20,8 @@ DEMAND_SET = set(DEMAND_LABELS)
 async def _run_collect(
     domain: str, window: int, output: str, config_path: str
 ) -> None:
+    # TODO: window param is not yet passed to downstream fetchers (fetch_top_repos,
+    # fetch_issues). Wire through once they support time-based filtering.
     cfg = load_config(config_path)
     domain_config = cfg.domains.get(domain)
     if not domain_config:
@@ -40,6 +42,7 @@ async def _run_collect(
 
     try:
         # Step 1: Topic repos
+        # TODO: pass window to fetch_top_repos once it supports time-based filtering
         for topic in topics:
             repos = await fetch_top_repos(client, topic)
             for r in repos:
@@ -50,7 +53,7 @@ async def _run_collect(
                 all_repos.append(r)
 
         # Step 2: Demand issues from top repos
-        top_names = [r["full_name"] for r in all_repos[:5] if r.get("full_name")]
+        top_names = [r.get("full_name", "") for r in all_repos[:5] if r.get("full_name")]
         issue_tasks = [fetch_issues(client, name, max_issues=30) for name in top_names]
         issue_results = await asyncio.gather(*issue_tasks, return_exceptions=True)
         for issues in issue_results:
@@ -72,7 +75,7 @@ async def _run_collect(
             vendor_accounts.append((account, "overseas"))
 
         seen_vendor: set[str] = set()
-        for account, tag in vendor_accounts:
+        for account, _ in vendor_accounts:
             if account in seen_vendor:
                 continue
             seen_vendor.add(account)
@@ -84,8 +87,8 @@ async def _run_collect(
                     if fn not in seen_repos:
                         seen_repos.add(fn)
                         all_repos.append(r)
-            except Exception:
-                pass
+            except Exception as e:
+                console.print(f"[yellow]Warning: failed to fetch repos for {account}: {e}[/yellow]")
     finally:
         await client.close()
 
