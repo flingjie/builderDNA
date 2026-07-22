@@ -1,5 +1,5 @@
 """Repo & Release collector for BuilderDNA 2.0."""
-from collect.github.client import GitHubClient
+from collector.github.client import GitHubClient
 
 
 async def fetch_top_repos(

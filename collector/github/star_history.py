@@ -3,7 +3,7 @@
 Collects star count trajectory for second-derivative velocity computation.
 """
 from datetime import datetime, timezone, timedelta
-from collect.github.client import GitHubClient
+from collector.github.client import GitHubClient
 
 
 async def fetch_star_history(

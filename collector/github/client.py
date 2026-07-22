@@ -10,8 +10,8 @@ from typing import Any
 
 import httpx
 
-from collect.github.cache import CacheStore
-from collect.github.rate_limit import RateLimiter
+from collector.github.cache import CacheStore
+from collector.github.rate_limit import RateLimiter
 
 
 class GitHubClient:

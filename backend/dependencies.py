@@ -2,7 +2,7 @@
 from functools import lru_cache
 from pathlib import Path
 
-from collect.github.client import GitHubClient
+from collector.github.client import GitHubClient
 from config import load_config, Config, _load_dotenv
 
 

@@ -1,5 +1,5 @@
 """Issue & Discussion collector for BuilderDNA 2.0."""
-from collect.github.client import GitHubClient
+from collector.github.client import GitHubClient
 
 # Labels that directly signal developer demand / pain / contribution gaps
 DEMAND_LABELS = [
