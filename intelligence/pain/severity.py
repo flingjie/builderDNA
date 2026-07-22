@@ -36,26 +36,34 @@ def compute_sentiment_multiplier(text: str) -> float:
     return 1.0
 
 
-def compute_severity(comments: int, participants: int, text: str) -> float:
+def compute_severity(comments: int, participants: int, text: str, reactions: int = 0) -> float:
     """Compute a composite pain severity score.
 
     Formula:
-        log(comments + 1) * log(participants + 1) * sentiment_multiplier
+        log(comments + 1) * log(participants + 1) * log(reactions/2 + 1) * sentiment_multiplier
+
+    Reactions (👍❤️🎉) indicate broader demand alignment — an issue with 50 👍
+    but few comments is still a clear signal of widespread need.
 
     Args:
         comments: Number of comments on the issue.
         participants: Estimated unique participants.
         text: Issue title + body text for sentiment analysis.
+        reactions: Total reaction count (across all types).
 
     Returns:
         Severity score rounded to 2 decimal places. Returns 0.0 when
         both comments and participants are zero or negative.
     """
     if comments <= 0 and participants <= 0:
-        return 0.0
+        # Reactions alone can be a signal even without comments
+        if reactions <= 0:
+            return 0.0
 
     comment_factor = math.log(comments + 1)
     participant_factor = math.log(participants + 1)
+    # reactions/2 dampens so 2 reactions ≈ 1 comment equivalent; floor at 1.0 when no reactions
+    reaction_factor = math.log(reactions / 2.0 + 1) if reactions > 0 else 1.0
     sentiment_mult = compute_sentiment_multiplier(text)
 
-    return round(comment_factor * participant_factor * sentiment_mult, 2)
+    return round(comment_factor * participant_factor * reaction_factor * sentiment_mult, 2)

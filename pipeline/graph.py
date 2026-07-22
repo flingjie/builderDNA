@@ -44,7 +44,7 @@ async def _collect_signals(state: AgentState) -> AgentState:
     """
     import asyncio
     from collector.github.repo import fetch_top_repos
-    from collector.github.issue import fetch_issues
+    from collector.github.issue import fetch_demand_issues
     from collector.normalizer import normalize_all
     from backend.dependencies import get_github_client, get_domain_config, get_config
 
@@ -65,7 +65,7 @@ async def _collect_signals(state: AgentState) -> AgentState:
 
         # Issues from top repos
         top_full_names = [r["full_name"] for r in all_repos[:5] if r.get("full_name")]
-        issue_tasks = [fetch_issues(client, name) for name in top_full_names]
+        issue_tasks = [fetch_demand_issues(client, name) for name in top_full_names]
         issue_results = await asyncio.gather(*issue_tasks, return_exceptions=True)
         for issues in issue_results:
             if isinstance(issues, list):

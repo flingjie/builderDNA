@@ -55,19 +55,25 @@ def normalize_repo(raw: dict) -> Signal:
 
 def normalize_issue(raw: dict) -> Signal:
     """GitHub issue (pre-processed by collector) → Signal."""
+    reactions = raw.get("reactions", 0)
+    participants = raw.get("participants", 0)
+    # Impact: engagement strength — participants + reactions together
+    impact = min(1.0, (participants + reactions / 5.0) / 10.0)
+
     return Signal(
         source="github",
         type="issue_opened",
         actor=raw.get("user_login", "unknown"),
         target_repo=raw.get("repo", ""),
         timestamp=datetime.now(timezone.utc),
-        impact=min(1.0, raw.get("participants", 0) / 10.0),
+        impact=impact,
         payload={
             "issue_number": raw.get("issue_number", 0),
             "title": raw.get("title", ""),
             "body": raw.get("body", ""),
             "comments": raw.get("comments", 0),
-            "participants": raw.get("participants", 0),
+            "participants": participants,
+            "reactions": reactions,
             "labels": raw.get("labels", []),
             "url": raw.get("url", ""),
         },
