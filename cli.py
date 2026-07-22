@@ -110,8 +110,7 @@ def snapshots():
 @click.argument("domain")
 @click.option("--window", "-w", default=60, help="Time window in days")
 @click.option("--refresh/--no-refresh", default=False, help="Force refresh data")
-@click.option("--web/--no-web", default=True, help="Start web server")
-def radar(domain: str, window: int, refresh: bool, web: bool):
+def radar(domain: str, window: int, refresh: bool):
     """Run Trend Radar analysis for a DOMAIN (e.g. 'agent')."""
     from backend.dependencies import get_github_client, get_domain_config
     from backend.store.trend_store import TrendStore
@@ -158,14 +157,6 @@ def radar(domain: str, window: int, refresh: bool, web: bool):
     # GitHub stats
     console.print()
     console.print(f"[GitHub] {client.rate_limiter.usage_summary()}")
-
-    # Web
-    if web:
-        console.print("\n[bold green]\U0001f4ca Starting web dashboard...[/bold green]")
-        console.print("   Open http://localhost:8000\n")
-        # Start FastAPI server (blocking)
-        import uvicorn
-        uvicorn.run("backend.main:app", host="0.0.0.0", port=8000)
 
 
 @main.command()
