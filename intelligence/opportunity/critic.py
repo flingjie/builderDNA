@@ -1,5 +1,5 @@
 """Critic Agent — independent skeptical LLM review of opportunities."""
-from llm.prompts.opportunity import build_critic_prompt
+from intelligence.opportunity.prompts import build_critic_prompt
 
 
 async def review_opportunities(opportunities: list[dict], llm) -> list[dict]:

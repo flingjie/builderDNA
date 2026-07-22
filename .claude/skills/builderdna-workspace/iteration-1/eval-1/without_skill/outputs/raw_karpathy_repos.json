@@ -1,0 +1,22 @@
+{
+  "source": "GitHub API /users/karpathy/repos",
+  "fetched_at": "2026-07-22",
+  "repos": [
+    {"name":"nanoGPT","pushed":"2025-11-12","stars":61412,"lang":"Python","desc":"The simplest, fastest repository for training/finetuning medium-sized GPTs."},
+    {"name":"autoresearch","pushed":"2026-03-26","stars":91764,"lang":"Python","desc":"AI agents running research on single-GPU nanochat training automatically"},
+    {"name":"llm-council","pushed":"2025-11-22","stars":22978,"lang":"Python","desc":"LLM Council works together to answer your hardest questions"},
+    {"name":"llm.c","pushed":"2025-06-26","stars":30609,"lang":"Cuda","desc":"LLM training in simple, raw C/CUDA"},
+    {"name":"nanochat","pushed":"2026-07-04","stars":56528,"lang":"Python","desc":"The best ChatGPT that $100 can buy."},
+    {"name":"jobs","pushed":"2026-03-16","stars":1928,"lang":"HTML","desc":"BLS labor data exploration tool"},
+    {"name":"rendergit","pushed":"2025-08-21","stars":2406,"lang":"Python","desc":"Render any git repo into a single static HTML page for humans or LLMs"},
+    {"name":"rustbpe","pushed":"2026-01-03","stars":502,"lang":"Rust","desc":"The missing tiktoken training code"},
+    {"name":"reader3","pushed":"2025-11-18","stars":3790,"lang":"Python","desc":"Quick illustration of how one can easily read books together with LLMs"},
+    {"name":"LLM101n","pushed":"2024-08-01","stars":37483,"lang":"N/A","desc":"LLM101n: Let's build a Storyteller"},
+    {"name":"nn-zero-to-hero","pushed":"2024-08-18","stars":23630,"lang":"Jupyter","desc":"Neural Networks: Zero to Hero"},
+    {"name":"minGPT","pushed":"2024-08-15","stars":24728,"lang":"Python","desc":"A minimal PyTorch re-implementation of the OpenAI GPT training"},
+    {"name":"llama2.c","pushed":"2024-08-06","stars":19746,"lang":"C","desc":"Inference Llama 2 in one file of pure C"},
+    {"name":"micrograd","pushed":"2024-08-08","stars":16797,"lang":"Jupyter","desc":"A tiny scalar-valued autograd engine"},
+    {"name":"minbpe","pushed":"2024-07-01","stars":10632,"lang":"Python","desc":"Minimal, clean code for the Byte Pair Encoding (BPE) algorithm"},
+    {"name":"karpathy.github.io","pushed":"2026-04-10","stars":1806,"lang":"CSS","desc":"my blog"}
+  ]
+}

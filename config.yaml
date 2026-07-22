@@ -1,53 +1,5 @@
 accounts:
   - hwchase17
-  - joaomdmoura
-
-# 推荐关注的 GitHub 账号/Org，按领域分组
-# 每组内独立归一化评分，不受跨组极端值影响
-# 使用: python cli.py follow --from-config        # 全量
-#       python cli.py follow --from-config --diff  # 趋势对比
-follow_groups:
-  Agent 核心:
-    - anthropics
-    - langchain-ai
-    - modelcontextprotocol
-    - hwchase17
-  Agent 产品:
-    - NousResearch
-    - Significant-Gravitas
-    - browser-use
-    - crewAIInc
-    - joaomdmoura
-    - ColeMurray
-  Agent 基础设施:
-    - firecrawl
-    - langflow-ai
-    - infiniflow
-    - transitive-bullshit
-  推理引擎:
-    - vllm-project
-    - sgl-project
-  代码生成:
-    - antonosika
-    - assafelovic
-  Python 生态:
-    - samuelcolvin
-    - charliermarsh
-  个人影响力:
-    - karpathy
-    - geohot
-  深度学习:
-    - foolwood
-  国产大模型:
-    - deepseek-ai          # DeepSeek V4/R1 高性价比
-    - QwenLM               # 通义千问 Qwen3 系列
-    - alibaba              # 阿里巴巴（通义千问备用）
-    - THUDM                # 智谱 AI GLM-5.2 长上下文/Agent
-    - MoonshotAI           # Kimi 月之暗面 长文本/代码
-    - 01-ai                # Yi 系列 零一万物
-    - baichuan-inc         # 百川智能
-    - MiniMax              # MiniMax 系列
-    - Tencent-Hunyuan      # 腾讯混元
 
 github:
   token: ${GITHUB_TOKEN}
@@ -55,63 +7,20 @@ github:
   max_concurrent: 5
   rate_limit_margin: 50
 
-llm:
-  provider: openai
-  model: deepseek-v4-pro
-  api_key: ${OPENAI_API_KEY}
-  base_url: ${LLM_BASE_URL}
-
-weights:
-  repo: 5.0
-  commit: 3.0
-  pr: 2.5
-  issue: 1.5
-  star: 1.0
-
-output:
-  dir: ./output
-  formats:
-    - markdown
-    - json
-
-collect:
-  time_range_days: 365
-
-compare:
-  enabled: true
+embedding:
+  model: bge-m3:latest
+  base_url: ${EMBEDDING_BASE_URL:-http://localhost:11434/v1}
 
 domains:
   agent:
     topics:
       - mcp
       - langchain
-      - agent-protocol
+      - agent-framework
       - llm
       - rag
-      - agent-framework
       - tool-calling
       - multi-agent
-
-discovery:
-  enabled: true
-  schedule: "weekly"
-  max_results: 100
-  min_stars: 100
-  lookback_days: 30
-  language_filter:
-    exclude:
-      - JavaScript
-      - CSS
-      - HTML
-      - PHP
-      - Ruby
-    include:
-      - Python
-      - TypeScript
-      - Rust
-      - Go
-      - C++
-      - Jupyter Notebook
 
 vendors:
   domestic:
@@ -119,20 +28,15 @@ vendors:
     - QwenLM
     - THUDM
     - MoonshotAI
-    - 01-ai
-    - baichuan-inc
-    - MiniMax
-    - Tencent-Hunyuan
   overseas:
     - anthropics
     - langchain-ai
-    - NousResearch
     - browser-use
     - crewAIInc
-    - vllm-project
-    - sgl-project
     - modelcontextprotocol
-    - Significant-Gravitas
-    - firecrawl
-    - infiniflow
-    - langflow-ai
+
+output:
+  dir: ./output
+  formats:
+    - markdown
+    - json

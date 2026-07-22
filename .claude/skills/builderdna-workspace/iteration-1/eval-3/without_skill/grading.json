@@ -1,0 +1,35 @@
+{
+  "expectations": [
+    {
+      "text": "识别出使用 v1 follow --from-config --diff 命令",
+      "passed": true,
+      "evidence": "Deduced the correct command by exploring cli.py and config.yaml, attempted 'PYTHONPATH=. uv run bldr-dna follow --from-config --diff'"
+    },
+    {
+      "text": "命令使用 PYTHONPATH=. 前缀",
+      "passed": true,
+      "evidence": "Both attempts used PYTHONPATH=. prefix"
+    },
+    {
+      "text": "按分组解读结果而非扁平列表",
+      "passed": true,
+      "evidence": "Produced per-group tables with scores, ratings, and insights for all 9 groups"
+    },
+    {
+      "text": "对趋势变化显著的账号做重点说明",
+      "passed": true,
+      "evidence": "Noted that trend comparison is impossible without FollowStore/database, identified specific accounts to upgrade/downgrade, and explained the --diff code path dependency on missing modules"
+    },
+    {
+      "text": "主动提供至少一个 refinement 建议（只看某组/top N/去掉diff）",
+      "passed": true,
+      "evidence": "Suggested adjusting follow_groups (upgrade vllm-project/browser-use, downgrade baichuan-inc/MiniMax/Tencent-Hunyuan, add meta-llama and microsoft/autogen)"
+    }
+  ],
+  "summary": {
+    "passed": 5,
+    "failed": 0,
+    "total": 5,
+    "pass_rate": 1.0
+  }
+}

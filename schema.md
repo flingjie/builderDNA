@@ -1,0 +1,35 @@
+# BuilderDNA Sandbox Schema Reference
+
+Claude Code reads these JSON outputs. Every command wraps results in `SandboxResult`.
+
+## Common Wrapper
+
+```json
+{"command": "<name>", "domain": "<domain>", "computed_at": "<ISO8601>", "payload": {...}, "stats": {...}}
+```
+
+## collect -> output/signals.json
+
+payload.repos[]: { full_name, owner, stars, forks, contributors, velocity, topics[], description, language, created_at }
+payload.issues[]: { repo, issue_number, title, body, comments, participants, reactions, labels[], url }
+
+stats: { total_signals, repos, issues, topics_searched, vendors_scanned }
+
+## trend -> output/trends.json
+
+payload.trends[]: { topic, stage (accelerating|emerging|mainstream|declining), confidence, growth_velocity, acceleration, evidence_count, top_repos[{full_name, stars, stars_delta, forks, contributors, velocity, description}] }
+stats: { total_trends }
+
+## pain -> output/pain_clusters.json
+
+payload.clusters[]: { cluster_id, title, severity, frequency, affected_repos[], top_issues[{repo, issue_number, title, pain_score}] }
+stats: { clusters, issues_analyzed }
+
+## opportunity -> output/opportunities.json
+
+payload.opportunities[]: { title, demand_score, competition_score, gap_score, signals[], recommended_action }
+stats: { total, avg_gap }
+
+## report -> output/report-*.md|json
+
+Renders any SandboxResult to Markdown tables or JSON.

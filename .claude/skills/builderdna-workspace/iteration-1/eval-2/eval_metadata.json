@@ -1,0 +1,13 @@
+{
+  "eval_id": 2,
+  "eval_name": "trend-radar-agent-domain",
+  "prompt": "我想看看现在 agent 领域什么技术最火，只看最近30天的趋势",
+  "assertions": [
+    "识别出使用 v2 radar 命令而非自己搜索 GitHub",
+    "正确传入 domain=agent 和 --window 30 参数",
+    "使用 --mode full_auto（默认不打断用户）",
+    "命令使用 PYTHONPATH=. 前缀",
+    "对趋势结果做解读（如 accelerating/emerging/mainstream 的含义）",
+    "主动提供至少一个 refinement 建议（调整窗口/切换领域）"
+  ]
+}
