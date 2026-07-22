@@ -1,18 +1,17 @@
 """Trend Radar engine — detects accelerating GitHub topics and repos.
 
-Phase 1 uses GitHub Search API to find repos by topic, then computes
-trend scores using either 1st-order velocity (first run) or 2nd-order
-acceleration (subsequent runs with snapshot history).
+Migrated from backend/engine/radar.py. Computes trend scores using either
+1st-order velocity (first run) or 2nd-order acceleration (subsequent runs
+with snapshot history).
 
-Also available from intelligence/trend/detector.py
+Also re-exported from intelligence/trend/detector.py
 """
 
 import asyncio
 import math
-import os
 from datetime import datetime, timezone
 
-from backend.models.trend import DomainConfig, RepoTrend, TopicTrend, TrendSnapshot
+from intelligence.trend.models import DomainConfig, RepoTrend, TopicTrend, TrendSnapshot
 
 
 def _days_since(date_str: str | None) -> int:
@@ -189,48 +188,5 @@ async def run_radar(client, domain_config: DomainConfig, store) -> TrendSnapshot
         topics=all_topics,
     )
     store.save(snapshot)
-
-    # ── Phase 2 + 3: Pain Mining + Opportunity Intelligence ──
-    top_repos: list[str] = []
-    seen_repos: set[str] = set()
-    for topic in all_topics[:3]:
-        for repo in topic.top_repos[:2]:
-            if repo.full_name not in seen_repos:
-                seen_repos.add(repo.full_name)
-                top_repos.append(repo.full_name)
-    top_repos = top_repos[:5]
-
-    if top_repos:
-        import traceback
-        from backend.engine.pain import run_pain_mining
-        from backend.engine.opportunity import run_opportunity_engine
-        from backend.store.pain_store import PainStore
-        from backend.store.opportunity_store import OpportunityStore
-        from llm.client import OpenAIClient
-        from config import load_config
-
-        cfg = load_config("config.yaml")
-        llm_client = OpenAIClient(
-            api_key=os.environ.get("OPENAI_API_KEY", ""),
-            model="gpt-4o",
-            base_url="",
-        )
-
-        # Phase 2: Pain Mining
-        try:
-            pain_store = PainStore()
-            await run_pain_mining(client, top_repos, llm_client, pain_store)
-        except Exception:
-            print(f"[Pain Mining] Failed:\n{traceback.format_exc()}")
-
-        # Phase 3: Opportunity Intelligence
-        try:
-            trend_snapshot = store.get_latest(domain_config.name)
-            pain_snapshot = PainStore().get_latest(domain_config.name)
-            if trend_snapshot and pain_snapshot:
-                opp_store = OpportunityStore()
-                await run_opportunity_engine(trend_snapshot, pain_snapshot, llm_client, opp_store)
-        except Exception:
-            print(f"[Opportunity] Failed:\n{traceback.format_exc()}")
 
     return snapshot

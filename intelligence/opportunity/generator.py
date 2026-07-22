@@ -8,9 +8,9 @@ import json
 from typing import cast
 from uuid import uuid4
 
-from backend.models.trend import TrendSnapshot, TopicTrend, RepoTrend
-from backend.models.pain import PainSnapshot, PainCluster, PainIssue
-from backend.models.opportunity import OpportunityCard, OpportunityEvidence, OpportunitySnapshot
+from intelligence.trend.models import TrendSnapshot, TopicTrend, RepoTrend
+from intelligence.pain.models import PainSnapshot, PainCluster, PainIssue
+from intelligence.opportunity.models import OpportunityCard, OpportunityEvidence, OpportunitySnapshot
 
 
 def format_trends_for_llm(snapshot: TrendSnapshot) -> str:
@@ -176,7 +176,7 @@ async def run_opportunity_engine(
     """
     cards = await generate_opportunities(trend_snapshot, pain_snapshot, llm)
 
-    from backend.engine.validation import validate_opportunity
+    from intelligence.opportunity.validator import validate_opportunity
     for card in cards:
         try:
             card.validation = validate_opportunity(card, trend_snapshot, pain_snapshot)

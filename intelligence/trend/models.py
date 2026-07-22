@@ -1,4 +1,4 @@
-"""Trend data models for BuilderDNA 2.0 Phase 1."""
+"""Trend data models for BuilderDNA — migrated from backend/models/trend.py."""
 from datetime import datetime, timezone
 from typing import Literal
 from uuid import uuid4

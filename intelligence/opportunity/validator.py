@@ -1,8 +1,10 @@
-"""Demand Validation engine — cross-validates opportunities with 3 signal sources."""
-from backend.models.opportunity import ValidationResult
-from backend.models.opportunity import OpportunityCard
-from backend.models.trend import TrendSnapshot
-from backend.models.pain import PainSnapshot
+"""Demand Validation engine — cross-validates opportunities with 3 signal sources.
+
+Migrated from backend/engine/validation.py.
+"""
+from intelligence.opportunity.models import OpportunityCard, ValidationResult
+from intelligence.trend.models import TrendSnapshot
+from intelligence.pain.models import PainSnapshot
 
 
 def validate_opportunity(

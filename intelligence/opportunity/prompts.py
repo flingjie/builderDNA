@@ -1,4 +1,4 @@
-"""Opportunity generation prompt templates."""
+"""Opportunity generation prompt templates — migrated from llm/prompts/opportunity.py."""
 
 
 def build_opportunity_prompt(

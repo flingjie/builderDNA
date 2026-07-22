@@ -4,7 +4,7 @@ Re-exports core logic from the radar engine and the velocity computation
 module so the main pipeline can import from a single path.
 """
 
-from backend.engine.radar import (
+from intelligence.trend.radar import (
     collect_topic_data,
     compute_repo_trend,
     aggregate_topic,
