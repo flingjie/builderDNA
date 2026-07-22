@@ -42,8 +42,10 @@ def render_opportunities(opportunities: list[dict]):
         if repos:
             console.print("  [dim]Related repos:[/dim]")
             for r in repos:
+                tag = r.get("vendor_tag", "")
+                tag_str = f" [{tag}]" if tag else ""
                 console.print(
-                    f"    [cyan]{r['full_name']}[/cyan] "
-                    f"★ {r['stars']}  ↑ {r['velocity']:.1f}/d  "
+                    f"    [cyan]{r['full_name']}[/cyan]{tag_str}"
+                    f" ★ {r['stars']}  ↑ {r['velocity']:.1f}/d  "
                     f"[dim]{r.get('description', '')[:60]}[/dim]"
                 )
