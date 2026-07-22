@@ -36,7 +36,7 @@ dev = [
 bldr-dna = "cli:main"
 
 [tool.setuptools.packages.find]
-include = ["models*", "collect*", "insight*", "opportunity*", "output*", "llm*", "follow*", "signals*", "pipeline*"]
+include = ["models*", "collect*", "insight*", "opportunity*", "output*", "llm*", "follow*", "signals*", "pipeline*", "control_plane*"]
 exclude = ["snapshots*", "tests*", "output/*.md", "output/*.json"]
 
 [tool.pytest.ini_options]
