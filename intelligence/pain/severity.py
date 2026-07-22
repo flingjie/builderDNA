@@ -1,10 +1,8 @@
 """Pain severity — computes severity scores from issue metadata and text sentiment.
-
-Migrated from backend/engine/pain.py (Phase 2) with explicit
-sentiment seed words for negative language detection.
 """
 
 import math
+import re
 
 SENTIMENT_SEEDS: dict[str, list[str]] = {
     "negative": [
@@ -17,18 +15,16 @@ SENTIMENT_SEEDS: dict[str, list[str]] = {
 def compute_sentiment_multiplier(text: str) -> float:
     """Compute a severity multiplier based on negative language density.
 
-    Counts occurrences of negative seed words in the text.
+    Uses word-boundary matching to avoid false positives
+    (e.g. 'error' matches 'error' but not 'terror').
+
     Returns 1.5 for high negativity (>=5 hits), 1.2 for moderate (>=2),
     and 1.0 otherwise.
-
-    Args:
-        text: Issue title + body text to analyse.
-
-    Returns:
-        Multiplier in {1.0, 1.2, 1.5}.
     """
     text_lower = text.lower()
-    negative_count = sum(text_lower.count(word) for word in SENTIMENT_SEEDS["negative"])
+    negative_count = 0
+    for word in SENTIMENT_SEEDS["negative"]:
+        negative_count += len(re.findall(rf"\b{re.escape(word)}\b", text_lower))
     if negative_count >= 5:
         return 1.5
     if negative_count >= 2:

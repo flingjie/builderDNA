@@ -116,7 +116,10 @@ async def _collect_signals(state: AgentState) -> AgentState:
                     if fn not in seen_repos:
                         seen_repos.add(fn)
                         new.append(r)
-                return normalize_all(raw_repos=new)
+                signals = normalize_all(raw_repos=new)
+                for s in signals:
+                    s.payload["vendor_tag"] = tag
+                return signals
             except Exception:
                 return []
 

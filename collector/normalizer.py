@@ -8,6 +8,16 @@ from uuid import uuid4
 from signals.models import Signal
 
 
+def _parse_time(date_str: str | None) -> datetime:
+    """Parse ISO timestamp from raw data, fall back to now."""
+    if not date_str:
+        return datetime.now(timezone.utc)
+    try:
+        return datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        return datetime.now(timezone.utc)
+
+
 def _days_since(date_str: str | None) -> int:
     """Days between date_str and now."""
     if not date_str:
@@ -39,7 +49,7 @@ def normalize_repo(raw: dict) -> Signal:
         type="repo_created",
         actor=actor,
         target_repo=full_name,
-        timestamp=datetime.now(timezone.utc),
+        timestamp=_parse_time(created_at),
         velocity=velocity,
         impact=min(1.0, stars / 10000.0),
         payload={
@@ -65,7 +75,7 @@ def normalize_issue(raw: dict) -> Signal:
         type="issue_opened",
         actor=raw.get("user_login", "unknown"),
         target_repo=raw.get("repo", ""),
-        timestamp=datetime.now(timezone.utc),
+        timestamp=_parse_time(raw.get("created_at")),
         impact=impact,
         payload={
             "issue_number": raw.get("issue_number", 0),
@@ -87,7 +97,7 @@ def normalize_star_event(raw: dict, repo_name: str) -> Signal:
         type="star_growth",
         actor="",
         target_repo=repo_name,
-        timestamp=datetime.now(timezone.utc),
+        timestamp=_parse_time(raw.get("created_at")),
         velocity=raw.get("stars", 0),
         payload=raw,
     )

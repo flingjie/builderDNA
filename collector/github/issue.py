@@ -109,6 +109,7 @@ def _extract_issues(issues_data: list[dict], repo: str) -> list[dict]:
             "labels": [lb.get("name", "") for lb in issue.get("labels", []) if isinstance(lb, dict)],
             "url": issue.get("html_url", ""),
             "user_login": user_login,
+            "created_at": issue.get("created_at", ""),
         })
 
     return extracted
@@ -129,7 +130,10 @@ async def fetch_discussions(
     Returns:
         List of discussion dicts (may be empty if no GraphQL access).
     """
-    owner, repo_name = repo.split("/", 1)
+    try:
+        owner, repo_name = repo.split("/", 1)
+    except ValueError:
+        return []
     query = """
     query($owner: String!, $repo: String!, $first: Int!) {
       repository(owner: $owner, name: $repo) {
