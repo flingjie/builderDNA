@@ -44,9 +44,11 @@ class LLMConfig(BaseModel):
     """LLM provider configuration."""
 
     provider: str = Field(default="openai", description="LLM provider name")
-    model: str = Field(default="gpt-4o", description="Model ID")
+    model: str = Field(default="gpt-4o", description="Chat model ID")
     api_key: str = Field(description="API key for the LLM provider")
     base_url: str = Field(default="", description="Optional base URL for the LLM API endpoint")
+    embedding_model: str = Field(default="bge-m3:latest", description="Embedding model ID (for local Ollama)")
+    embedding_base_url: str = Field(default="http://localhost:11434/v1", description="Embedding API base URL (separate from chat)")
 
 
 class WeightConfig(BaseModel):

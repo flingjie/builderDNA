@@ -40,6 +40,9 @@ builderdna = "cli.main:app"
 include = ["models*", "collect*", "collector*", "backend*", "intelligence*", "output*", "llm*", "signals*", "pipeline*", "control_plane*", "cli*", "report*"]
 exclude = ["snapshots*", "tests*", "output/*.md", "output/*.json"]
 
+[tool.setuptools]
+py-modules = ["config"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
