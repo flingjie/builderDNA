@@ -109,7 +109,7 @@ async def _run_collect(
                 velocity=s.velocity,
                 topics=s.payload.get("topics", []),
                 description=s.payload.get("description", ""),
-                language=s.payload.get("language", ""),
+                language=s.payload.get("language") or "",
                 created_at=str(s.payload.get("created_at", "")),
             ))
         elif s.type == "issue_opened":
