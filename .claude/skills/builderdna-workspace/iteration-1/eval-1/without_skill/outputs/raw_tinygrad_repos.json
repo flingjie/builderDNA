@@ -1,0 +1,17 @@
+{
+  "source": "GitHub API /orgs/tinygrad/repos",
+  "fetched_at": "2026-07-22",
+  "repos": [
+    {"name":"tinygrad","pushed":"2026-07-22","stars":33314,"desc":"You like pytorch? You like micrograd? You love tinygrad!"},
+    {"name":"asm2464pd-firmware","pushed":"2026-07-21","stars":108,"desc":"Firmware for the ASM2464PD"},
+    {"name":"open-gpu-kernel-modules","pushed":"2025-06-06","stars":1401,"desc":"NVIDIA Linux open GPU with P2P support"},
+    {"name":"tinyos","pushed":"2026-06-11","stars":48,"desc":"TinyOS"},
+    {"name":"7900xtx","pushed":"2025-04-06","stars":455,"desc":"AMD 7900XTX related"},
+    {"name":"teenygrad","pushed":"2024-03-09","stars":816,"desc":"If tinygrad wasn't small enough for you..."},
+    {"name":"tinymod","pushed":"2026-07-11","stars":9,"desc":"tinygrad's premier discord moderation bot"},
+    {"name":"tinybox","pushed":"2024-04-22","stars":101,"desc":"Scripts and environment for the tinybox"},
+    {"name":"gpuocelot","pushed":"2026-06-09","stars":17,"desc":"GPUOcelot: A dynamic compilation framework for PTX"},
+    {"name":"tinyxxx","pushed":"2026-06-19","stars":9,"desc":"tiny corporation website"},
+    {"name":"tinyspec","pushed":"2026-05-05","stars":37,"desc":"A spec for tinygrad"}
+  ]
+}

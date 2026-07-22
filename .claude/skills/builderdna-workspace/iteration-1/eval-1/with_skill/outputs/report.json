@@ -1,0 +1,652 @@
+{
+  "trends": [
+    {
+      "topic": "agent-skills",
+      "stage": "mainstream",
+      "confidence": 0.1,
+      "growth_velocity": 2187.57,
+      "acceleration": 0.0,
+      "evidence_count": 1,
+      "top_repos": []
+    },
+    {
+      "topic": "claude",
+      "stage": "mainstream",
+      "confidence": 0.1,
+      "growth_velocity": 2187.57,
+      "acceleration": 28.88,
+      "evidence_count": 1,
+      "top_repos": []
+    },
+    {
+      "topic": "claude-code-plugin",
+      "stage": "mainstream",
+      "confidence": 0.1,
+      "growth_velocity": 2187.57,
+      "acceleration": 0.0,
+      "evidence_count": 1,
+      "top_repos": []
+    },
+    {
+      "topic": "cursor-rules",
+      "stage": "mainstream",
+      "confidence": 0.1,
+      "growth_velocity": 2187.57,
+      "acceleration": 0.0,
+      "evidence_count": 1,
+      "top_repos": []
+    },
+    {
+      "topic": "prompt-engineering",
+      "stage": "mainstream",
+      "confidence": 0.1,
+      "growth_velocity": 2187.57,
+      "acceleration": 29.15,
+      "evidence_count": 1,
+      "top_repos": []
+    },
+    {
+      "topic": "yagni",
+      "stage": "mainstream",
+      "confidence": 0.1,
+      "growth_velocity": 2187.57,
+      "acceleration": 0.0,
+      "evidence_count": 1,
+      "top_repos": []
+    },
+    {
+      "topic": "claude-code",
+      "stage": "mainstream",
+      "confidence": 0.2,
+      "growth_velocity": 1188.84,
+      "acceleration": 15.54,
+      "evidence_count": 2,
+      "top_repos": []
+    },
+    {
+      "topic": "ai-agents",
+      "stage": "mainstream",
+      "confidence": 0.3,
+      "growth_velocity": 792.72,
+      "acceleration": 11.89,
+      "evidence_count": 3,
+      "top_repos": []
+    },
+    {
+      "topic": "developer-tools",
+      "stage": "mainstream",
+      "confidence": 0.3,
+      "growth_velocity": 792.72,
+      "acceleration": 9.29,
+      "evidence_count": 3,
+      "top_repos": []
+    },
+    {
+      "topic": "llm",
+      "stage": "mainstream",
+      "confidence": 0.3,
+      "growth_velocity": 792.72,
+      "acceleration": 9.25,
+      "evidence_count": 3,
+      "top_repos": []
+    },
+    {
+      "topic": "offensive-security",
+      "stage": "mainstream",
+      "confidence": 0.1,
+      "growth_velocity": 267.37,
+      "acceleration": 0.0,
+      "evidence_count": 1,
+      "top_repos": []
+    },
+    {
+      "topic": "redteam",
+      "stage": "mainstream",
+      "confidence": 0.1,
+      "growth_velocity": 267.37,
+      "acceleration": 0.0,
+      "evidence_count": 1,
+      "top_repos": []
+    },
+    {
+      "topic": "agents",
+      "stage": "mainstream",
+      "confidence": 0.2,
+      "growth_velocity": 228.74,
+      "acceleration": 0.0,
+      "evidence_count": 2,
+      "top_repos": []
+    },
+    {
+      "topic": "ai",
+      "stage": "declining",
+      "confidence": 0.2,
+      "growth_velocity": 228.74,
+      "acceleration": -3.88,
+      "evidence_count": 2,
+      "top_repos": []
+    },
+    {
+      "topic": "agent-framework",
+      "stage": "mainstream",
+      "confidence": 0.1,
+      "growth_velocity": 190.1,
+      "acceleration": 1.53,
+      "evidence_count": 1,
+      "top_repos": []
+    },
+    {
+      "topic": "agent-governance",
+      "stage": "mainstream",
+      "confidence": 0.1,
+      "growth_velocity": 190.1,
+      "acceleration": 0.0,
+      "evidence_count": 1,
+      "top_repos": []
+    },
+    {
+      "topic": "agent-orchestration",
+      "stage": "mainstream",
+      "confidence": 0.1,
+      "growth_velocity": 190.1,
+      "acceleration": 2.18,
+      "evidence_count": 1,
+      "top_repos": []
+    },
+    {
+      "topic": "ai-agent",
+      "stage": "mainstream",
+      "confidence": 0.1,
+      "growth_velocity": 190.1,
+      "acceleration": 1.61,
+      "evidence_count": 1,
+      "top_repos": []
+    },
+    {
+      "topic": "coding-agents",
+      "stage": "mainstream",
+      "confidence": 0.1,
+      "growth_velocity": 190.1,
+      "acceleration": 0.0,
+      "evidence_count": 1,
+      "top_repos": []
+    },
+    {
+      "topic": "ml",
+      "stage": "mainstream",
+      "confidence": 0.1,
+      "growth_velocity": 190.1,
+      "acceleration": 0.0,
+      "evidence_count": 1,
+      "top_repos": []
+    },
+    {
+      "topic": "python",
+      "stage": "mainstream",
+      "confidence": 0.1,
+      "growth_velocity": 190.1,
+      "acceleration": 0.95,
+      "evidence_count": 1,
+      "top_repos": []
+    },
+    {
+      "topic": "multi-agent",
+      "stage": "mainstream",
+      "confidence": 0.3,
+      "growth_velocity": 152.66,
+      "acceleration": 1.53,
+      "evidence_count": 3,
+      "top_repos": []
+    },
+    {
+      "topic": "sandbox",
+      "stage": "mainstream",
+      "confidence": 0.2,
+      "growth_velocity": 95.75,
+      "acceleration": 0.0,
+      "evidence_count": 2,
+      "top_repos": []
+    },
+    {
+      "topic": "codex",
+      "stage": "declining",
+      "confidence": 0.3,
+      "growth_velocity": 64.0,
+      "acceleration": -3.69,
+      "evidence_count": 3,
+      "top_repos": []
+    },
+    {
+      "topic": "acp",
+      "stage": "mainstream",
+      "confidence": 0.1,
+      "growth_velocity": 1.41,
+      "acceleration": 0.0,
+      "evidence_count": 1,
+      "top_repos": []
+    },
+    {
+      "topic": "agent-client-protocol",
+      "stage": "mainstream",
+      "confidence": 0.1,
+      "growth_velocity": 1.41,
+      "acceleration": 0.0,
+      "evidence_count": 1,
+      "top_repos": []
+    },
+    {
+      "topic": "agent-driver",
+      "stage": "mainstream",
+      "confidence": 0.1,
+      "growth_velocity": 1.41,
+      "acceleration": 0.0,
+      "evidence_count": 1,
+      "top_repos": []
+    },
+    {
+      "topic": "agent-harness",
+      "stage": "mainstream",
+      "confidence": 0.1,
+      "growth_velocity": 1.41,
+      "acceleration": -0.1,
+      "evidence_count": 1,
+      "top_repos": []
+    },
+    {
+      "topic": "bun",
+      "stage": "mainstream",
+      "confidence": 0.1,
+      "growth_velocity": 1.41,
+      "acceleration": 0.0,
+      "evidence_count": 1,
+      "top_repos": []
+    },
+    {
+      "topic": "claude-agent-sdk",
+      "stage": "mainstream",
+      "confidence": 0.1,
+      "growth_velocity": 1.41,
+      "acceleration": 0.0,
+      "evidence_count": 1,
+      "top_repos": []
+    },
+    {
+      "topic": "coding-agent",
+      "stage": "declining",
+      "confidence": 0.1,
+      "growth_velocity": 1.41,
+      "acceleration": -2.57,
+      "evidence_count": 1,
+      "top_repos": []
+    },
+    {
+      "topic": "mcp",
+      "stage": "declining",
+      "confidence": 0.1,
+      "growth_velocity": 1.41,
+      "acceleration": -2.82,
+      "evidence_count": 1,
+      "top_repos": []
+    },
+    {
+      "topic": "openai-app-server",
+      "stage": "mainstream",
+      "confidence": 0.1,
+      "growth_velocity": 1.41,
+      "acceleration": 0.0,
+      "evidence_count": 1,
+      "top_repos": []
+    },
+    {
+      "topic": "opencode",
+      "stage": "mainstream",
+      "confidence": 0.1,
+      "growth_velocity": 1.41,
+      "acceleration": 0.02,
+      "evidence_count": 1,
+      "top_repos": []
+    },
+    {
+      "topic": "typescript",
+      "stage": "declining",
+      "confidence": 0.1,
+      "growth_velocity": 1.41,
+      "acceleration": -1.27,
+      "evidence_count": 1,
+      "top_repos": []
+    },
+    {
+      "topic": "agent-protocol",
+      "stage": "mainstream",
+      "confidence": 0.2,
+      "growth_velocity": 0.95,
+      "acceleration": 0.01,
+      "evidence_count": 2,
+      "top_repos": []
+    },
+    {
+      "topic": "agent-runtime",
+      "stage": "mainstream",
+      "confidence": 0.2,
+      "growth_velocity": 0.95,
+      "acceleration": 0.0,
+      "evidence_count": 2,
+      "top_repos": []
+    },
+    {
+      "topic": "agent-audit",
+      "stage": "mainstream",
+      "confidence": 0.1,
+      "growth_velocity": 0.5,
+      "acceleration": 0.0,
+      "evidence_count": 1,
+      "top_repos": []
+    },
+    {
+      "topic": "agentic-workflows",
+      "stage": "mainstream",
+      "confidence": 0.1,
+      "growth_velocity": 0.5,
+      "acceleration": 0.0,
+      "evidence_count": 1,
+      "top_repos": []
+    },
+    {
+      "topic": "audit-trail",
+      "stage": "mainstream",
+      "confidence": 0.1,
+      "growth_velocity": 0.5,
+      "acceleration": 0.0,
+      "evidence_count": 1,
+      "top_repos": []
+    },
+    {
+      "topic": "automation",
+      "stage": "mainstream",
+      "confidence": 0.1,
+      "growth_velocity": 0.5,
+      "acceleration": -0.24,
+      "evidence_count": 1,
+      "top_repos": []
+    },
+    {
+      "topic": "evidence",
+      "stage": "mainstream",
+      "confidence": 0.1,
+      "growth_velocity": 0.5,
+      "acceleration": 0.0,
+      "evidence_count": 1,
+      "top_repos": []
+    },
+    {
+      "topic": "multi-agent-systems",
+      "stage": "mainstream",
+      "confidence": 0.1,
+      "growth_velocity": 0.5,
+      "acceleration": 0.0,
+      "evidence_count": 1,
+      "top_repos": []
+    },
+    {
+      "topic": "open-protocol",
+      "stage": "mainstream",
+      "confidence": 0.1,
+      "growth_velocity": 0.5,
+      "acceleration": 0.01,
+      "evidence_count": 1,
+      "top_repos": []
+    },
+    {
+      "topic": "runtime-adapters",
+      "stage": "mainstream",
+      "confidence": 0.1,
+      "growth_velocity": 0.5,
+      "acceleration": 0.0,
+      "evidence_count": 1,
+      "top_repos": []
+    }
+  ],
+  "opportunities": [
+    {
+      "id": "b6cc2a7d",
+      "title": "Agent Skills Marketplace for AI Code Assistants",
+      "why_now": "Explosive growth of agent-skills, claude-code-plugin, and cursor-rules (velocity 2187.57) shows developers are creating custom behaviors but lack a centralized, discoverable, versioned ecosystem to share and reuse these skills. High-severity pain from open-webui indicates users struggle to configure advanced agentic behaviors, pointing to an urgent need for curated, plug-and-play skill packs.",
+      "problem": "Developers writing agent skills (prompts, rules, tool integrations) for Claude Code and Cursor work in silos with no standard format, sharing mechanism, or quality control, leading to duplicated effort and inconsistent agent performance.",
+      "evidence": {
+        "trends": [
+          "agent-skills",
+          "claude-code-plugin",
+          "cursor-rules"
+        ],
+        "pain_clusters": [
+          "Pain Cluster 0 (severity 9.43, open-webui)",
+          "Pain Cluster 3 (severity 7.23, open-webui)"
+        ],
+        "key_issues": [],
+        "key_repos": []
+      },
+      "existing_solutions": [
+        "GitHub gists and personal repos for prompt snippets",
+        "Cursor Rules documentation with manual copy-paste",
+        "Discourse/Reddit threads for sharing ideas"
+      ],
+      "gap": "No dedicated registry with conflict resolution, testing harness, or compatibility across Claude Code and Cursor. Existing platforms treat these as static text, not as executable agent extensions with dependencies and versioning.",
+      "mvp": "A web marketplace where developers publish agent-skill packages (defined in a unified schema); CLI tool to install into Claude Code or Cursor, with basic sanity checks; rating system and usage analytics for skill creators.",
+      "score": 8.5,
+      "validation": null,
+      "risk": "medium",
+      "related_repos": [
+        {
+          "full_name": "DietrichGebert/ponytail",
+          "stars": 87504,
+          "velocity": 2187.6,
+          "trend_score": 8051.5,
+          "topic": "agent-skills",
+          "description": "Makes your AI agent think like the laziest senior dev in the room. The best code is the code you never wrote.",
+          "url": "https://github.com/DietrichGebert/ponytail",
+          "vendor_tag": null
+        },
+        {
+          "full_name": "nexu-io/open-design",
+          "stars": 80534,
+          "velocity": 947.46,
+          "trend_score": 3759.58,
+          "topic": "agent-skills",
+          "description": "\ud83c\udfa8 The open-source Claude Design alternative. \ud83d\udda5\ufe0f Local-first desktop app. \ud83d\uddbc\ufe0f Your coding agent becomes the design engine: prototypes, landing pages, dashboards, slides, images & video \u2014 real files, HTML/PDF/PPTX/MP4 export. \ud83e\udd16 Claude Code / Codex / Cursor / Gemini / OpenCode / Qwen & 20+ CLIs via BYOK.",
+          "url": "https://github.com/nexu-io/open-design",
+          "vendor_tag": null
+        },
+        {
+          "full_name": "anthropics/skills",
+          "stars": 163287,
+          "velocity": 540.69,
+          "trend_score": 2317.96,
+          "topic": "agent-skills",
+          "description": "Public repository for Agent Skills",
+          "url": "https://github.com/anthropics/skills",
+          "vendor_tag": "\ud83c\udf0d"
+        },
+        {
+          "full_name": "addyosmani/agent-skills",
+          "stars": 79744,
+          "velocity": 511.18,
+          "trend_score": 2010.75,
+          "topic": "agent-skills",
+          "description": "Production-grade engineering skills for AI coding agents.",
+          "url": "https://github.com/addyosmani/agent-skills",
+          "vendor_tag": null
+        },
+        {
+          "full_name": "thedotmack/claude-mem",
+          "stars": 88179,
+          "velocity": 272.16,
+          "trend_score": 1057.07,
+          "topic": "claude-code-plugin",
+          "description": "Persistent Context Across Sessions for Every Agent \u2013  Captures everything your agent does during sessions, compresses it with AI, and injects relevant context back into future sessions. Works with Claude Code, OpenClaw, Codex, Gemini, Hermes, Copilot, OpenCode + More",
+          "url": "https://github.com/thedotmack/claude-mem",
+          "vendor_tag": null
+        }
+      ]
+    },
+    {
+      "id": "f959ecb5",
+      "title": "Prompt Engineering IDE for Self-Hosted LLM Interfaces",
+      "why_now": "Prompt-engineering is mainstream (velocity 2187.57) while open-webui exhibits critical pain (severity 9.43 and 7.23), indicating users struggle to craft, test, and iterate prompts within self-hosted environments. Dify and JavaGuide pain highlights broader need for structured prompt workflows beyond simple chat UIs.",
+      "problem": "Teams adopting open-webui and Dify lack collaborative, visual tools to design prompt templates, inject context, run A/B tests, and track performance across models, resulting in suboptimal LLM applications.",
+      "evidence": {
+        "trends": [
+          "prompt-engineering"
+        ],
+        "pain_clusters": [
+          "Pain Cluster 0 (open-webui)",
+          "Pain Cluster 3 (open-webui)",
+          "Pain Cluster 4 (langgenius/dify)"
+        ],
+        "key_issues": [],
+        "key_repos": []
+      },
+      "existing_solutions": [
+        "Open-webui\u2019s built-in prompt settings (basic text fields)",
+        "Dify\u2019s visual flow editor (limited prompt iteration features)",
+        "Spreadsheets and shared docs for manual versioning"
+      ],
+      "gap": "No dedicated prompt IDE that plugs into open-webui/Dify REST APIs to provide real-time templating with variable injection, model-switching, side-by-side comparisons, and automatic regression testing for prompts.",
+      "mvp": "A browser-based prompt workspace that connects to a user\u2019s open-webui/Dify instance; supports prompt templating (Jinja2, mustache), version history, collaborative editing, and a test runner that scores outputs against predefined metrics.",
+      "score": 9.0,
+      "validation": null,
+      "risk": "low",
+      "related_repos": [
+        {
+          "full_name": "DietrichGebert/ponytail",
+          "stars": 87504,
+          "velocity": 2187.6,
+          "trend_score": 8051.5,
+          "topic": "prompt-engineering",
+          "description": "Makes your AI agent think like the laziest senior dev in the room. The best code is the code you never wrote.",
+          "url": "https://github.com/DietrichGebert/ponytail",
+          "vendor_tag": null
+        },
+        {
+          "full_name": "JuliusBrussee/caveman",
+          "stars": 91875,
+          "velocity": 850.69,
+          "trend_score": 3162.37,
+          "topic": "prompt-engineering",
+          "description": "\ud83e\udea8 why use many token when few token do trick \u2014 Claude Code skill that cuts 65% of tokens by talking like caveman",
+          "url": "https://github.com/JuliusBrussee/caveman",
+          "vendor_tag": null
+        },
+        {
+          "full_name": "f/prompts.chat",
+          "stars": 166179,
+          "velocity": 125.51,
+          "trend_score": 543.7,
+          "topic": "prompt-engineering",
+          "description": "f.k.a. Awesome ChatGPT Prompts. Share, discover, and collect prompts from the community. Free and open source \u2014 self-host for your organization with complete privacy.",
+          "url": "https://github.com/f/prompts.chat",
+          "vendor_tag": null
+        },
+        {
+          "full_name": "microsoft/generative-ai-for-beginners",
+          "stars": 113352,
+          "velocity": 100.49,
+          "trend_score": 480.76,
+          "topic": "prompt-engineering",
+          "description": "21 Lessons, Get Started Building with Generative AI ",
+          "url": "https://github.com/microsoft/generative-ai-for-beginners",
+          "vendor_tag": null
+        },
+        {
+          "full_name": "dair-ai/Prompt-Engineering-Guide",
+          "stars": 76814,
+          "velocity": 58.5,
+          "trend_score": 229.68,
+          "topic": "prompt-engineering",
+          "description": "\ud83d\udc19 Guides, papers, lessons, notebooks and resources for prompt engineering, context engineering, RAG, and AI Agents.",
+          "url": "https://github.com/dair-ai/Prompt-Engineering-Guide",
+          "vendor_tag": null
+        }
+      ]
+    },
+    {
+      "id": "bbad805b",
+      "title": "Cross-IDE Agent Rules Synchronizer",
+      "why_now": "The simultaneous mainstream emergence of claude-code-plugin and cursor-rules (velocity 2187.57) reveals that power users are juggling multiple AI coding environments with incompatible rule formats, while pain on open-webui indicates complexity in maintaining consistent agent behavior across tools.",
+      "problem": "Developers must manually rewrite the same custom instructions, context files, and safety rules for each AI coding tool (Cursor, Claude Code, GitHub Copilot) leading to drift, errors, and wasted time.",
+      "evidence": {
+        "trends": [
+          "claude-code-plugin",
+          "cursor-rules",
+          "agent-skills"
+        ],
+        "pain_clusters": [
+          "Pain Cluster 0 (open-webui)",
+          "Pain Cluster 3 (open-webui)"
+        ],
+        "key_issues": [],
+        "key_repos": []
+      },
+      "existing_solutions": [
+        "Manual copy-paste between .cursorrules, claude_dev_settings, copilot instructions",
+        "Individual editor extensions that only work within that editor"
+      ],
+      "gap": "No abstraction layer that normalizes rules across editors, handles format conversion, and syncs changes bidirectionally while respecting each tool\u2019s unique capabilities.",
+      "mvp": "A lightweight VS Code extension plus a companion CLI that maintains a master ruleset (YAML/JSON) and compiles it to native formats for Cursor, Claude Code, and Copilot, with live preview and conflict detection.",
+      "score": 7.5,
+      "validation": null,
+      "risk": "high",
+      "related_repos": [
+        {
+          "full_name": "DietrichGebert/ponytail",
+          "stars": 87504,
+          "velocity": 2187.6,
+          "trend_score": 8051.5,
+          "topic": "claude-code-plugin",
+          "description": "Makes your AI agent think like the laziest senior dev in the room. The best code is the code you never wrote.",
+          "url": "https://github.com/DietrichGebert/ponytail",
+          "vendor_tag": null
+        },
+        {
+          "full_name": "nexu-io/open-design",
+          "stars": 80534,
+          "velocity": 947.46,
+          "trend_score": 3759.58,
+          "topic": "agent-skills",
+          "description": "\ud83c\udfa8 The open-source Claude Design alternative. \ud83d\udda5\ufe0f Local-first desktop app. \ud83d\uddbc\ufe0f Your coding agent becomes the design engine: prototypes, landing pages, dashboards, slides, images & video \u2014 real files, HTML/PDF/PPTX/MP4 export. \ud83e\udd16 Claude Code / Codex / Cursor / Gemini / OpenCode / Qwen & 20+ CLIs via BYOK.",
+          "url": "https://github.com/nexu-io/open-design",
+          "vendor_tag": null
+        },
+        {
+          "full_name": "anthropics/skills",
+          "stars": 163287,
+          "velocity": 540.69,
+          "trend_score": 2317.96,
+          "topic": "agent-skills",
+          "description": "Public repository for Agent Skills",
+          "url": "https://github.com/anthropics/skills",
+          "vendor_tag": "\ud83c\udf0d"
+        },
+        {
+          "full_name": "addyosmani/agent-skills",
+          "stars": 79744,
+          "velocity": 511.18,
+          "trend_score": 2010.75,
+          "topic": "agent-skills",
+          "description": "Production-grade engineering skills for AI coding agents.",
+          "url": "https://github.com/addyosmani/agent-skills",
+          "vendor_tag": null
+        },
+        {
+          "full_name": "thedotmack/claude-mem",
+          "stars": 88179,
+          "velocity": 272.16,
+          "trend_score": 1057.07,
+          "topic": "claude-code-plugin",
+          "description": "Persistent Context Across Sessions for Every Agent \u2013  Captures everything your agent does during sessions, compresses it with AI, and injects relevant context back into future sessions. Works with Claude Code, OpenClaw, Codex, Gemini, Hermes, Copilot, OpenCode + More",
+          "url": "https://github.com/thedotmack/claude-mem",
+          "vendor_tag": null
+        }
+      ]
+    }
+  ]
+}

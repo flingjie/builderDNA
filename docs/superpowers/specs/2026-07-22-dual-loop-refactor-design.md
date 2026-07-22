@@ -339,7 +339,7 @@ output:
     - json
 ```
 
-删掉的字段：llm (不再需要自己调 LLM), weights, collect.time_range_days, compare, discovery, follow_groups
+删掉的字段：llm (不再需要自己调 LLM), weights, collect.time_range_days, compare, discovery, follow_groups（功能由 accounts+vendors 覆盖，从未实装）
 
 ---
 

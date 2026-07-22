@@ -1,0 +1,40 @@
+{
+  "expectations": [
+    {
+      "text": "识别出使用 v1 run 命令而非直接调用 GitHub API",
+      "passed": false,
+      "evidence": "Used direct GitHub REST API via curl+jq for both karpathy and geohot. Also fetched tinygrad and commaai org repos. Did not discover or use BuilderDNA."
+    },
+    {
+      "text": "在运行前检查或修改 config.yaml 中的 accounts 列表",
+      "passed": false,
+      "evidence": "Did not touch config.yaml at all — worked entirely outside BuilderDNA."
+    },
+    {
+      "text": "命令使用 PYTHONPATH=. 前缀",
+      "passed": false,
+      "evidence": "Not applicable — BuilderDNA was not used."
+    },
+    {
+      "text": "运行后尝试读取 output 目录下的报告文件",
+      "passed": false,
+      "evidence": "No BuilderDNA run, no report reading. Results were self-generated."
+    },
+    {
+      "text": "对结果做中文解读（不只是 dump 原始输出）",
+      "passed": true,
+      "evidence": "Excellent structured analysis: philosophy summaries, tech directions for each developer, comparison table, and 6 product opportunity directions with practical descriptions"
+    },
+    {
+      "text": "主动提供至少一个 refinement 建议（调整权重/账号/时间窗口）",
+      "passed": false,
+      "evidence": "No feedback loop offered. Analysis is presented as a finished deliverable without asking for refinement."
+    }
+  ],
+  "summary": {
+    "passed": 1,
+    "failed": 5,
+    "total": 6,
+    "pass_rate": 0.17
+  }
+}

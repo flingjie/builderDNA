@@ -9,6 +9,7 @@ Also available from intelligence/trend/detector.py
 
 import asyncio
 import math
+import os
 from datetime import datetime, timezone
 
 from backend.models.trend import DomainConfig, RepoTrend, TopicTrend, TrendSnapshot
@@ -210,7 +211,7 @@ async def run_radar(client, domain_config: DomainConfig, store) -> TrendSnapshot
 
         cfg = load_config("config.yaml")
         llm_client = OpenAIClient(
-            api_key=cfg.embedding.api_key,
+            api_key=os.environ.get("OPENAI_API_KEY", ""),
             model="gpt-4o",
             base_url="",
         )

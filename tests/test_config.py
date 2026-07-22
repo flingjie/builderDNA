@@ -114,7 +114,6 @@ class TestLoadConfig:
         )
         assert cfg.embedding.model == "bge-m3:latest"
         assert cfg.embedding.base_url == "http://localhost:11434/v1"
-        assert cfg.embedding.api_key == ""
 
     def test_embedding_override(self):
         """EmbeddingConfig fields can be overridden."""
@@ -122,12 +121,10 @@ class TestLoadConfig:
             accounts=["test"],
             github=GitHubConfig(token="test"),
             embedding=EmbeddingConfig(
-                api_key="sk-test",
                 model="custom-model",
                 base_url="http://custom:11434/v1",
             ),
         )
-        assert cfg.embedding.api_key == "sk-test"
         assert cfg.embedding.model == "custom-model"
         assert cfg.embedding.base_url == "http://custom:11434/v1"
 

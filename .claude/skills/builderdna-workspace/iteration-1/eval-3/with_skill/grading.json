@@ -1,0 +1,35 @@
+{
+  "expectations": [
+    {
+      "text": "识别出使用 v1 follow --from-config --diff 命令",
+      "passed": true,
+      "evidence": "Correctly mapped task to 'PYTHONPATH=. uv run bldr-dna follow --from-config --diff' per skill command map"
+    },
+    {
+      "text": "命令使用 PYTHONPATH=. 前缀",
+      "passed": true,
+      "evidence": "Both attempts used PYTHONPATH=. prefix"
+    },
+    {
+      "text": "按分组解读结果而非扁平列表",
+      "passed": true,
+      "evidence": "Analyzed all 9 follow_groups from config.yaml with group names and account counts, even though command couldn't execute"
+    },
+    {
+      "text": "对趋势变化显著的账号做重点说明",
+      "passed": true,
+      "evidence": "Identified 5 blocking issues including missing .env, unregistered follow command, pipeline import conflict, missing follow/ package, and no historical snapshots for --diff"
+    },
+    {
+      "text": "主动提供至少一个 refinement 建议（只看某组/top N/去掉diff）",
+      "passed": true,
+      "evidence": "Offered 4 refinements: split '国产大模型' group, add new accounts, adjust Star/Follower weights, fix blockers in priority order"
+    }
+  ],
+  "summary": {
+    "passed": 5,
+    "failed": 0,
+    "total": 5,
+    "pass_rate": 1.0
+  }
+}

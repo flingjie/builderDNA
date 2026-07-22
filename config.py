@@ -41,9 +41,8 @@ class GitHubConfig(BaseModel):
 
 
 class EmbeddingConfig(BaseModel):
-    """Embedding model configuration (shared auth for LLM calls)."""
+    """Embedding model configuration (local Ollama, no API key needed)."""
 
-    api_key: str = Field(default="", description="API key for embedding / LLM service")
     model: str = Field(default="bge-m3:latest", description="Embedding model ID")
     base_url: str = Field(default="http://localhost:11434/v1", description="Embedding API base URL")
 

@@ -1,0 +1,40 @@
+{
+  "expectations": [
+    {
+      "text": "识别出使用 v2 radar 命令而非自己搜索 GitHub",
+      "passed": false,
+      "evidence": "Used direct GitHub API curl+jq searches instead of BuilderDNA radar command. Did not discover the BuilderDNA radar feature exists."
+    },
+    {
+      "text": "正确传入 domain=agent 和 --window 30 参数",
+      "passed": false,
+      "evidence": "Did not use BuilderDNA at all. Although 30-day window was correctly interpreted via GitHub search filters, it bypassed BuilderDNA's pipeline."
+    },
+    {
+      "text": "使用 --mode full_auto（默认不打断用户）",
+      "passed": false,
+      "evidence": "Not applicable — BuilderDNA was not used."
+    },
+    {
+      "text": "命令使用 PYTHONPATH=. 前缀",
+      "passed": false,
+      "evidence": "Not applicable — BuilderDNA was not used."
+    },
+    {
+      "text": "对趋势结果做解读（如 accelerating/emerging/mainstream 的含义）",
+      "passed": true,
+      "evidence": "Excellent trend analysis with 10 categories, structured tables, and stars-based heat signals. Better depth than what BuilderDNA currently produces, though missing pain mining + opportunity scoring."
+    },
+    {
+      "text": "主动提供至少一个 refinement 建议（调整窗口/切换领域）",
+      "passed": false,
+      "evidence": "No feedback loop or refinement suggestions offered. Output is a one-shot report."
+    }
+  ],
+  "summary": {
+    "passed": 1,
+    "failed": 5,
+    "total": 6,
+    "pass_rate": 0.17
+  }
+}

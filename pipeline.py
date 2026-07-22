@@ -1,6 +1,7 @@
 """Pipeline — orchestrates the full Collect→Understand→Recommend flow."""
 
 import asyncio
+import os
 from pathlib import Path
 from typing import Any
 
@@ -27,7 +28,7 @@ class Pipeline:
             rate_limit_margin=config.github.rate_limit_margin,
         )
         self.llm = OpenAIClient(
-            api_key=config.embedding.api_key,
+            api_key=os.environ.get("OPENAI_API_KEY", ""),
             model="gpt-4o",
             base_url="",
         )

@@ -1,0 +1,13 @@
+{
+  "eval_id": 1,
+  "eval_name": "analyze-github-developers",
+  "prompt": "帮我分析一下 karpathy 和 geohot 的 GitHub，看看他们最近在做什么技术方向，有什么可以做的产品",
+  "assertions": [
+    "识别出使用 v1 run 命令而非直接调用 GitHub API",
+    "在运行前检查或修改 config.yaml 中的 accounts 列表",
+    "命令使用 PYTHONPATH=. 前缀",
+    "运行后尝试读取 output 目录下的报告文件",
+    "对结果做中文解读（不只是 dump 原始输出）",
+    "主动提供至少一个 refinement 建议（调整权重/账号/时间窗口）"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "source": "GitHub API /orgs/commaai/repos",
+  "fetched_at": "2026-07-22",
+  "repos": [
+    {"name":"openpilot","pushed":"2026-07-22","stars":63193,"desc":"openpilot is an operating system for robotics. Currently, it upgrades the driver assistance system on 300+ supported cars."},
+    {"name":"opendbc","pushed":"2026-07-22","stars":3285,"desc":"a Python API for your car"},
+    {"name":"panda","pushed":"2026-07-21","stars":1687,"desc":"code powering the comma.ai panda"},
+    {"name":"laika","pushed":"2026-01-21","stars":722,"desc":"Simple Python GNSS processing library"},
+    {"name":"comma10k","pushed":"2026-02-20","stars":696,"desc":"10k crowdsourced images for training segnets"},
+    {"name":"commavq","pushed":"2026-07-13","stars":377,"desc":"commaVQ is a dataset of compressed driving video"},
+    {"name":"msgq","pushed":"2026-07-22","stars":251,"desc":"MSGQ: A lock free single producer multi consumer message queue"},
+    {"name":"connect","pushed":"2026-07-21","stars":128,"desc":"manage your openpilot experience"},
+    {"name":"miniray","pushed":"2026-07-21","stars":136,"desc":"Minimal library for distributed python work. Can efficiently run CPU and GPU tasks across 100s of machines."},
+    {"name":"vamOS","pushed":"2026-07-21","stars":22,"desc":"a new operating system for comma 3X and comma four"},
+    {"name":"torchtitan","pushed":"2026-07-22","stars":1,"desc":"A PyTorch native platform for training generative AI models"}
+  ]
+}
