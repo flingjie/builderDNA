@@ -36,68 +36,92 @@ def build_pipeline(mode: str = "full_auto"):
 # ---------------------------------------------------------------------------
 
 async def _collect_signals(state: AgentState) -> AgentState:
-    """Collect signals from GitHub: topic repos + vendor/follow account repos.
+    """Collect signals from GitHub: demand issues first, then repos.
 
-    1. For each domain topic: fetch top repos + issues
-    2. For each vendor + follow_group account: fetch repos as vendor star signals
-    3. Normalize all raw data → unified Signal list
+    Order matters for API quota: issues (fewer calls) → topic repos →
+    vendor repos (bulk, REST API).
+
+    Deduplicates repos by full_name across all sources.
+    Vendor repos are capped at top 5 per account (by stars).
     """
     import asyncio
     from collector.github.repo import fetch_top_repos
-    from collector.github.issue import fetch_demand_issues
+    from collector.github.issue import fetch_issues, DEMAND_LABELS
     from collector.normalizer import normalize_all
     from backend.dependencies import get_github_client, get_domain_config, get_config
+
+    # Demand labels for client-side filtering (more reliable than Search API)
+    DEMAND_SET = set(DEMAND_LABELS)
 
     config = get_config()
     domain_config = get_domain_config(state["domain"])
     client = get_github_client()
 
-    all_signals = []
+    seen_repos: set[str] = set()
+    all_repos: list[dict] = []
+    all_issues: list[dict] = []
 
     try:
-        # 1. Collect topic repos + issues
-        all_repos = []
-        all_issues = []
-
+        # ── Step 1: Topic repos (needed to know WHICH repos to pull issues from) ──
         for topic in domain_config.topics:
             repos = await fetch_top_repos(client, topic)
-            all_repos.extend(repos)
+            for r in repos:
+                fn = r.get("full_name", "")
+                if fn in seen_repos:
+                    continue
+                seen_repos.add(fn)
+                all_repos.append(r)
 
-        # Issues from top repos
-        top_full_names = [r["full_name"] for r in all_repos[:5] if r.get("full_name")]
-        issue_tasks = [fetch_demand_issues(client, name) for name in top_full_names]
+        # ── Step 2: Demand issues from top repos ──
+        # Use REST API fetch_issues (NOT search — Search API label index unreliable)
+        # then filter client-side by demand labels
+        top_names = [r["full_name"] for r in all_repos[:5] if r.get("full_name")]
+        issue_tasks = [fetch_issues(client, name, max_issues=30) for name in top_names]
         issue_results = await asyncio.gather(*issue_tasks, return_exceptions=True)
         for issues in issue_results:
             if isinstance(issues, list):
-                all_issues.extend(issues)
+                for iss in issues:
+                    iss_labels = iss.get("labels", [])
+                    # Keep issues that match demand labels, OR have high engagement
+                    if (any(lbl in DEMAND_SET for lbl in iss_labels)
+                            or iss.get("reactions", 0) >= 5
+                            or iss.get("comments", 0) >= 10):
+                        all_issues.append(iss)
 
-        all_signals.extend(normalize_all(raw_repos=all_repos, raw_issues=all_issues))
+        all_signals = normalize_all(raw_repos=all_repos, raw_issues=all_issues)
 
-        # 2. Collect vendor + follow_group account star signals
-        vendor_accounts: list[tuple[str, str]] = []  # (account, group_tag)
-
+        # ── Step 3: Vendor + follow_group account repos ──
+        vendor_accounts: list[tuple[str, str]] = []
         for account in config.vendors.domestic:
-            vendor_accounts.append((account, "🇨🇳 国产"))
+            vendor_accounts.append((account, "🇨🇳"))
         for account in config.vendors.overseas:
-            vendor_accounts.append((account, "🌍 海外"))
+            vendor_accounts.append((account, "🌍"))
         for group_name, accounts in config.follow_groups.items():
             for account in accounts:
                 vendor_accounts.append((account, group_name))
 
-        seen_vendor_accounts: set[str] = set()
+        seen_vendor: set[str] = set()
 
         async def _collect_vendor(account: str, tag: str):
-            if account in seen_vendor_accounts:
+            if account in seen_vendor:
                 return []
-            seen_vendor_accounts.add(account)
+            seen_vendor.add(account)
             try:
                 repos = await client.get_repos(account)
-                return normalize_all(raw_repos=repos)
+                # Cap: top 5 by stars, only new repos
+                repos.sort(key=lambda r: r.get("stargazers_count", 0), reverse=True)
+                new = []
+                for r in repos[:5]:
+                    fn = r.get("full_name", "")
+                    if fn not in seen_repos:
+                        seen_repos.add(fn)
+                        new.append(r)
+                return normalize_all(raw_repos=new)
             except Exception:
                 return []
 
         vendor_tasks = [_collect_vendor(a, t) for a, t in vendor_accounts
-                        if a not in seen_vendor_accounts]
+                        if a not in seen_vendor]
         vendor_results = await asyncio.gather(*vendor_tasks, return_exceptions=True)
         for result in vendor_results:
             if isinstance(result, list):
