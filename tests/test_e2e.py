@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from config import Config, GitHubConfig, LLMConfig, WeightConfig, OutputConfig, CompareConfig
+from config import Config, GitHubConfig, OutputConfig
 from pipeline import Pipeline
 
 
@@ -30,9 +30,7 @@ def e2e_config():
     return Config(
         accounts=["alice"],
         github=GitHubConfig(token="ghp_test"),
-        llm=LLMConfig(provider="openai", model="gpt-4o", api_key="sk-test"),
-        weights=WeightConfig(), output=OutputConfig(dir="./test_output"),
-        compare=CompareConfig(enabled=False),
+        output=OutputConfig(dir="./test_output"),
     )
 
 

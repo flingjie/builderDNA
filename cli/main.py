@@ -66,7 +66,7 @@ def health():
     from backend.dependencies import get_config
     cfg = get_config()
     console.print("[green]BuilderDNA 2.0 ready.[/green]")
-    console.print(f"  Chat: {cfg.llm.model}  |  Embed: {cfg.llm.embedding_model} @ {cfg.llm.embedding_base_url}")
+    console.print(f"  Embedding: {cfg.embedding.model} @ {cfg.embedding.base_url}")
     console.print(f"  Domain: {list(cfg.domains.keys())}")
 
 

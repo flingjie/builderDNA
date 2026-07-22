@@ -96,9 +96,8 @@ async def _collect_signals(state: AgentState) -> AgentState:
             vendor_accounts.append((account, "🇨🇳"))
         for account in config.vendors.overseas:
             vendor_accounts.append((account, "🌍"))
-        for group_name, accounts in config.follow_groups.items():
-            for account in accounts:
-                vendor_accounts.append((account, group_name))
+        for account in config.follow_accounts:
+            vendor_accounts.append((account, "followed"))
 
         seen_vendor: set[str] = set()
 
@@ -213,9 +212,9 @@ async def _mine_pain(state: AgentState) -> AgentState:
     try:
         cfg = get_config()
         llm_client = OpenAIClient(
-            api_key=cfg.llm.api_key,
-            model=cfg.llm.embedding_model,
-            base_url=cfg.llm.embedding_base_url,
+            api_key=cfg.embedding.api_key,
+            model=cfg.embedding.model,
+            base_url=cfg.embedding.base_url,
         )
         # Batch embed issues (100 per call max for Ollama)
         for i in range(0, len(texts), 50):
@@ -282,7 +281,7 @@ async def _generate_opportunities(state: AgentState) -> AgentState:
 
     cfg = get_config()
     llm_client = OpenAIClient(
-        api_key=cfg.llm.api_key, model=cfg.llm.model, base_url=cfg.llm.base_url,
+        api_key=cfg.embedding.api_key, model="gpt-4o", base_url="",
     )
 
     trend_topics = [
@@ -331,7 +330,7 @@ async def _review_opportunities(state: AgentState) -> AgentState:
 
     cfg = get_config()
     llm_client = OpenAIClient(
-        api_key=cfg.llm.api_key, model=cfg.llm.model, base_url=cfg.llm.base_url,
+        api_key=cfg.embedding.api_key, model="gpt-4o", base_url="",
     )
     try:
         reviews = await review_opportunities(opportunities, llm_client)
@@ -381,10 +380,9 @@ async def _enrich_evidence(state: AgentState) -> AgentState:
     for account in config.vendors.overseas:
         vendor_map[account] = "🌍"
 
-    for group_name, accounts in config.follow_groups.items():
-        for account in accounts:
-            if account not in vendor_map:
-                vendor_map[account] = group_name
+    for account in config.follow_accounts:
+        if account not in vendor_map:
+            vendor_map[account] = "followed"
 
     client = get_github_client()
     try:

@@ -210,9 +210,9 @@ async def run_radar(client, domain_config: DomainConfig, store) -> TrendSnapshot
 
         cfg = load_config("config.yaml")
         llm_client = OpenAIClient(
-            api_key=cfg.llm.api_key,
-            model=cfg.llm.model,
-            base_url=cfg.llm.base_url,
+            api_key=cfg.embedding.api_key,
+            model="gpt-4o",
+            base_url="",
         )
 
         # Phase 2: Pain Mining

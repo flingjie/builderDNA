@@ -37,7 +37,7 @@ def run(config: str, compare: bool | None):
         sys.exit(1)
 
     cfg = load_config(config_path)
-    do_compare = compare if compare is not None else cfg.compare.enabled
+    do_compare = compare if compare is not None else False
     if do_compare:
         console.print("[yellow]Running in compare mode[/yellow]")
 
@@ -172,7 +172,7 @@ def radar(domain: str, window: int, refresh: bool, web: bool):
 @click.argument("accounts", nargs=-1)
 @click.option("--config", "-c", default=DEFAULT_CONFIG, help="Path to config.yaml")
 @click.option("--top", "-n", default=0, help="Show only top N results per group")
-@click.option("--from-config", is_flag=True, help="Read groups from config.yaml follow_groups")
+@click.option("--from-config", is_flag=True, help="Read accounts from config.yaml follow_accounts")
 @click.option("--diff", is_flag=True, help="Show trend vs last snapshot")
 def follow(accounts: tuple[str], config: str, top: int, from_config: bool, diff: bool):
     """Evaluate GitHub ACCOUNTS for follow-worthiness by stars and followers."""
@@ -183,10 +183,7 @@ def follow(accounts: tuple[str], config: str, top: int, from_config: bool, diff:
 
     # Determine account list and grouping mode
     grouped_mode = False
-    if from_config and cfg.follow_groups:
-        grouped_mode = True
-        groups = cfg.follow_groups
-    elif from_config and cfg.follow_accounts:
+    if from_config:
         accounts = tuple(cfg.follow_accounts)
     elif not accounts:
         console.print("[red]请提供账号列表，或使用 --from-config[/red]")

@@ -1,6 +1,6 @@
 """Configuration system for BuilderDNA.
 
-Loads config.yaml with environment variable substitution (${VAR} syntax).
+Loads config.yaml with environment variable substitution (${VAR} and ${VAR:-default} syntax).
 Auto-loads .env file if present.
 """
 
@@ -40,25 +40,12 @@ class GitHubConfig(BaseModel):
                                    description="Pause when remaining calls below this")
 
 
-class LLMConfig(BaseModel):
-    """LLM provider configuration."""
+class EmbeddingConfig(BaseModel):
+    """Embedding model configuration (shared auth for LLM calls)."""
 
-    provider: str = Field(default="openai", description="LLM provider name")
-    model: str = Field(default="gpt-4o", description="Chat model ID")
-    api_key: str = Field(description="API key for the LLM provider")
-    base_url: str = Field(default="", description="Optional base URL for the LLM API endpoint")
-    embedding_model: str = Field(default="bge-m3:latest", description="Embedding model ID (for local Ollama)")
-    embedding_base_url: str = Field(default="http://localhost:11434/v1", description="Embedding API base URL (separate from chat)")
-
-
-class WeightConfig(BaseModel):
-    """Signal weight configuration."""
-
-    repo: float = 5.0
-    commit: float = 3.0
-    pr: float = 2.5
-    issue: float = 1.5
-    star: float = 1.0
+    api_key: str = Field(default="", description="API key for embedding / LLM service")
+    model: str = Field(default="bge-m3:latest", description="Embedding model ID")
+    base_url: str = Field(default="http://localhost:11434/v1", description="Embedding API base URL")
 
 
 class OutputConfig(BaseModel):
@@ -78,29 +65,6 @@ class CollectConfig(BaseModel):
     )
 
 
-class CompareConfig(BaseModel):
-    """Incremental comparison configuration."""
-
-    enabled: bool = Field(default=True, description="Enable incremental comparison")
-
-
-class DiscoveryConfig(BaseModel):
-    """Auto-discovery configuration."""
-
-    enabled: bool = Field(default=True, description="Enable auto theme discovery")
-    schedule: str = Field(default="weekly", description="Run frequency: weekly | daily")
-    max_results: int = Field(default=100, ge=10, le=500, description="Max repos per broad search")
-    language_filter: dict = Field(
-        default_factory=lambda: {
-            "exclude": ["JavaScript", "CSS", "HTML", "PHP", "Ruby"],
-            "include": ["Python", "TypeScript", "Rust", "Go", "C++", "Jupyter Notebook"],
-        },
-        description="Language filter: include mode filters to these languages"
-    )
-    min_stars: int = Field(default=100, ge=10, description="Minimum stars for broad search")
-    lookback_days: int = Field(default=30, ge=7, le=90, description="Only repos created within N days")
-
-
 class VendorConfig(BaseModel):
     """Vendor tracking configuration."""
 
@@ -115,30 +79,32 @@ class Config(BaseModel):
     follow_accounts: list[str] = Field(
         default_factory=list, description="GitHub accounts recommended to follow (flat)"
     )
-    follow_groups: dict[str, list[str]] = Field(
-        default_factory=dict, description="Follow accounts grouped by domain"
-    )
     domains: dict[str, dict] = Field(
         default_factory=dict, description="Radar domain configurations (e.g. agent.topics)"
     )
     github: GitHubConfig
-    llm: LLMConfig
-    weights: WeightConfig = Field(default_factory=WeightConfig)
+    embedding: EmbeddingConfig = Field(default_factory=EmbeddingConfig)
     output: OutputConfig = Field(default_factory=OutputConfig)
     collect: CollectConfig = Field(default_factory=CollectConfig)
-    compare: CompareConfig = Field(default_factory=CompareConfig)
-    discovery: DiscoveryConfig = Field(default_factory=DiscoveryConfig)
     vendors: VendorConfig = Field(default_factory=VendorConfig)
 
 
-_ENV_VAR_RE = re.compile(r"\$\{(\w+)\}")
+_ENV_VAR_RE = re.compile(r"\$\{(\w+)(?::-([^}]*))?\}")
 
 
 def _resolve_env(value: str) -> str:
-    """Replace ${VAR} patterns with environment variable values."""
+    """Replace ${VAR} and ${VAR:-default} patterns with environment variable values."""
     if not isinstance(value, str):
         return value
-    return _ENV_VAR_RE.sub(lambda m: os.environ.get(m.group(1), m.group(0)), value)
+
+    def _replacer(m: re.Match) -> str:
+        var = m.group(1)
+        default = m.group(2)
+        if default is not None:
+            return os.environ.get(var, default)
+        return os.environ.get(var, m.group(0))
+
+    return _ENV_VAR_RE.sub(_replacer, value)
 
 
 def _resolve_config(data: dict) -> dict:

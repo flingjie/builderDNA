@@ -27,9 +27,9 @@ class Pipeline:
             rate_limit_margin=config.github.rate_limit_margin,
         )
         self.llm = OpenAIClient(
-            api_key=config.llm.api_key,
-            model=config.llm.model,
-            base_url=config.llm.base_url,
+            api_key=config.embedding.api_key,
+            model="gpt-4o",
+            base_url="",
         )
         self.store = SignalStore(Path("snapshots") / "builderdna.db")
 
@@ -114,8 +114,8 @@ class Pipeline:
         return map_all(
             raw_repos=raw_repos, raw_starred=raw_starred,
             raw_commits_by_repo=raw_commits, actor=actor,
-            repo=self.config.weights.repo, star=self.config.weights.star,
-            commit=self.config.weights.commit,
+            repo=5.0, star=1.0,
+            commit=3.0,
         )
 
     def _run_understand(self, signals: list, compare: bool, snapshot_id: str) -> tuple[list, list]:
