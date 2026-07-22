@@ -66,9 +66,9 @@ def trend(
         repo_signals.append(s)
 
     # Insert into store and graph
-    store = SignalStore()
-    store.insert(repo_signals)
-    trend_rows = store.get_topic_trends(days=window)
+    with SignalStore() as store:
+        store.insert(repo_signals)
+        trend_rows = store.get_topic_trends(days=window)
 
     graph = SignalGraph()
     graph.build_from_signals(repo_signals)

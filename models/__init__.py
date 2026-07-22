@@ -1,6 +1,6 @@
 """BuilderDNA domain models."""
 
-from models.signal import Signal, SignalCluster
+from signals.models import Signal
 from models.opportunity import Opportunity
 from models.payload import (
     SandboxResult,
@@ -11,7 +11,7 @@ from models.payload import (
 )
 
 __all__ = [
-    "Signal", "SignalCluster", "Opportunity",
+    "Signal", "Opportunity",
     "SandboxResult", "RepoSignal", "IssueSignal", "CollectPayload",
     "TopicTrend", "RepoSummary", "TrendPayload",
     "PainCluster", "IssueSummary", "PainPayload",

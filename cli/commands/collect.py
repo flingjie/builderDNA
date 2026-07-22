@@ -18,10 +18,8 @@ DEMAND_SET = set(DEMAND_LABELS)
 
 
 async def _run_collect(
-    domain: str, window: int, output: str, config_path: str
+    domain: str, output: str, config_path: str
 ) -> None:
-    # TODO: window param is not yet passed to downstream fetchers (fetch_top_repos,
-    # fetch_issues). Wire through once they support time-based filtering.
     cfg = load_config(config_path)
     domain_config = cfg.domains.get(domain)
     if not domain_config:
@@ -42,7 +40,6 @@ async def _run_collect(
 
     try:
         # Step 1: Topic repos
-        # TODO: pass window to fetch_top_repos once it supports time-based filtering
         for topic in topics:
             repos = await fetch_top_repos(client, topic)
             for r in repos:
@@ -146,9 +143,8 @@ async def _run_collect(
 
 def collect(
     domain: str = typer.Argument(..., help="Domain to collect signals for"),
-    window: int = typer.Option(60, "--window", "-w", help="Time window in days"),
     output: str = typer.Option("output/signals.json", "--output", "-o", help="Output JSON file"),
     config: str = typer.Option("config.yaml", "--config", "-c", help="Config file path"),
 ) -> None:
     """Collect GitHub signals for a domain."""
-    asyncio.run(_run_collect(domain, window, output, config))
+    asyncio.run(_run_collect(domain, output, config))

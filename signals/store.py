@@ -26,6 +26,18 @@ class SignalStore:
         self._conn.row_factory = sqlite3.Row
         self._init_db()
 
+    def __enter__(self) -> "SignalStore":
+        return self
+
+    def __exit__(self, *args) -> None:
+        self.close()
+
+    def __del__(self) -> None:
+        try:
+            self.close()
+        except Exception:
+            pass
+
     def _init_db(self) -> None:
         self._conn.execute("""
             CREATE TABLE IF NOT EXISTS signals (

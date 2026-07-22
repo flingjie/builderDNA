@@ -16,9 +16,10 @@ console = Console()
 
 
 def _get_embeddings(texts: list[str]) -> list[list[float]]:
-    """Get embeddings for a list of texts."""
+    """Get embeddings for a list of texts with exponential backoff retry."""
     import os
-    from openai import OpenAI
+    import time
+    from openai import OpenAI, APIError
 
     base_url = os.environ.get("EMBEDDING_BASE_URL", "http://localhost:11434/v1")
     model = os.environ.get("EMBEDDING_MODEL", "bge-m3:latest")
@@ -27,8 +28,18 @@ def _get_embeddings(texts: list[str]) -> list[list[float]]:
     embeddings = []
     for i in range(0, len(texts), 50):
         batch = texts[i:i + 50]
-        resp = client.embeddings.create(model=model, input=batch)
-        embeddings.extend([d.embedding for d in resp.data])
+        for attempt in range(3):
+            try:
+                resp = client.embeddings.create(model=model, input=batch)
+                embeddings.extend([d.embedding for d in resp.data])
+                break
+            except (APIError, Exception) as e:
+                if attempt < 2:
+                    delay = 1.0 * (2 ** attempt)
+                    console.print(f"[yellow]Embedding retry {attempt + 1}/3 after {delay}s: {e}[/yellow]")
+                    time.sleep(delay)
+                else:
+                    raise RuntimeError(f"Embedding failed after 3 attempts: {e}") from e
     return embeddings
 
 
