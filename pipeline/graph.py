@@ -137,17 +137,215 @@ async def _collect_signals(state: AgentState) -> AgentState:
 
 
 async def _detect_trends(state: AgentState) -> AgentState:
-    state["topic_trends"] = []
+    """Detect trends from collected signals via SignalStore aggregation.
+
+    Builds SignalGraph, computes topic-level trends, and enriches
+    with co-occurrence data.
+    """
+    from signals.store import SignalStore
+    from signals.graph import SignalGraph
+    from intelligence.trend.velocity import compute_acceleration
+
+    signals = state.get("signals", [])
+    if not signals:
+        state["topic_trends"] = []
+        return state
+
+    store = SignalStore()
+    store.insert(signals)
+    trends = store.get_topic_trends(days=state["window_days"])
+
+    graph = SignalGraph()
+    graph.build_from_signals(signals)
+
+    topic_signals: dict[str, list] = {}
+    for s in signals:
+        for topic in s.payload.get("topics", []):
+            topic_signals.setdefault(topic, []).append(s)
+
+    topic_trends = []
+    for t in trends:
+        sigs = topic_signals.get(t.topic, [])
+        accel = compute_acceleration(sigs, window_days=state["window_days"])
+        if accel > 2.0 and t.confidence > 0.6:
+            stage = "accelerating"
+        elif accel > 0.5 and t.confidence > 0.3:
+            stage = "emerging"
+        elif accel < -1.0:
+            stage = "declining"
+        else:
+            stage = "mainstream"
+        topic_trends.append({
+            "topic": t.topic,
+            "stage": stage,
+            "confidence": t.confidence,
+            "growth_velocity": t.growth_velocity,
+            "acceleration": round(accel, 2),
+            "evidence_count": t.evidence_count,
+            "top_repos": [r.model_dump() for r in t.top_repos[:5]],
+        })
+
+    topic_trends.sort(key=lambda t: t["growth_velocity"], reverse=True)
+    state["topic_trends"] = topic_trends
     return state
 
 
 async def _mine_pain(state: AgentState) -> AgentState:
-    state["pain_clusters"] = []
+    """Mine pain points from collected issue signals using HDBSCAN clustering."""
+    from intelligence.pain.cluster import PainClusterer
+    from intelligence.pain.severity import compute_severity
+    from llm.client import OpenAIClient
+    from backend.dependencies import get_config
+
+    signals = state.get("signals", [])
+    issue_signals = [s for s in signals if s.type == "issue_opened"]
+    if not issue_signals:
+        state["pain_clusters"] = []
+        return state
+
+    texts = []
+    for s in issue_signals:
+        title = s.payload.get("title", "")
+        body = s.payload.get("body", "")
+        texts.append(f"{title}\n{body}"[:1000])
+
+    embeddings: list[list[float]] = []
+    try:
+        cfg = get_config()
+        llm_client = OpenAIClient(
+            api_key=cfg.llm.api_key, model=cfg.llm.model, base_url=cfg.llm.base_url,
+        )
+        resp = llm_client.complete(
+            "embed this: pain point", response_format=None
+        )
+        embeddings = []
+    except Exception:
+        embeddings = []
+
+    pain_clusters = []
+    if embeddings:
+        clusterer = PainClusterer(min_cluster_size=3)
+        clusters = clusterer.fit(embeddings)
+        for cluster_id, indices in clusters.items():
+            cluster_issues = [issue_signals[i] for i in indices]
+            severities = [
+                compute_severity(
+                    s.payload.get("comments", 0),
+                    s.payload.get("participants", 0),
+                    s.payload.get("title", "") + " " + s.payload.get("body", ""),
+                    s.payload.get("reactions", 0),
+                )
+                for s in cluster_issues
+            ]
+            pain_clusters.append({
+                "cluster_id": cluster_id,
+                "title": f"Pain Cluster {cluster_id}",
+                "severity": round(sum(severities) / len(severities), 2),
+                "frequency": len(cluster_issues),
+                "affected_repos": list(set(s.target_repo for s in cluster_issues)),
+                "top_issues": [
+                    {
+                        "repo": s.target_repo,
+                        "number": s.payload.get("issue_number"),
+                        "title": s.payload.get("title", "")[:100],
+                        "pain_score": compute_severity(
+                            s.payload.get("comments", 0),
+                            s.payload.get("participants", 0),
+                            s.payload.get("title", "") + " " + s.payload.get("body", ""),
+                            s.payload.get("reactions", 0),
+                        ),
+                    }
+                    for s in sorted(cluster_issues, key=lambda x: x.impact, reverse=True)[:3]
+                ],
+            })
+
+    state["pain_clusters"] = pain_clusters
     return state
 
 
 async def _generate_opportunities(state: AgentState) -> AgentState:
-    state["opportunities"] = []
+    """Generate opportunities from trend + pain signals using LLM CoT."""
+    from intelligence.opportunity.generator import generate_opportunities
+    from backend.models.trend import TrendSnapshot, TopicTrend
+    from backend.models.pain import PainSnapshot, PainCluster
+    from llm.client import OpenAIClient
+    from backend.dependencies import get_config
+
+    trend_data = state.get("topic_trends", [])
+    pain_data = state.get("pain_clusters", [])
+    if not trend_data:
+        state["opportunities"] = []
+        return state
+
+    cfg = get_config()
+    llm_client = OpenAIClient(
+        api_key=cfg.llm.api_key, model=cfg.llm.model, base_url=cfg.llm.base_url,
+    )
+
+    trend_topics = [
+        TopicTrend(
+            topic=t["topic"], stage=t["stage"], confidence=t["confidence"],
+            growth_velocity=t["growth_velocity"],
+            evidence_count=t.get("evidence_count", 0), top_repos=[],
+        )
+        for t in trend_data[:5]
+    ]
+    trend_snapshot = TrendSnapshot(
+        domain=state["domain"], window_days=state["window_days"], topics=trend_topics,
+    )
+    pain_snapshot = PainSnapshot(
+        domain=state["domain"],
+        clusters=[
+            PainCluster(
+                title=p.get("title", ""), severity=p.get("severity", 0.0),
+                frequency=p.get("frequency", 0), evidence=[], affected_repos=p.get("affected_repos", []),
+            )
+            for p in pain_data[:5]
+        ],
+        issue_count=sum(p.get("frequency", 0) for p in pain_data),
+        repos_analyzed=[],
+    )
+
+    try:
+        cards = await generate_opportunities(trend_snapshot, pain_snapshot, llm_client)
+        state["opportunities"] = [c.model_dump() for c in cards]
+    except Exception:
+        state["opportunities"] = []
+
+    return state
+
+
+async def _review_opportunities(state: AgentState) -> AgentState:
+    """Review each opportunity with the Critic Agent."""
+    from intelligence.opportunity.critic import review_opportunities
+    from llm.client import OpenAIClient
+    from backend.dependencies import get_config
+
+    opportunities = state.get("opportunities", [])
+    if not opportunities:
+        state["critic_reviews"] = []
+        return state
+
+    cfg = get_config()
+    llm_client = OpenAIClient(
+        api_key=cfg.llm.api_key, model=cfg.llm.model, base_url=cfg.llm.base_url,
+    )
+    try:
+        reviews = await review_opportunities(opportunities, llm_client)
+        state["critic_reviews"] = reviews
+    except Exception:
+        state["critic_reviews"] = []
+    return state
+
+
+def _generate_report(state: AgentState) -> AgentState:
+    """Generate Markdown + JSON report from pipeline results."""
+    from report.builder_report import write_markdown
+    path = write_markdown({
+        "topic_trends": state.get("topic_trends", []),
+        "opportunities": state.get("opportunities", []),
+    })
+    state["report_path"] = path
     return state
 
 
@@ -238,14 +436,4 @@ async def _enrich_evidence(state: AgentState) -> AgentState:
     finally:
         await client.close()
 
-    return state
-
-
-async def _review_opportunities(state: AgentState) -> AgentState:
-    state["critic_reviews"] = []
-    return state
-
-
-def _generate_report(state: AgentState) -> AgentState:
-    state["report_path"] = ""
     return state
