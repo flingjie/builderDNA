@@ -24,11 +24,14 @@ def radar(
 
     async def _run():
         graph = build_pipeline(mode)
-        state = await graph.ainvoke({
-            "domain": domain,
-            "window_days": window,
-            "mode": mode,
-        })
+        state = await graph.ainvoke(
+            {
+                "domain": domain,
+                "window_days": window,
+                "mode": mode,
+            },
+            {"configurable": {"thread_id": f"cli-{domain}"}},
+        )
         trends = state.get("topic_trends", [])
         opportunities = state.get("opportunities", [])
 
