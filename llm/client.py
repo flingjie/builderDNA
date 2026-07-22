@@ -170,4 +170,22 @@ class OpenAIClient:
                     raise LLMError(
                         f"Failed to parse LLM response after retry. Raw: {raw[:200]}"
                     )
-        return None  # unreachable
+    def embed(self, texts: list[str]) -> list[list[float]]:
+        """Get embeddings for a batch of texts.
+
+        Uses the OpenAI-compatible /v1/embeddings endpoint.
+        Works with Ollama (bge-m3), OpenAI, and any compatible provider.
+
+        Args:
+            texts: List of text strings to embed (max ~100 per batch).
+
+        Returns:
+            List of embedding vectors, each a list of floats.
+        """
+        try:
+            resp = self._client.embeddings.create(model=self.model, input=texts)
+            # OpenAI returns data with index; sort by index for correct order
+            sorted_items = sorted(resp.data, key=lambda d: d.index)
+            return [d.embedding for d in sorted_items]
+        except Exception:
+            return []

@@ -213,12 +213,13 @@ async def _mine_pain(state: AgentState) -> AgentState:
     try:
         cfg = get_config()
         llm_client = OpenAIClient(
-            api_key=cfg.llm.api_key, model=cfg.llm.model, base_url=cfg.llm.base_url,
+            api_key=cfg.llm.api_key, model="bge-m3:latest", base_url=cfg.llm.base_url,
         )
-        resp = llm_client.complete(
-            "embed this: pain point", response_format=None
-        )
-        embeddings = []
+        # Batch embed issues (100 per call max for Ollama)
+        for i in range(0, len(texts), 50):
+            batch = texts[i:i + 50]
+            batch_embeddings = llm_client.embed(batch)
+            embeddings.extend(batch_embeddings)
     except Exception:
         embeddings = []
 
