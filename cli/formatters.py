@@ -37,3 +37,13 @@ def render_opportunities(opportunities: list[dict]):
         console.print(f"  Score: {score}/10 | Risk: [{rc}]{risk}[/{rc}]")
         console.print(f"  Why now: {opp.get('why_now', '')}")
         console.print(f"  Problem: {opp.get('problem', '')}")
+
+        repos = opp.get("related_repos", [])
+        if repos:
+            console.print("  [dim]Related repos:[/dim]")
+            for r in repos:
+                console.print(
+                    f"    [cyan]{r['full_name']}[/cyan] "
+                    f"★ {r['stars']}  ↑ {r['velocity']:.1f}/d  "
+                    f"[dim]{r.get('description', '')[:60]}[/dim]"
+                )

@@ -36,3 +36,7 @@ class OpportunityCard(_OpportunityCard):
     critic_review: CriticReview | None = Field(
         default=None, description="Independent skeptical LLM review"
     )
+    related_repos: list[dict] = Field(
+        default_factory=list,
+        description="Related fast-growing GitHub repos for this opportunity",
+    )
