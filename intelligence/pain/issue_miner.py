@@ -4,7 +4,7 @@ Migrated from backend/engine/pain.py (Phase 2).
 GitHub client import lives at collect/github/client.py.
 """
 
-from collect.github.client import GitHubClient
+from collector.github.client import GitHubClient
 
 
 async def fetch_issues(client: GitHubClient, repo: str, max_issues: int = 20) -> list[dict]:
