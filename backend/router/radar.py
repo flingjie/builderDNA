@@ -81,113 +81,46 @@ async def explorer(
     window: int = Query(30, description="Lookback window in days"),
     refresh: bool = Query(False, description="Force re-run discovery"),
 ):
-    """Get auto-discovered emerging themes from the discovery engine."""
-    from backend.dependencies import get_config
-    from backend.store.discovery_store import DiscoveryStore
-    from backend.engine.discovery import run_discovery
-    from llm.client import OpenAIClient
+    """Get auto-discovered emerging themes.
 
-    store = DiscoveryStore()
-    cfg = get_config()
-    cfg.discovery.lookback_days = window
-
-    client = get_github_client()
-    try:
-        if refresh:
-            llm_client = OpenAIClient(
-                api_key=cfg.llm.api_key,
-                model=cfg.llm.model,
-                base_url=cfg.llm.base_url,
-            )
-            snapshot = await run_discovery(client, cfg, llm_client, store)
-        else:
-            snapshot = store.get_latest("global")
-            if snapshot is None:
-                llm_client = OpenAIClient(
-                    api_key=cfg.llm.api_key,
-                    model=cfg.llm.model,
-                    base_url=cfg.llm.base_url,
-                )
-                snapshot = await run_discovery(client, cfg, llm_client, store)
-
-        if snapshot is None:
-            return {"domain": "global", "snapshot_id": "", "generated_at": "", "window_days": window, "themes": []}
-
-        return {
-            "domain": snapshot.domain,
-            "snapshot_id": snapshot.id,
-            "generated_at": snapshot.created_at.isoformat(),
-            "window_days": snapshot.window_days,
-            "themes": [t.model_dump() for t in snapshot.themes],
-        }
-    except Exception:
-        return {"domain": "global", "snapshot_id": "", "generated_at": "", "window_days": window, "themes": []}
-    finally:
-        await client.close()
+    WARNING: Discovery engine has been deprecated. This endpoint returns empty
+    data until the new intelligence/trend/detector.py pipeline is wired up.
+    Frontend should handle empty themes gracefully.
+    """
+    return {"domain": "global", "snapshot_id": "", "generated_at": "", "window_days": window, "themes": []}
 
 
 @router.get("/vendors")
 async def vendors(
     tag: str = Query("", description="Filter by comparison_group: domestic, overseas, or empty for all"),
 ):
-    """Get latest vendor profiles, optionally filtered by tag."""
-    from backend.store.vendor_store import VendorStore
-    store = VendorStore()
-    snapshot = store.get_latest("agent")
-    if snapshot is None:
-        return {"profiles": [], "count": 0}
+    """Get latest vendor profiles.
 
-    profiles = snapshot.profiles
-    if tag:
-        profiles = [p for p in profiles if p.comparison_group == tag]
-
-    return {"profiles": [p.model_dump() for p in profiles], "count": len(profiles)}
+    WARNING: Vendor engine has been deprecated. Returns empty data until
+    the new intelligence/trend/detector.py pipeline is wired up.
+    """
+    return {"profiles": [], "count": 0}
 
 
 @router.get("/vendors/{name}")
 async def vendor_detail(name: str):
-    """Get detailed profile for a single vendor."""
-    from backend.store.vendor_store import VendorStore
-    store = VendorStore()
-    snapshot = store.get_latest("agent")
-    if snapshot is None:
-        raise HTTPException(status_code=404, detail="No vendor data")
+    """Get detailed profile for a single vendor.
 
-    for p in snapshot.profiles:
-        if p.name == name:
-            return p.model_dump()
-    raise HTTPException(status_code=404, detail=f"Vendor '{name}' not found")
+    WARNING: Vendor engine has been deprecated.
+    """
+    raise HTTPException(status_code=404, detail="Vendor engine unavailable — awaiting intelligence/trend migration")
 
 
 @router.get("/compare")
 async def compare(
     dimension: str = Query("", description="Optional: filter by dimension name"),
 ):
-    """Get domestic-vs-overseas comparison. Requires a refresh to generate."""
-    from backend.store.vendor_store import VendorStore
-    from backend.engine.vendor import generate_comparison
-    from llm.client import OpenAIClient
-    from backend.dependencies import get_config
+    """Get domestic-vs-overseas comparison.
 
-    store = VendorStore()
-    cfg = get_config()
-    client = get_github_client()
-    try:
-        llm_client = OpenAIClient(
-            api_key=cfg.llm.api_key,
-            model=cfg.llm.model,
-            base_url=cfg.llm.base_url,
-        )
-        diffs = await generate_comparison(client, cfg, llm_client)
-    except Exception:
-        diffs = []
-    finally:
-        await client.close()
-
-    if dimension:
-        diffs = [d for d in diffs if d.dimension == dimension]
-
-    return {"diffs": [d.model_dump() for d in diffs]}
+    WARNING: Vendor engine has been deprecated. Returns empty diffs until
+    the new intelligence/trend/detector.py pipeline is wired up.
+    """
+    return {"diffs": []}
 
 
 @router.get("/pain")
