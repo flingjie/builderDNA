@@ -1,5 +1,5 @@
 """Tests for validation models."""
-from backend.models.validation import ValidationResult, ValidationSignal
+from backend.models.opportunity import ValidationResult, ValidationSignal
 
 
 class TestValidationSignal:

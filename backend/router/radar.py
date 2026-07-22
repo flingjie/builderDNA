@@ -5,8 +5,7 @@ from backend.dependencies import get_github_client, get_domain_config
 from backend.store.trend_store import TrendStore
 from backend.store.pain_store import PainStore
 from backend.store.opportunity_store import OpportunityStore
-from backend.store.discovery_store import DiscoveryStore
-from backend.engine.discovery import run_discovery
+from backend.engine.radar import run_radar
 from llm.client import OpenAIClient
 from backend.dependencies import get_config
 

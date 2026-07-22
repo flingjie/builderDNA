@@ -3,6 +3,8 @@
 Phase 1 uses GitHub Search API to find repos by topic, then computes
 trend scores using either 1st-order velocity (first run) or 2nd-order
 acceleration (subsequent runs with snapshot history).
+
+Also available from intelligence/trend/detector.py
 """
 
 import asyncio

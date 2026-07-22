@@ -8,7 +8,7 @@ from backend.models.opportunity import (
     OpportunityEvidence as _OpportunityEvidence,
     OpportunitySnapshot as _OpportunitySnapshot,
 )
-from backend.models.validation import ValidationResult
+from backend.models.opportunity import ValidationResult
 from pydantic import BaseModel, Field
 
 
