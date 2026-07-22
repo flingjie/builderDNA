@@ -101,28 +101,28 @@ async def _run_collect(
     for s in signals:
         if s.type in ("repo_created", "star_growth"):
             repo_signals.append(RepoSignal(
-                full_name=s.target_repo,
-                owner=s.actor,
+                full_name=s.target_repo or "",
+                owner=s.actor or "",
                 stars=s.payload.get("stars", 0),
                 forks=s.payload.get("forks", 0),
                 contributors=s.payload.get("contributors", 0),
                 velocity=s.velocity,
-                topics=s.payload.get("topics", []),
-                description=s.payload.get("description", ""),
+                topics=s.payload.get("topics") or [],
+                description=s.payload.get("description") or "",
                 language=s.payload.get("language") or "",
                 created_at=str(s.payload.get("created_at", "")),
             ))
         elif s.type == "issue_opened":
             issue_signals.append(IssueSignal(
-                repo=s.target_repo,
+                repo=s.target_repo or "",
                 issue_number=s.payload.get("issue_number", 0),
-                title=s.payload.get("title", ""),
-                body=s.payload.get("body", ""),
+                title=s.payload.get("title") or "",
+                body=s.payload.get("body") or "",
                 comments=s.payload.get("comments", 0),
                 participants=s.payload.get("participants", 0),
                 reactions=s.payload.get("reactions", 0),
-                labels=s.payload.get("labels", []),
-                url=s.payload.get("url", ""),
+                labels=s.payload.get("labels") or [],
+                url=s.payload.get("url") or "",
             ))
 
     result = SandboxResult(
