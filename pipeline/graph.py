@@ -340,12 +340,14 @@ async def _review_opportunities(state: AgentState) -> AgentState:
 
 def _generate_report(state: AgentState) -> AgentState:
     """Generate Markdown + JSON report from pipeline results."""
-    from report.builder_report import write_markdown
-    path = write_markdown({
+    from report.builder_report import write_markdown, write_json
+    data = {
         "topic_trends": state.get("topic_trends", []),
         "opportunities": state.get("opportunities", []),
-    })
-    state["report_path"] = path
+    }
+    md_path = write_markdown(data)
+    json_path = write_json(data)
+    state["report_path"] = f"{md_path}\n{json_path}"
     return state
 
 
