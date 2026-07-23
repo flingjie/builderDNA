@@ -82,6 +82,24 @@ Record feedback in `feedback_log` after each session.
 
 `schema.md` documents exact JSON schemas for all 5 command outputs. Read it when you need field names or types.
 
+## Builder's Lens — 深度项目分析
+
+When the user wants "builder 视角", "从开发者角度分析", "值得借鉴的做法", "commit 历史分析", or wants to learn from a successful project's approach, read `references/builder-lens.md` and apply its 10-dimension framework.
+
+This is a **qualitative, Claude-driven analysis** — no sandbox command covers it. Use `gh api` to fetch commit history, releases, PRs, and contributor stats, then interpret the patterns across 10 dimensions: value quantification, versioning strategy, platform coverage, README architecture, benchmark credibility, commit discipline, core IP positioning, contributor gradient, development cadence, and brand personality.
+
+**When to use**: after trending discovery or deep-dive, when the user sees a standout project and wants to understand *how* it was built, not just *what* it does.
+
+## Reference Files
+
+Read these when needed:
+
+| File | When to Read | Content |
+|------|-------------|---------|
+| `references/builder-lens.md` | Before builder's perspective analysis | 10-dimension methodology for analyzing project success patterns |
+| `schema.md` | Before reading command outputs | JSON schemas for all 5 commands |
+| `state/hypotheses.json` | Session start | Exploration state tree |
+
 ## Config Management
 
 - **accounts**: in `config.yaml` — developers/orgs to analyze
