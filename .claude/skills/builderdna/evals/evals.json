@@ -4,43 +4,41 @@
     {
       "id": 1,
       "prompt": "帮我分析一下 karpathy 和 geohot 的 GitHub，看看他们最近在做什么技术方向，有什么可以做的产品",
-      "expected_output": "Claude识别出这是分析请求，使用 v1 run 命令，先确认或修改 config.yaml 中的 accounts 列表，运行 PYTHONPATH=. uv run bldr-dna run，然后读取报告并解读 insights 和 opportunities，最后询问是否需要调整参数",
+      "expected_output": "Claude reads state/hypotheses.json, runs PYTHONPATH=. builderdna collect agent --window 365 (or edits config.yaml accounts first), then PYTHONPATH=. builderdna trend agent --data output/signals.json, then PYTHONPATH=. builderdna opportunity --trends output/trends.json --pains output/pain_clusters.json, reads the output JSON files, interprets insights in Chinese, presents opportunities with gap scores, updates hypotheses, and asks if user wants to refine",
       "files": [],
-      "expectations": [
-        "Claude 识别出使用 v1 run 命令",
-        "Claude 在运行前检查或修改 config.yaml 中的 accounts",
-        "Claude 使用 PYTHONPATH=. 前缀",
-        "Claude 运行后读取 output 目录下的报告",
-        "Claude 用中文解读结果（insights + opportunities）",
-        "Claude 主动询问是否需要调整参数或账号"
+      "assertions": [
+        "reads-hypotheses",
+        "collect-signals",
+        "compute-trends",
+        "generate-opportunities",
+        "chinese-interpretation",
+        "asks-refine"
       ]
     },
     {
       "id": 2,
       "prompt": "我想看看现在 agent 领域什么技术最火，只看最近30天的趋势",
-      "expected_output": "Claude识别出这是趋势雷达请求，使用 v2 radar 命令，指定 agent 域名和 --window 30，运行 PYTHONPATH=. uv run builderdna radar agent --window 30 --mode full_auto，然后解读趋势结果，询问是否需要更宽的时间窗口或不同领域",
+      "expected_output": "Claude runs PYTHONPATH=. builderdna collect agent --window 30, then PYTHONPATH=. builderdna trend agent --data output/signals.json, interprets velocity and lifecycle stages (accelerating/emerging/mainstream/declining), presents the trends clearly, and asks if user wants a deeper opportunity analysis or different time window",
       "files": [],
-      "expectations": [
-        "Claude 识别出使用 v2 radar 命令",
-        "Claude 正确传入 domain=agent 和 --window 30",
-        "Claude 使用 --mode full_auto（默认不打扰用户）",
-        "Claude 使用 PYTHONPATH=. 前缀",
-        "Claude 解读趋势结果（accelerating/emerging/mainstream/declining）",
-        "Claude 询问是否需要调整时间窗口或切换领域"
+      "assertions": [
+        "window-30-days",
+        "collect-then-trend",
+        "lifecycle-stages",
+        "asks-deeper-or-wider"
       ]
     },
     {
       "id": 3,
       "prompt": "评估一下 config 里配置的那些账号哪些值得关注，看看跟上次比有什么变化",
-      "expected_output": "Claude识别出这是 follow 评估请求，使用 v1 follow --from-config --diff，运行 PYTHONPATH=. uv run bldr-dna follow --from-config --diff，然后解读各组评分和趋势变化，对变化显著的账号做说明",
+      "expected_output": "Claude reads config.yaml for accounts list, runs PYTHONPATH=. builderdna collect <domain> --window 90 (for each domain or the main one), runs PYTHONPATH=. builderdna trend <domain> --data output/signals.json, compares current results against hypotheses.json and any prior output files, highlights accounts with accelerating velocity or new signals, presents groups by tech domain or engagement level, and asks if user wants to adjust accounts or focus on specific ones",
       "files": [],
-      "expectations": [
-        "Claude 识别出使用 v1 follow --from-config --diff",
-        "Claude 正确传入 --from-config 和 --diff 参数",
-        "Claude 使用 PYTHONPATH=. 前缀",
-        "Claude 按分组解读结果",
-        "Claude 对趋势变化显著的账号做重点说明",
-        "Claude 询问是否需要只看某个分组或调整 top N"
+      "assertions": [
+        "reads-config-accounts",
+        "runs-collect",
+        "runs-trend",
+        "compares-diff",
+        "highlights-changes",
+        "asks-adjust-accounts"
       ]
     }
   ]

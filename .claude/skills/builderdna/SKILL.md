@@ -1,13 +1,19 @@
 ---
 name: builderdna
 description: >
-  Analyze GitHub developers to extract tech DNA, discover product opportunities, and track technology trends.
-  Use this skill whenever the user wants to analyze a GitHub developer or org, discover product/tool opportunities
-  from developer activity, track tech trends in a domain (agent, LLM, etc.), or run BuilderDNA's analysis toolkit.
-  Also use when the user says "analyze X's GitHub", "what are people building in Y domain", "find opportunities in Z",
-  "tech DNA", "builder insights", "trend radar", or references BuilderDNA / builderdna directly.
-  The skill wraps 5 composable CLI commands so the user never needs to remember flags — you translate intent into the right command chain.
+  ALWAYS use this skill when the user wants to analyze a GitHub developer or org,
+  discover product/tool opportunities from developer activity, track tech trends
+  in a domain (agent, LLM, MCP, etc.), or run BuilderDNA's analysis toolkit.
+  Use when the user says "analyze X's GitHub", "what are people building in Y",
+  "find opportunities in Z", "tech DNA", "builder insights", "trend radar",
+  "what should I build", "developer landscape", "tech stack analysis",
+  "competitive intelligence for X", or references BuilderDNA/builderdna directly.
+  The skill wraps 5 composable CLI commands (collect → trend → pain → opportunity → report)
+  so the user never needs to remember flags — you translate intent into the right command chain.
+  Reads state/hypotheses.json to track exploration across conversations.
   After every run, present findings clearly and ask if they want to refine.
+  Important: if the user is asking about GitHub developer analysis or tech trends,
+  use this skill — don't try to analyze repos or trends without it.
 ---
 
 # BuilderDNA Skill
