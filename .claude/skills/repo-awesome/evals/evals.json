@@ -1,0 +1,26 @@
+{
+  "skill_name": "repo-awesome",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "mine awesome lists for MCP servers, I want to see what the community curates",
+      "expected_output": "Claude searches for awesome MCP lists on GitHub, picks top 2-3 by stars, fetches raw READMEs, parses repo links from markdown, deduplicates across lists, fetches metadata for top repos, computes curation scores based on list membership and stars, presents a ranked Tier 1 table with Stars/Lists/Curation/Velocity/Stage columns, updates output/tracked_repos.json, and asks if user wants to deep-dive",
+      "files": [],
+      "assertions": ["list-search", "readme-fetch", "repo-link-parsing", "deduplication", "curation-scoring", "ranked-table-with-lists", "deep-dive-offer"]
+    },
+    {
+      "id": 2,
+      "prompt": "what do awesome lists recommend for AI agent frameworks? evaluate the top 3 with a deep dive",
+      "expected_output": "Claude mines awesome lists for AI agent frameworks, presents Tier 1 table, then runs Tier 2 full checklist on the top 3 repos (metadata + README + contributors, 7-dimension scoring), presents comparison table, and runs Tier 3 qualitative deep analysis on the top-ranked one with verdict and recommendations",
+      "files": [],
+      "assertions": ["awesome-mining", "tier1-top3", "tier2-multi-repo", "comparison-table", "tier3-deep-dive", "verdict-per-repo"]
+    },
+    {
+      "id": 3,
+      "prompt": "find awesome lists for Rust developer tools and show me what's in them, I only care about the ones that are still actively maintained",
+      "expected_output": "Claude mines awesome Rust dev tools lists, parses repos, fetches metadata, applies freshness filter (recently pushed, not archived), presents Tier 1 table with active-maintenance signal highlighted, notes any repos that were filtered out due to inactivity",
+      "files": [],
+      "assertions": ["list-discovery", "repo-extraction", "archived-filter", "freshness-filter", "inactive-noted", "active-signal-highlighted"]
+    }
+  ]
+}

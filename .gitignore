@@ -6,3 +6,5 @@ snapshots/cache/
 output/
 .venv/
 builderdna.egg-info/
+*-workspace/
+.claude/worktrees/

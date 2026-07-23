@@ -1,0 +1,26 @@
+{
+  "skill_name": "repo-trend",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "find me trending MCP server repos on GitHub, I want to see what's hot right now",
+      "expected_output": "Claude discovers trending MCP server repos using a two-query strategy (established + emerging), computes hotness scores and lifecycle stages, presents a ranked Tier 1 table with Stars/Velocity/Forks/Language/Stage/Hotness columns, updates output/tracked_repos.json, and asks if the user wants to deep-dive on any",
+      "files": [],
+      "assertions": ["two-query-strategy", "hotness-formula", "ranked-table", "lifecycle-stage", "track-state", "deep-dive-offer"]
+    },
+    {
+      "id": 2,
+      "prompt": "what are the hottest AI agent repos in Python? only show me ones with over 500 stars",
+      "expected_output": "Claude adjusts the star threshold to 500 (user override), constructs queries with language:python filter, runs two-query discovery, filters and ranks results, presents Tier 1 table, notes the adjusted threshold and language filter in the summary",
+      "files": [],
+      "assertions": ["star-threshold-override", "language-filter", "python-only-results", "stars-above-threshold", "filter-documented"]
+    },
+    {
+      "id": 3,
+      "prompt": "find trending Rust CLI tools and deep dive on the top one",
+      "expected_output": "Claude discovers trending Rust CLI tool repos, presents Tier 1 table, then automatically runs Tier 2 + Tier 3 evaluation on the top-ranked repo including metadata fetch, README analysis, contributor check, dimension scoring, and a qualitative verdict with strengths/concerns/audience",
+      "files": [],
+      "assertions": ["tier1-discovery", "tier2-checklist", "tier2-dimensions", "tier3-deep-analysis", "structured-verdict"]
+    }
+  ]
+}
