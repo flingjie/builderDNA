@@ -31,8 +31,8 @@ dev = [
 builderdna = "cli.main:app"
 
 [tool.setuptools.packages.find]
-include = ["models*", "collect*", "collector*", "intelligence*", "output*", "signals*", "cli*", "report*"]
-exclude = ["snapshots*", "tests*", "output/*.md", "output/*.json"]
+include = ["models*", "collect*", "collector*", "intelligence*", "signals*", "cli*"]
+exclude = ["snapshots*", "tests*"]
 
 [tool.setuptools]
 py-modules = ["config"]
