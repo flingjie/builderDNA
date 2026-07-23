@@ -1,7 +1,4 @@
-"""Signal normalizer — GitHub API raw dicts → unified Signal model.
-
-Replaces collect/github/mapper.py with a single, type-dispatch normalizer.
-"""
+"""Signal normalizer — GitHub API raw dicts → unified Signal model."""
 from datetime import datetime, timezone
 from uuid import uuid4
 
