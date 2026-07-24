@@ -14,7 +14,7 @@ Claude Code（编排 + 解读）── 读取 state/hypotheses.json，决定跑�
   collect → trend → pain → opportunity → report
     │
     ▼
-全局记忆 — DuckDB + output/*.json + state/*.json
+全局记忆 — SQLite + output/*.json + state/*.json
 ```
 
 命令之间通过 JSON 文件传递数据：`collect` 产出 `signals.json` → `trend` 和 `pain` 消费它 → `opportunity` 消费两者 → `report` 渲染任意结果。
@@ -71,8 +71,8 @@ BuilderDNA/
 ├── intelligence/opportunity/  # 机会评分（规则引擎）
 │
 ├── signals/
-│   ├── models.py              # Signal, AggregateRepoTrend, AggregateTopicTrend
-│   ├── store.py               # DuckDB 持久化
+│   ├── models.py              # Signal（统一事件模型）
+│   ├── store.py               # SQLite 持久化
 │   └── graph.py               # NetworkX 共现图
 │
 ├── models/payload.py          # 所有 5 个命令的输出 schema（Claude Code 读取的契约）

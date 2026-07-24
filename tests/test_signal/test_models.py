@@ -1,6 +1,6 @@
-"""Tests for unified Signal model and aggregate views."""
+"""Tests for Signal model."""
 from datetime import datetime, timezone
-from signals.models import Signal, AggregateTopicTrend, AggregateRepoTrend
+from signals.models import Signal
 
 
 class TestSignal:
@@ -48,30 +48,3 @@ class TestSignal:
                 timestamp=datetime.now(timezone.utc),
             )
             assert s.type == t
-
-
-class TestAggregateTopicTrend:
-    def test_from_signals(self):
-        signals = [
-            Signal(
-                id="s1", source="github", type="repo_created",
-                actor="dev", target_repo="org/repo1",
-                timestamp=datetime.now(timezone.utc), velocity=5.0,
-                payload={"topics": ["agent", "mcp"]},
-            ),
-            Signal(
-                id="s2", source="github", type="star_growth",
-                actor="dev2", target_repo="org/repo2",
-                timestamp=datetime.now(timezone.utc), velocity=3.0,
-                payload={"topics": ["agent", "langchain"]},
-            ),
-        ]
-        trends = AggregateTopicTrend.from_signals(signals)
-        assert len(trends) > 0
-
-
-class TestAggregateRepoTrend:
-    def test_defaults(self):
-        r = AggregateRepoTrend(full_name="a/b", stars=100, velocity=5.0)
-        assert r.stars == 100
-        assert r.trend_score == 0.0

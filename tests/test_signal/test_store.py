@@ -1,4 +1,4 @@
-"""Tests for SignalStore (SQLite transactions + DuckDB analytics)."""
+"""Tests for SignalStore (SQLite-backed signal storage and aggregation)."""
 import pytest
 from datetime import datetime, timezone, timedelta
 from signals.models import Signal

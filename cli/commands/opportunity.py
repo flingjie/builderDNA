@@ -1,12 +1,13 @@
-"""opportunity — rule-engine scorer that generates opportunity cards.
+"""opportunity — generate opportunity cards from trends + pain clusters.
 
-No LLM calls. Uses deterministic formulas:
-  demand_score = f(trend_velocity, pain_severity, pain_frequency)
-  competition_score = f(evidence_count, repo_maturity)
-  gap_score = demand / competition
+Delegates scoring to intelligence/opportunity/scoring.py and alignment
+to intelligence/opportunity/alignment.py. The CLI command is a thin
+orchestrator: read inputs → score → render → write output.
+
+With User DNA integration:
+  personalized_score = gap_score × alignment_multiplier
 """
 import json
-import math
 from pathlib import Path
 
 import typer
@@ -15,35 +16,20 @@ from rich.console import Console
 from models.payload import (
     SandboxResult, OpportunityPayload, OpportunityCard,
 )
+from state.user_dna_schema import load_user_dna
+from intelligence.opportunity.scoring import (
+    compute_demand, compute_competition, compute_gap, recommend_action,
+)
+from intelligence.opportunity.alignment import compute_alignment
 
 console = Console()
 
 
-def _compute_demand(trends: list[dict], pain_clusters: list[dict]) -> float:
-    """Demand score from trend velocity + pain intensity."""
-    avg_velocity = sum(t.get("growth_velocity", 0) for t in trends) / max(1, len(trends))
-    avg_severity = sum(p.get("severity", 0) for p in pain_clusters) / max(1, len(pain_clusters))
-    total_frequency = sum(p.get("frequency", 0) for p in pain_clusters)
-
-    # Normalize to 1-10
-    vel_score = min(10, avg_velocity / 10)  # velocity 100 → 10
-    pain_score = min(10, avg_severity * 2)  # severity 5 → 10
-    freq_score = min(10, math.log(total_frequency + 1) * 3)  # log scale
-
-    return round((vel_score * 0.4 + pain_score * 0.4 + freq_score * 0.2), 1)
-
-
-def _compute_competition(trends: list[dict]) -> float:
-    """Competition score: more evidence → more crowded."""
-    total_evidence = sum(t.get("evidence_count", 0) for t in trends)
-    total_repos = sum(len(t.get("top_repos", [])) for t in trends)
-
-    # More repos + higher count = more competition
-    raw = math.log(total_evidence + 1) * 1.5 + math.log(total_repos + 1)
-    return round(min(10, max(1, raw)), 1)
-
-
-def _generate_actions(trends: list[dict], pain_clusters: list[dict]) -> list[OpportunityCard]:
+def _generate_cards(
+    trends: list[dict],
+    pain_clusters: list[dict],
+    user_dna= None,
+) -> list[OpportunityCard]:
     """Generate opportunity cards from trend + pain intersections."""
     cards = []
     top_trends = sorted(trends, key=lambda t: t.get("growth_velocity", 0), reverse=True)[:5]
@@ -51,35 +37,35 @@ def _generate_actions(trends: list[dict], pain_clusters: list[dict]) -> list[Opp
 
     for trend in top_trends:
         topic = trend.get("topic", "unknown")
-        velocity = trend.get("growth_velocity", 0)
 
-        # Find intersecting pain clusters
         related_pains = [
             p for p in top_pains
             if any(topic.lower() in r.lower() for r in p.get("affected_repos", []))
         ] or top_pains[:2]
 
-        demand = _compute_demand([trend], related_pains)
-        competition = _compute_competition([trend])
-        gap = round(demand / max(0.1, competition), 1)
+        demand = compute_demand([trend], related_pains)
+        competition = compute_competition([trend])
+        gap = compute_gap(demand, competition)
 
-        # Signal list from evidence
         signals = []
-        for r in trend.get("top_repos", [])[:3]:
+        top_repos = trend.get("top_repos", [])
+        for r in top_repos[:3]:
             signals.append(f"{r.get('full_name', '')} ({r.get('stars', 0)}★)")
         for p in related_pains[:1]:
             for iss in p.get("top_issues", [])[:2]:
                 signals.append(f"Issue: {iss.get('title', '')[:60]}")
 
-        # Heuristic action recommendation
-        if gap > 2.0:
-            action = f"强烈推荐在 {topic} 方向创业或立项，缺口显著"
-        elif gap > 1.5:
-            action = f"密切关注 {topic}，需求强但已有竞争，需差异化切入"
-        elif gap > 1.0:
-            action = f"跟踪 {topic} 发展，等待更明确的市场信号"
-        else:
-            action = f"暂不建议进入 {topic}，竞争饱和或需求不足"
+        action = recommend_action(topic, gap)
+
+        # Alignment
+        personalized_score = None
+        alignment_reason = ""
+        alignment_multiplier = 1.0
+        if user_dna:
+            alignment_multiplier, alignment_reason = compute_alignment(
+                trend, top_repos, user_dna
+            )
+            personalized_score = round(gap * alignment_multiplier, 1)
 
         cards.append(OpportunityCard(
             title=f"{topic} — gap={gap}",
@@ -88,9 +74,12 @@ def _generate_actions(trends: list[dict], pain_clusters: list[dict]) -> list[Opp
             gap_score=gap,
             signals=signals[:5],
             recommended_action=action,
+            personalized_score=personalized_score,
+            alignment_reason=alignment_reason,
+            alignment_multiplier=alignment_multiplier,
         ))
 
-    cards.sort(key=lambda c: c.gap_score, reverse=True)
+    cards.sort(key=lambda c: c.personalized_score if c.personalized_score is not None else c.gap_score, reverse=True)
     return cards
 
 
@@ -98,8 +87,12 @@ def opportunity(
     trends: str = typer.Option(..., "--trends", "-t", help="Input trends JSON"),
     pains: str = typer.Option(..., "--pains", "-p", help="Input pain clusters JSON"),
     output: str = typer.Option("output/opportunities.json", "--output", "-o", help="Output JSON file"),
+    user_dna: str = typer.Option("state/user_dna.json", "--user-dna", help="User DNA file for personalization"),
 ) -> None:
-    """Generate opportunity cards from trends and pain clusters (rule engine)."""
+    """Generate opportunity cards from trends and pain clusters (rule engine).
+
+    Optionally applies User DNA for personalized scoring.
+    """
     trends_path = Path(trends)
     pains_path = Path(pains)
     if not trends_path.exists():
@@ -118,7 +111,12 @@ def opportunity(
     trend_list = t_payload.get("trends", [])
     pain_list = p_payload.get("clusters", [])
 
-    cards = _generate_actions(trend_list, pain_list)
+    # Load User DNA if available
+    dna = load_user_dna(user_dna)
+    if dna:
+        console.print(f"[dim]User DNA loaded — applying personalized alignment[/dim]")
+
+    cards = _generate_cards(trend_list, pain_list, dna)
 
     result = SandboxResult(
         command="opportunity",
@@ -127,6 +125,7 @@ def opportunity(
         stats={
             "total": len(cards),
             "avg_gap": round(sum(c.gap_score for c in cards) / max(1, len(cards)), 2),
+            "personalized": dna is not None,
         },
     )
 
@@ -135,4 +134,7 @@ def opportunity(
     output_path.write_text(json.dumps(result.model_dump(), indent=2, ensure_ascii=False))
     console.print(f"[green]{len(cards)} opportunities → {output}[/green]")
     for c in cards[:5]:
-        console.print(f"  gap={c.gap_score:.1f}  {c.title}")
+        base = f"gap={c.gap_score:.1f}"
+        if c.personalized_score is not None:
+            base += f"  personal={c.personalized_score:.1f} (×{c.alignment_multiplier:.2f})"
+        console.print(f"  {base}  {c.title}")

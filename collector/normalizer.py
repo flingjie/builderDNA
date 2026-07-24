@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from signals.models import Signal
+from intelligence.trend.velocity import compute_velocity
 
 
 def _parse_time(date_str: str | None) -> datetime:
@@ -26,12 +27,6 @@ def _days_since(date_str: str | None) -> int:
         return 365
 
 
-def _compute_velocity(stars: int, created_at: str | None) -> float:
-    """Simple velocity: stars / days_since_creation."""
-    days = _days_since(created_at)
-    return round(stars / max(1, days), 2)
-
-
 def normalize_repo(raw: dict) -> Signal:
     """GitHub repo API response → Signal."""
     full_name = raw.get("full_name", "")
@@ -39,7 +34,7 @@ def normalize_repo(raw: dict) -> Signal:
     actor = owner.get("login", "") if isinstance(owner, dict) else str(owner)
     stars = raw.get("stargazers_count", 0)
     created_at = raw.get("created_at")
-    velocity = _compute_velocity(stars, created_at)
+    velocity = compute_velocity(stars, _days_since(created_at))
 
     return Signal(
         source="github",

@@ -48,9 +48,15 @@ class IssueSignal(BaseModel):
 
 
 class CollectPayload(BaseModel):
-    """Payload for collect command output."""
+    """Payload for collect command output.
+
+    repos and issues are flat, human-readable output contracts.
+    signals is the normalized form (Signal JSON dicts) for direct
+    consumption by downstream commands — no re-normalization needed.
+    """
     repos: list[RepoSignal] = Field(default_factory=list)
     issues: list[IssueSignal] = Field(default_factory=list)
+    signals: list[dict[str, Any]] = Field(default_factory=list, description="Normalized Signal objects serialized as JSON dicts")
 
 
 # ── trend command output ──
@@ -121,6 +127,10 @@ class OpportunityCard(BaseModel):
     gap_score: float
     signals: list[str] = Field(default_factory=list)
     recommended_action: str = ""
+    # Personalized fields added by alignment engine (User DNA integration)
+    personalized_score: float | None = Field(default=None, description="gap_score × alignment_multiplier")
+    alignment_reason: str = Field(default="", description="Why this opportunity matches user values")
+    alignment_multiplier: float = Field(default=1.0, description="Raw multiplier from User DNA alignment")
 
 
 class OpportunityPayload(BaseModel):

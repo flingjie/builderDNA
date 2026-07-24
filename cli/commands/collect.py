@@ -1,6 +1,11 @@
-"""collect — fetch GitHub repos and issues for a domain, output structured signals."""
+"""collect — fetch GitHub repos and issues for a domain, output structured signals.
+
+Supports User DNA personalization: reads state/user_dna.json and applies
+4 mapping rules to customize domain, topics, window, and repo sorting.
+"""
 import asyncio
 import json
+import math
 from pathlib import Path
 
 import typer
@@ -12,21 +17,156 @@ from collector.github.repo import fetch_top_repos
 from collector.github.issue import fetch_issues, DEMAND_LABELS
 from collector.normalizer import normalize_all
 from models.payload import SandboxResult, CollectPayload, RepoSignal, IssueSignal
+from state.user_dna_schema import (
+    load_user_dna, UserDNA,
+    OUTPUT_DOMAIN_MAP, ACTIVITY_CONFIG,
+    REWARD_WEIGHTS, ENVIRONMENT_SOURCE_MIX,
+)
 
 console = Console()
 DEMAND_SET = set(DEMAND_LABELS)
 
 
+def _apply_user_dna_rules(
+    domain: str,
+    cfg: dict,
+    user_dna: UserDNA,
+) -> tuple[str, list[str], int, dict, dict]:
+    """Apply 4 mapping rules from User DNA to collect parameters.
+
+    Returns: (domain, topics, window_days, repo_sort_weights, source_mix)
+
+    Rules are applied in priority order:
+      1. output → domain + topics
+      2. activity → window + filter thresholds
+      3. reward → repo sort weights
+      4. environment → data source mix
+    """
+    output_ranking = user_dna.values.output.ranking
+    activity_ranking = user_dna.values.activity.ranking
+    reward_ranking = user_dna.values.reward.ranking
+    env_ranking = user_dna.values.environment.ranking
+
+    # ── Rule 1: output → domain + topics ──
+    final_domain = domain
+    final_topics: list[str] = []
+    domain_config = cfg.get("domains", {}).get(domain, {})
+
+    if output_ranking:
+        top_output = output_ranking[0]
+        mapping = OUTPUT_DOMAIN_MAP.get(top_output, {})
+        new_domain = mapping.get("domain")
+
+        if new_domain and new_domain != domain and new_domain in cfg.get("domains", {}):
+            final_domain = new_domain
+            final_topics = cfg["domains"][final_domain].get("topics", [])
+        elif "topics_filter" in mapping:
+            # Filter current domain topics
+            all_topics = domain_config.get("topics", [])
+            final_topics = [t for t in all_topics if any(
+                kw in t.lower() for kw in mapping["topics_filter"]
+            )] or all_topics
+        elif "topics_append" in mapping:
+            final_topics = list(domain_config.get("topics", [])) + mapping["topics_append"]
+
+    if not final_topics:
+        final_topics = domain_config.get("topics", [])
+
+    # ── Rule 2: activity → window + filter thresholds ──
+    window_days = 365
+    repo_filter = {"min_stars": 0, "boost": "velocity"}
+
+    if activity_ranking:
+        top_activity = activity_ranking[0]
+        act_cfg = ACTIVITY_CONFIG.get(top_activity, ACTIVITY_CONFIG["exploration"])
+        window_days = act_cfg["window"]
+        repo_filter = {"min_stars": act_cfg["min_stars"], "boost": act_cfg["boost"]}
+
+    # ── Rule 3: reward → repo sort weights ──
+    repo_sort_weights = REWARD_WEIGHTS.get("growth", REWARD_WEIGHTS["growth"])
+    if reward_ranking:
+        # Blend top 2: ranking[0] gets 0.5, ranking[1] gets 0.3, rest gets 0.2 distributed
+        primary = REWARD_WEIGHTS.get(reward_ranking[0], REWARD_WEIGHTS["growth"])
+        if len(reward_ranking) > 1:
+            secondary = REWARD_WEIGHTS.get(reward_ranking[1], REWARD_WEIGHTS["growth"])
+            repo_sort_weights = {
+                k: primary.get(k, 0) * 0.6 + secondary.get(k, 0) * 0.3
+                for k in primary
+            }
+        else:
+            repo_sort_weights = dict(primary)
+
+    # ── Rule 4: environment → data source mix ──
+    source_mix = ENVIRONMENT_SOURCE_MIX.get("autonomy", ENVIRONMENT_SOURCE_MIX["autonomy"])
+    if env_ranking:
+        source_mix = ENVIRONMENT_SOURCE_MIX.get(
+            env_ranking[0], ENVIRONMENT_SOURCE_MIX["autonomy"]
+        )
+
+    return final_domain, final_topics, window_days, repo_sort_weights, source_mix
+
+
+def _score_repo(repo: dict, weights: dict) -> float:
+    """Score a repo by reward weights for personalized sorting."""
+    max_stars = 100000
+    max_forks = 50000
+    max_contribs = 5000
+
+    stars = repo.get("stargazers_count", 0)
+    forks = repo.get("forks_count", 0)
+    velocity = repo.get("velocity", 0) or 0
+    # open_issues as rough proxy for contributor activity
+    open_issues = repo.get("open_issues_count", 0)
+
+    stars_log = math.log(stars + 1) / math.log(max_stars + 1)
+    forks_log = math.log(forks + 1) / math.log(max_forks + 1)
+    velocity_norm = min(1.0, velocity / 100)
+    contribs_norm = min(1.0, open_issues / max_contribs)
+    commercial = 1.0 if repo.get("has_sponsors") or repo.get("topics") and "enterprise" in repo.get("topics", []) else 0.3
+
+    score = (
+        weights.get("velocity", 0.2) * velocity_norm
+        + weights.get("stars_log", 0.2) * stars_log
+        + weights.get("commercial", 0.2) * commercial
+        + weights.get("contributors", 0.2) * contribs_norm
+    ) * 10
+    return score
+
+
+def _get_window_days_from_dna(user_dna: UserDNA) -> int:
+    """Extract window_days from User DNA — used by builderdna skill."""
+    if user_dna and user_dna.values.activity.ranking:
+        top = user_dna.values.activity.ranking[0]
+        return ACTIVITY_CONFIG.get(top, {}).get("window", 365)
+    return 365
+
+
 async def _run_collect(
-    domain: str, output: str, config_path: str
+    domain: str, output: str, config_path: str,
+    user_dna_path: str = "state/user_dna.json",
+    window_days: int | None = None,
 ) -> None:
     cfg = load_config(config_path)
-    domain_config = cfg.domains.get(domain)
-    if not domain_config:
-        console.print(f"[red]Unknown domain: {domain}[/red]")
-        raise typer.Exit(1)
 
-    topics = domain_config.get("topics", [])
+    # Load User DNA and apply mapping rules
+    user_dna = load_user_dna(user_dna_path)
+    if user_dna:
+        final_domain, topics, w_days, sort_weights, source_mix = _apply_user_dna_rules(
+            domain, cfg, user_dna
+        )
+        console.print(f"[dim]User DNA loaded → domain={final_domain}, window={w_days}d, "
+                       f"topics={topics[:3]}...[/dim]")
+    else:
+        domain_config = cfg.domains.get(domain)
+        if not domain_config:
+            console.print(f"[red]Unknown domain: {domain}[/red]")
+            raise typer.Exit(1)
+        final_domain = domain
+        topics = domain_config.get("topics", [])
+        w_days = window_days or 365
+        sort_weights = REWARD_WEIGHTS["growth"]
+        source_mix = ENVIRONMENT_SOURCE_MIX["autonomy"]
+
     client = GitHubClient(
         token=cfg.github.token,
         cache_dir=cfg.github.cache_dir,
@@ -49,8 +189,12 @@ async def _run_collect(
                 seen_repos.add(fn)
                 all_repos.append(r)
 
-        # Step 2: Demand issues from top repos
-        top_names = [r.get("full_name", "") for r in all_repos[:5] if r.get("full_name")]
+        # Step 2: Demand issues from top repos (sorted by personalized weights)
+        scored = [(r, _score_repo(r, sort_weights)) for r in all_repos]
+        scored.sort(key=lambda x: x[1], reverse=True)
+        sorted_repos = [r for r, _ in scored]
+
+        top_names = [r.get("full_name", "") for r in sorted_repos[:5] if r.get("full_name")]
         issue_tasks = [fetch_issues(client, name, max_issues=30) for name in top_names]
         issue_results = await asyncio.gather(*issue_tasks, return_exceptions=True)
         for issues in issue_results:
@@ -62,7 +206,7 @@ async def _run_collect(
                             or iss.get("comments", 0) >= 10):
                         all_issues.append(iss)
 
-        # Step 3: Vendor + account repos
+        # Step 3: Vendor + account repos (weighted by environment source_mix)
         vendor_accounts: list[tuple[str, str]] = []
         for account in cfg.accounts:
             vendor_accounts.append((account, "account"))
@@ -72,14 +216,20 @@ async def _run_collect(
             vendor_accounts.append((account, "overseas"))
 
         seen_vendor: set[str] = set()
-        for account, _ in vendor_accounts:
+        for account, source_type in vendor_accounts:
             if account in seen_vendor:
                 continue
             seen_vendor.add(account)
             try:
                 repos = await client.get_repos(account)
                 repos.sort(key=lambda r: r.get("stargazers_count", 0), reverse=True)
-                for r in repos[:5]:
+                # Environment mix: adjust repo limit by source type weight
+                limit = 5
+                if source_type == "account":
+                    limit = max(1, int(5 * source_mix.get("accounts", 0.3)))
+                elif source_type in ("domestic", "overseas"):
+                    limit = max(1, int(5 * source_mix.get("vendors", 0.3)))
+                for r in repos[:limit]:
                     fn = r.get("full_name", "")
                     if fn not in seen_repos:
                         seen_repos.add(fn)
@@ -122,16 +272,24 @@ async def _run_collect(
                 url=s.payload.get("url") or "",
             ))
 
+    # Serialize normalized signals for downstream consumption
+    signal_dicts = [s.model_dump() for s in signals]
+
     result = SandboxResult(
         command="collect",
-        domain=domain,
-        payload=CollectPayload(repos=repo_signals, issues=issue_signals).model_dump(),
+        domain=final_domain,
+        payload=CollectPayload(
+            repos=repo_signals,
+            issues=issue_signals,
+            signals=signal_dicts,
+        ).model_dump(),
         stats={
             "total_signals": len(signals),
             "repos": len(repo_signals),
             "issues": len(issue_signals),
             "topics_searched": len(topics),
             "vendors_scanned": len(vendor_accounts),
+            "personalized": user_dna is not None,
         },
     )
 
@@ -145,6 +303,8 @@ def collect(
     domain: str = typer.Argument(..., help="Domain to collect signals for"),
     output: str = typer.Option("output/signals.json", "--output", "-o", help="Output JSON file"),
     config: str = typer.Option("config.yaml", "--config", "-c", help="Config file path"),
+    user_dna: str = typer.Option("state/user_dna.json", "--user-dna", help="User DNA file for personalization"),
+    window: int = typer.Option(None, "--window", "-w", help="Analysis window in days (overrides DNA)"),
 ) -> None:
-    """Collect GitHub signals for a domain."""
-    asyncio.run(_run_collect(domain, output, config))
+    """Collect GitHub signals for a domain (optionally personalized via User DNA)."""
+    asyncio.run(_run_collect(domain, output, config, user_dna, window))

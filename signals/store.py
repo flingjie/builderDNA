@@ -1,21 +1,21 @@
-"""SignalStore -- SQLite for transactions + DuckDB for analytics.
+"""SignalStore -- SQLite-backed signal persistence and aggregation.
 
-SQLite stores snapshot metadata and signal blobs (existing pattern).
-DuckDB provides time-series analytics queries (velocity, topic trends).
+Stores normalized Signal events and provides analytical queries
+(topic trends, velocity) that return canonical payload types.
+
+DuckDB integration is planned for future scale, but currently
+SQLite handles both transactional and analytical workloads.
 """
 import json
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 
-from signals.models import Signal, AggregateTopicTrend
+from signals.models import Signal
+from models.payload import TopicTrend
 
 
 class SignalStore:
-    """Dual-engine signal storage.
-
-    SQLite: transactional -- snapshots, feedback, audit log.
-    DuckDB: analytical -- time series, aggregations, trending queries.
-    """
+    """SQLite-backed signal storage with analytical query methods."""
 
     def __init__(self, db_path: str = "snapshots/signals.db"):
         import sqlite3
@@ -86,7 +86,12 @@ class SignalStore:
         ).fetchall()
         return [{"target_repo": r["target_repo"], "avg_velocity": round(r["avg_v"], 2), "count": r["cnt"]} for r in rows]
 
-    def get_topic_trends(self, days: int = 30) -> list[AggregateTopicTrend]:
+    def get_topic_trends(self, days: int = 30) -> list[TopicTrend]:
+        """Compute topic-level trend aggregations from the signal table.
+
+        Returns canonical TopicTrend objects (acceleration and top_repos
+        are left at defaults — callers enrich them as needed).
+        """
         since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
         rows = self._conn.execute(
             "SELECT payload_json, velocity FROM signals WHERE timestamp >= ?",
@@ -104,10 +109,12 @@ class SignalStore:
         for topic, velocities in topic_velocities.items():
             valid = [v for v in velocities if v > 0]
             avg_v = sum(valid) / len(valid) if valid else 0.0
-            results.append(AggregateTopicTrend(
+            results.append(TopicTrend(
                 topic=topic,
+                stage="emerging",
                 confidence=min(1.0, len(velocities) / 10.0),
                 growth_velocity=round(avg_v, 2),
+                acceleration=0.0,
                 evidence_count=len(velocities),
             ))
         results.sort(key=lambda t: t.growth_velocity, reverse=True)

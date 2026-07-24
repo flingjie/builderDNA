@@ -21,6 +21,30 @@ domains:
       - rag
       - tool-calling
       - multi-agent
+  devtools:
+    topics:
+      - sdk
+      - cli
+      - framework
+      - library
+      - api
+      - open-source-tools
+      - developer-tools
+  consumer:
+    topics:
+      - productivity
+      - creator-tool
+      - no-code
+      - automation
+      - personal-ai
+  infrastructure:
+    topics:
+      - database
+      - networking
+      - runtime
+      - compiler
+      - orchestration
+      - observability
 
 vendors:
   domestic:

@@ -32,7 +32,7 @@ Claude Code (you) — reads hypotheses.json, decides what to run, interprets res
   collect → trend → pain → opportunity → report
       │
       ▼
-Global memory — DuckDB + output/*.json + state/*.json + claude-mem
+Global memory — SQLite + output/*.json + state/*.json + claude-mem
 ```
 
 All commands run from the project root with `PYTHONPATH=.` prefix.
@@ -77,6 +77,36 @@ Read: hyp_001 "Agent Memory needs unified State Engine" is EXPLORING, confidence
 
 Read `state/user_weights.json` at session start. Apply `scoring_bias` when interpreting opportunities.
 Record feedback in `feedback_log` after each session.
+
+## User DNA (Value Discovery Integration)
+
+BuilderDNA now integrates with the `value-discovery` Skill for personalized analysis.
+
+**On every session start:**
+1. Check if `state/user_dna.json` exists and has non-empty values (check `values.environment.ranking` has entries).
+2. **If missing or empty:** This is a first-time user. BEFORE running `collect`, trigger the `value-discovery` Skill:
+   - Say: "在开始分析之前，我想先了解你的偏好——这样分析结果会更贴合你。我们花5-8分钟快速聊一下？"
+   - If user agrees → invoke `value-discovery` skill, then continue with collect.
+   - If user declines → proceed without personalization (no `--user-dna` flag).
+3. **If exists:** Ask: "我之前已经了解过你的偏好，要不要更新一下？" 
+   - If yes → invoke `value-discovery` skill for an incremental update.
+   - If no → use existing DNA.
+
+**When User DNA is available, pass it to commands:**
+```bash
+# Collect with personalization
+PYTHONPATH=. uv run builderdna collect <domain> --window N --user-dna state/user_dna.json --output output/signals.json
+
+# Opportunity with personalized scoring
+PYTHONPATH=. uv run builderdna opportunity --trends output/trends.json --pains output/pain_clusters.json --user-dna state/user_dna.json
+```
+
+**When presenting results:**
+- If personalized: mention "已根据你的价值偏好做了个性化排序" and highlight the `alignment_reason` on top opportunities.
+- Show both `gap_score` (客观市场机会) and `personalized_score` (对你的匹配度) side by side.
+- If a high-gap opportunity has low personalization, flag it: "这个市场机会很大，但和你的偏好不太匹配——要不要了解一下？"
+
+The `--user-dna` flag is optional on both `collect` and `opportunity` — omitting it gives objective/unpersonalized results (backward compatible).
 
 ## Schema Reference
 

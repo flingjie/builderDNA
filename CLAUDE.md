@@ -58,10 +58,9 @@ cli/main.py ── Typer app, 5 commands
      │
      └─ report   ──▶ output/markdown.py, output/json_out.py (rendering only)
 
-signals/ ── Unified Signal model + DuckDB store + NetworkX graph
-  models.py    — Signal, AggregateRepoTrend, AggregateTopicTrend, AggregateVendorProfile
-  store.py     — DuckDB-backed persistence with velocity queries
-  graph.py     — NetworkX co-occurrence graph for topic relationships
+signals/ ── Unified Signal model + SQLite store
+  models.py    — Signal (unified immutable event, all sources normalize to this)
+  store.py     — SQLite-backed persistence with velocity queries
 
 All commands wrap output in SandboxResult{command, domain, computed_at, payload, stats}.
 Schema contract: schema.md and models/payload.py — Claude Code reads these.
@@ -74,17 +73,20 @@ Schema contract: schema.md and models/payload.py — Claude Code reads these.
 - **Two-loop architecture**: Inner loop = deterministic sandbox commands run locally. Outer loop = Claude Code reads JSON outputs and does semantic reasoning.
 - **Config via YAML + env**: `config.yaml` supports `${VAR}` and `${VAR:-default}` substitution. `.env` is auto-loaded at `config.py` import time.
 - **Collector cache**: `collector/github/cache.py` provides filesystem-based HTTP response caching. Rate limiter in `collector/github/rate_limit.py` proactively manages GitHub API quotas.
-- **DuckDB for signals**: `signals/store.py` persists normalized signals to DuckDB for fast velocity queries across time windows.
+- **SQLite for signals**: `signals/store.py` persists normalized signals to SQLite for velocity queries across time windows.
 
 ## Skills (`.claude/skills/`)
 
-Three skills are deployed:
+Six skills are deployed:
 
 | Skill | Purpose | Trigger |
 |-------|---------|---------|
 | `builderdna` | Run the 5-command analysis pipeline, manage hypotheses | "analyze X's GitHub", "tech DNA", "find opportunities in Z" |
 | `repo-trend` | Discover trending repos via GitHub API search, 3-tier eval | "find trending X repos", "evaluate this repo", "check my watches" |
 | `repo-awesome` | Mine awesome-* lists for curated repo discovery | "mine awesome lists for X", "what do awesome lists recommend" |
+| `value-discovery` | Extract user's cognitive decision model via Meta Model interview | "value discovery", "what do I value", "help me understand my preferences" |
+| `reflect` | Multi-pass adversarial reflection on conversations → self-model updates | "/reflect", "reflect on this conversation", "复盘" |
+| `distill` | Synthesize accumulated reflections into growth reports | "/distill", "synthesize my reflections", "growth report", "蒸馏" |
 
 Each skill has evals in `evals/evals.json`. Shared evaluation rubrics: `references/repo-scout/`. Skills are pure Claude-orchestrated — they use `gh` CLI, not the Python codebase.
 
@@ -95,8 +97,11 @@ Each skill has evals in `evals/evals.json`. Shared evaluation rubrics: `referenc
 | `config.py` | Config loading with env var substitution + pydantic validation |
 | `config.yaml` | Accounts, domains (topic tags), vendors, embedding, output config |
 | `models/payload.py` | Output schemas for all 5 commands — the contract Claude Code reads |
-| `signals/models.py` | Unified Signal model + computed Aggregate views (TopicTrend, VendorProfile) |
+| `signals/models.py` | Unified Signal model — all data sources normalize to this |
+| `signals/store.py` | SQLite-backed persistence with velocity and topic trend queries |
 | `schema.md` | Human-readable schema reference for all SandboxResult payloads |
+| `state/user_dna.json` | User cognitive model (values, beliefs, criteria, preferences) |
+| `state/reflections.jsonl` | Reflection event log for /reflect and /distill skills |
 | `state/hypotheses.json` | Exploration state tracking across conversations (builderdna skill) |
 | `state/user_weights.json` | User preference weights for opportunity scoring bias |
 | `state/watches.json` | Saved repo searches for recurring monitoring (repo-trend skill) |

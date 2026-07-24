@@ -8,7 +8,6 @@ import typer
 from rich.console import Console
 
 from signals.store import SignalStore
-from signals.graph import SignalGraph
 from signals.models import Signal
 from intelligence.trend.velocity import compute_acceleration
 from models.payload import (
@@ -44,34 +43,36 @@ def trend(
     raw = json.loads(data_path.read_text())
     payload = raw.get("payload", raw)
 
-    # Reconstruct signals
-    repo_signals = []
-    for r in payload.get("repos", []):
-        s = Signal(
-            source="github",
-            type="repo_created",
-            actor=r.get("owner", ""),
-            target_repo=r.get("full_name", ""),
-            velocity=r.get("velocity", 0),
-            impact=min(1.0, r.get("stars", 0) / 10000.0),
-            payload={
-                "topics": r.get("topics", []),
-                "stars": r.get("stars", 0),
-                "forks": r.get("forks", 0),
-                "contributors": r.get("contributors", 0),
-                "description": r.get("description", ""),
-                "created_at": r.get("created_at", ""),
-            },
-        )
-        repo_signals.append(s)
+    # Reconstruct Signal objects — prefer normalized signals when available
+    signal_dicts = payload.get("signals", [])
+    if signal_dicts:
+        repo_signals = [Signal(**s) for s in signal_dicts]
+    else:
+        # Fallback: reconstruct from flat repo signals (older collect output format)
+        repo_signals = []
+        for r in payload.get("repos", []):
+            s = Signal(
+                source="github",
+                type="repo_created",
+                actor=r.get("owner", ""),
+                target_repo=r.get("full_name", ""),
+                velocity=r.get("velocity", 0),
+                impact=min(1.0, r.get("stars", 0) / 10000.0),
+                payload={
+                    "topics": r.get("topics", []),
+                    "stars": r.get("stars", 0),
+                    "forks": r.get("forks", 0),
+                    "contributors": r.get("contributors", 0),
+                    "description": r.get("description", ""),
+                    "created_at": r.get("created_at", ""),
+                },
+            )
+            repo_signals.append(s)
 
-    # Insert into store and graph
+    # Insert into store and query aggregated trends
     with SignalStore() as store:
         store.insert(repo_signals)
         trend_rows = store.get_topic_trends(days=window)
-
-    graph = SignalGraph()
-    graph.build_from_signals(repo_signals)
 
     # Group signals by topic
     topic_signals: dict[str, list[Signal]] = {}
@@ -79,34 +80,42 @@ def trend(
         for topic in s.payload.get("topics", []):
             topic_signals.setdefault(topic, []).append(s)
 
-    # Build trend output
+    # Build trend output — enrich store results with acceleration, stage, top_repos
     trends = []
     for t in trend_rows:
         sigs = topic_signals.get(t.topic, [])
         accel = compute_acceleration(sigs, window_days=window)
-        stage = _resolve_stage(t.growth_velocity, accel, t.confidence)
+        t.acceleration = round(accel, 2)
+        t.stage = _resolve_stage(t.growth_velocity, accel, t.confidence)
 
-        top_repos = []
-        for rt in t.top_repos[:5]:
-            top_repos.append(RepoSummary(
-                full_name=rt.full_name,
-                stars=rt.stars,
-                stars_delta=rt.stars_delta,
-                forks=rt.forks,
-                contributors=rt.contributors,
-                velocity=rt.velocity,
-                description="",
-            ))
+        # Build top_repos from raw signal data
+        topic_repos: dict[str, dict] = {}
+        for s in sigs:
+            name = s.target_repo
+            if name not in topic_repos:
+                payload = s.payload
+                topic_repos[name] = {
+                    "full_name": name,
+                    "stars": payload.get("stars", 0),
+                    "forks": payload.get("forks", 0),
+                    "contributors": payload.get("contributors", 0),
+                    "velocity": s.velocity,
+                }
+        sorted_repos = sorted(
+            topic_repos.values(), key=lambda r: r["stars"], reverse=True
+        )[:5]
+        t.top_repos = [
+            RepoSummary(
+                full_name=r["full_name"],
+                stars=r["stars"],
+                forks=r["forks"],
+                contributors=r["contributors"],
+                velocity=r["velocity"],
+            )
+            for r in sorted_repos
+        ]
 
-        trends.append(TopicTrend(
-            topic=t.topic,
-            stage=stage,
-            confidence=t.confidence,
-            growth_velocity=t.growth_velocity,
-            acceleration=round(accel, 2),
-            evidence_count=t.evidence_count,
-            top_repos=top_repos,
-        ))
+        trends.append(t)
 
     trends.sort(key=lambda x: x.growth_velocity, reverse=True)
 
