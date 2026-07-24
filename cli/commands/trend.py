@@ -11,7 +11,8 @@ from intelligence.trend.velocity import compute_acceleration
 from models.payload import (
     SandboxResult, TrendPayload, TopicTrend, RepoSummary,
 )
-from observability import RunTelemetry, OutputLevel, vprint
+from observability import RunTelemetry, OutputLevel, vprint, record_command, record_output_retention
+from observability.snapshot import save_trend_snapshot
 
 
 def _resolve_stage(velocity: float, acceleration: float, confidence: float) -> tuple[str, str]:
@@ -138,3 +139,17 @@ def trend(
     for t in trends[:5]:
         vprint(f"  {t.stage:15s} {t.topic:25s} v={t.growth_velocity:.1f}", level=OutputLevel.NORMAL)
         vprint(f"    {t.classification_reason}", level=OutputLevel.VERBOSE)
+
+    # Behavior tracking + prediction snapshot
+    trend_dicts = [t.model_dump() for t in trends]
+    record_command(
+        command="trend",
+        domain=domain,
+        flags={"window": window, "data": data},
+        output_path=output,
+        user_dna_used=False,
+        elapsed_seconds=tel.elapsed_seconds,
+        status="success",
+    )
+    record_output_retention(output)
+    save_trend_snapshot(domain=domain, trends=trend_dicts, window_days=window)

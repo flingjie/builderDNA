@@ -5,7 +5,9 @@ from datetime import datetime
 
 import typer
 
-from observability import OutputLevel, vprint
+import time as _time
+
+from observability import OutputLevel, vprint, record_command, record_output_retention
 
 
 def _render_md(data: dict, output_path: Path, verbose: bool = False) -> str:
@@ -114,6 +116,7 @@ def report(
     """Render structured results to a report."""
     from observability import get_output_level
     verbose = get_output_level().value >= OutputLevel.VERBOSE.value
+    t0 = _time.time()
 
     data_path = Path(data)
     if not data_path.exists():
@@ -132,3 +135,16 @@ def report(
         _render_md(raw, out, verbose=verbose)
 
     vprint(f"[green]Report → {out}[/green]", level=OutputLevel.NORMAL)
+
+    # Behavior tracking
+    elapsed = round(_time.time() - t0, 2)
+    record_command(
+        command="report",
+        domain=raw.get("domain", ""),
+        flags={"format": fmt, "output_dir": output_dir},
+        output_path=str(out),
+        user_dna_used=False,
+        elapsed_seconds=elapsed,
+        status="success",
+    )
+    record_output_retention(str(out))

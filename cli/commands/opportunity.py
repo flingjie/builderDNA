@@ -20,7 +20,8 @@ from intelligence.opportunity.scoring import (
     compute_demand, compute_competition, compute_gap, recommend_action,
 )
 from intelligence.opportunity.alignment import compute_alignment
-from observability import RunTelemetry, OutputLevel, vprint
+from observability import RunTelemetry, OutputLevel, vprint, record_command, record_output_retention
+from observability.snapshot import save_opportunity_snapshot
 
 
 def _generate_cards(
@@ -160,3 +161,17 @@ def opportunity(
             vprint(f"    demand={bd.get('demand_score','?')} competition={bd.get('competition_score','?')} "
                    f"| vel={bd.get('velocity_contribution','?')} sev={bd.get('severity_contribution','?')} "
                    f"freq={bd.get('frequency_contribution','?')}", level=OutputLevel.VERBOSE)
+
+    # Behavior tracking + prediction snapshot
+    card_dicts = [c.model_dump() for c in cards]
+    record_command(
+        command="opportunity",
+        domain=t_payload.get("domain", ""),
+        flags={"trends": trends, "pains": pains},
+        output_path=output,
+        user_dna_used=dna is not None,
+        elapsed_seconds=tel.elapsed_seconds,
+        status="success",
+    )
+    record_output_retention(output)
+    save_opportunity_snapshot(domain=t_payload.get("domain", ""), cards=card_dicts)

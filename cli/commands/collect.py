@@ -16,7 +16,7 @@ from collector.github.repo import fetch_top_repos
 from collector.github.issue import fetch_issues, DEMAND_LABELS
 from collector.normalizer import normalize_all
 from models.payload import SandboxResult, CollectPayload, RepoSignal, IssueSignal
-from observability import RunTelemetry, OutputLevel, vprint
+from observability import RunTelemetry, OutputLevel, vprint, record_command, record_output_retention
 from state.user_dna_schema import (
     load_user_dna, UserDNA,
     OUTPUT_DOMAIN_MAP, ACTIVITY_CONFIG,
@@ -354,6 +354,19 @@ async def _run_collect(
         for retry in tel.retry_exhausted:
             vprint(f"[yellow]  ⚠ Retry exhausted: {retry['url']} ({retry['reason']}, {retry['attempts']} attempts)[/yellow]",
                    level=OutputLevel.NORMAL)
+
+    # Behavior tracking
+    record_command(
+        command="collect",
+        domain=final_domain,
+        flags={"window": w_days, "no_cache": no_cache, "clear_cache": clear_cache,
+               "user_dna": user_dna is not None},
+        output_path=output,
+        user_dna_used=user_dna is not None,
+        elapsed_seconds=tel.elapsed_seconds,
+        status="success",
+    )
+    record_output_retention(output)
 
 
 def collect(

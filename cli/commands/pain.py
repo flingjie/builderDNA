@@ -10,7 +10,8 @@ from intelligence.pain.severity import compute_severity
 from models.payload import (
     SandboxResult, PainPayload, PainCluster, IssueSummary,
 )
-from observability import RunTelemetry, OutputLevel, vprint
+from observability import RunTelemetry, OutputLevel, vprint, record_command, record_output_retention
+from observability.snapshot import save_pain_snapshot
 
 
 def _get_embeddings(texts: list[str]) -> list[list[float]]:
@@ -147,3 +148,18 @@ def pain(
     noise_info = f" ({noise_count} noise)" if noise_count else ""
     vprint(f"[dim]Done in {tel.elapsed_seconds}s, {len(issues)} issues analyzed{noise_info}[/dim]",
            level=OutputLevel.NORMAL)
+
+    # Behavior tracking + prediction snapshot
+    cluster_dicts = [c.model_dump() for c in pain_clusters_list]
+    record_command(
+        command="pain",
+        domain=domain,
+        flags={"data": data},
+        output_path=output,
+        user_dna_used=False,
+        elapsed_seconds=tel.elapsed_seconds,
+        status="success",
+    )
+    record_output_retention(output)
+    save_pain_snapshot(domain=domain, clusters=cluster_dicts,
+                       issue_count=len(issues), noise_count=noise_count)
