@@ -35,30 +35,3 @@ async def fetch_top_repos(
         if tel:
             tel.add_error(url, str(e))
         return []
-
-
-async def fetch_releases(
-    client: GitHubClient, repo: str, max_results: int = 10
-) -> list[dict]:
-    """Fetch recent releases for a repository.
-
-    Args:
-        client: GitHubClient instance.
-        repo: Full repo name (e.g. "org/repo").
-        max_results: Max releases to return.
-
-    Returns:
-        List of release dicts.
-    """
-    url = f"/repos/{repo}/releases"
-    try:
-        params = {"per_page": str(min(max_results, 100))}
-        resp = await client._request("GET", f"/repos/{repo}/releases", params=params)
-        if resp is None:
-            return []
-        return resp.json()
-    except Exception as e:
-        tel = client.telemetry
-        if tel:
-            tel.add_error(url, str(e))
-        return []

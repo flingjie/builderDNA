@@ -10,7 +10,7 @@ class TestPainClusterer:
     def test_default_construction(self):
         """Default params produce a usable clusterer."""
         clusterer = PainClusterer()
-        assert clusterer.clusterer.min_cluster_size == 5
+        assert clusterer.clusterer.min_cluster_size == 3
         assert clusterer.clusterer.min_samples == 2
         assert clusterer.clusterer.metric == "euclidean"
 

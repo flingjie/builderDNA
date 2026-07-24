@@ -27,7 +27,7 @@ class PainClusterer:
 
     def __init__(
         self,
-        min_cluster_size: int = 5,
+        min_cluster_size: int = 3,
         min_samples: int = 2,
         metric: str = "euclidean",
     ):

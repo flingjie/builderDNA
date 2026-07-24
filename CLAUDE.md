@@ -4,13 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-BuilderDNA is a Technology Intelligence Sandbox Toolkit — 5 composable CLI commands that analyze GitHub developer activity. Each command is an independent sandbox: structured JSON in → deterministic compute → structured JSON out. Claude Code handles all semantic reasoning and orchestration, reading JSON outputs from `output/`. No LLM, no web server, no LangGraph pipeline.
+BuilderDNA is a Technology Intelligence Sandbox Toolkit — 6 composable CLI commands that analyze GitHub developer activity. Each command is an independent sandbox: structured JSON in → deterministic compute → structured JSON out. Claude Code handles all semantic reasoning and orchestration, reading JSON outputs from `output/`. No LLM, no web server, no LangGraph pipeline.
 
 ## Commands
 
 ```bash
 # All commands need PYTHONPATH=. prefix and config.yaml in project root
-# .env must contain: GITHUB_TOKEN
+# Copy .env.example to .env and fill in: GITHUB_TOKEN
 
 # Collect GitHub signals (repos + issues) for a domain
 PYTHONPATH=. uv run builderdna collect agent --window 365 --output output/signals.json
@@ -27,7 +27,10 @@ PYTHONPATH=. uv run builderdna opportunity --trends output/trends.json --pains o
 # Render any SandboxResult to Markdown or JSON
 PYTHONPATH=. uv run builderdna report --data output/opportunities.json --format md
 
-# Run all tests (118 tests)
+# Show resolved configuration (with sensitive values masked)
+PYTHONPATH=. uv run builderdna config --show
+
+# Run all tests (209 tests)
 uv run pytest tests/ -v
 
 # Run a single test file/class/function
@@ -41,7 +44,7 @@ uv run pytest tests/test_signal/test_models.py::TestSignal -v
 config.yaml ──▶ config.py (Config model, env var ${SUBSTITUTION})
      │
      ▼
-cli/main.py ── Typer app, 5 commands
+cli/main.py ── Typer app, 6 commands
      │
      ├─ collect  ──▶ collector/github/ (httpx client, cache, rate limiter)
      │              ▶ collector/normalizer.py (raw API → Signal model)
@@ -56,7 +59,9 @@ cli/main.py ── Typer app, 5 commands
      ├─ opportunity ▶ intelligence/opportunity/ (rule engine, gap_score = demand/competition)
      │              ▶ output: models/payload.py → OpportunityCard
      │
-     └─ report   ──▶ output/markdown.py, output/json_out.py (rendering only)
+     ├─ report   ──▶ cli/commands/report_cmd.py (rendering only)
+     │
+     └─ config   ──▶ cli/commands/config_cmd.py (show resolved config)
 
 signals/ ── Unified Signal model + SQLite store
   models.py    — Signal (unified immutable event, all sources normalize to this)
@@ -68,7 +73,7 @@ Schema contract: schema.md and models/payload.py — Claude Code reads these.
 
 ## Key Design Decisions
 
-- **LLM-free pipeline**: After refactoring (commits `b514421`, `c7566b6`), all LLM calls were removed. The `llm/` directory now contains only prompt templates. Trend/pain/opportunity use deterministic algorithms (velocity, HDBSCAN, rule engine).
+- **LLM-free pipeline**: After refactoring (commits `b514421`, `c7566b6`), all LLM calls were removed. Trend/pain/opportunity use deterministic algorithms (velocity, HDBSCAN, rule engine).
 - **No web layer**: FastAPI was removed. This is a CLI toolkit, not a service.
 - **Two-loop architecture**: Inner loop = deterministic sandbox commands run locally. Outer loop = Claude Code reads JSON outputs and does semantic reasoning.
 - **Config via YAML + env**: `config.yaml` supports `${VAR}` and `${VAR:-default}` substitution. `.env` is auto-loaded at `config.py` import time.
@@ -81,14 +86,14 @@ Six skills are deployed:
 
 | Skill | Purpose | Trigger |
 |-------|---------|---------|
-| `builderdna` | Run the 5-command analysis pipeline, manage hypotheses | "analyze X's GitHub", "tech DNA", "find opportunities in Z" |
+| `builderdna` | Run the 6-command analysis pipeline, manage hypotheses | "analyze X's GitHub", "tech DNA", "find opportunities in Z" |
 | `repo-trend` | Discover trending repos via GitHub API search, 3-tier eval | "find trending X repos", "evaluate this repo", "check my watches" |
 | `repo-awesome` | Mine awesome-* lists for curated repo discovery | "mine awesome lists for X", "what do awesome lists recommend" |
 | `value-discovery` | Extract user's cognitive decision model via Meta Model interview | "value discovery", "what do I value", "help me understand my preferences" |
 | `reflect` | Multi-pass adversarial reflection on conversations → self-model updates | "/reflect", "reflect on this conversation", "复盘" |
 | `distill` | Synthesize accumulated reflections into growth reports | "/distill", "synthesize my reflections", "growth report", "蒸馏" |
 
-Each skill has evals in `evals/evals.json`. Shared evaluation rubrics: `references/repo-scout/`. Skills are pure Claude-orchestrated — they use `gh` CLI, not the Python codebase.
+Three skills include evals in `evals/evals.json`. Shared evaluation rubrics: `references/repo-scout/`. Skills are pure Claude-orchestrated — they use `gh` CLI, not the Python codebase.
 
 ## Key Files
 
@@ -103,9 +108,8 @@ Each skill has evals in `evals/evals.json`. Shared evaluation rubrics: `referenc
 | `state/user_dna.json` | User cognitive model (values, beliefs, criteria, preferences) |
 | `state/reflections.jsonl` | Reflection event log for /reflect and /distill skills |
 | `state/hypotheses.json` | Exploration state tracking across conversations (builderdna skill) |
-| `state/user_weights.json` | User preference weights for opportunity scoring bias |
 | `state/watches.json` | Saved repo searches for recurring monitoring (repo-trend skill) |
-| `output/tracked_repos.json` | Persistent repo tracking with diff history (repo-trend skill) |
+| `.env` | Environment variables: GITHUB_TOKEN, EMBEDDING_BASE_URL (copy from .env.example) |
 
 ## README Warning
 

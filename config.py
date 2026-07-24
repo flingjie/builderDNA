@@ -75,9 +75,6 @@ class Config(BaseModel):
     """Root configuration for BuilderDNA."""
 
     accounts: list[str] = Field(description="GitHub accounts to analyze")
-    follow_accounts: list[str] = Field(
-        default_factory=list, description="GitHub accounts recommended to follow (flat)"
-    )
     domains: dict[str, dict] = Field(
         default_factory=dict, description="Radar domain configurations (e.g. agent.topics)"
     )

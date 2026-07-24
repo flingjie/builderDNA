@@ -56,29 +56,3 @@ def compute_velocity(stars: int, days_since_creation: int) -> float:
     if days_since_creation <= 0:
         return float(stars)
     return round(stars / days_since_creation, 2)
-
-
-def compute_confidence(
-    repo_count: int,
-    avg_velocity: float,
-    velocity_variance: float,
-) -> float:
-    """Compute a confidence score for a trend signal.
-
-    Balances two factors:
-      - Count factor: saturates at 10+ repos.
-      - Variance penalty: high variance reduces confidence.
-
-    Args:
-        repo_count: Number of repos contributing to the signal.
-        avg_velocity: Average velocity across repos (used as normalizer).
-        velocity_variance: Variance of repo velocities (spread indicator).
-
-    Returns:
-        Confidence score between 0.0 and 1.0, rounded to 2 decimals.
-    """
-    if repo_count <= 0:
-        return 0.0
-    count_factor = min(1.0, repo_count / 10.0)
-    variance_penalty = 1.0 / (1.0 + velocity_variance)
-    return round(count_factor * 0.5 + variance_penalty * 0.5, 2)

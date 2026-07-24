@@ -91,55 +91,6 @@ class GitHubClient:
         finally:
             self._force_refresh.discard(f"/users/{actor}/repos")
 
-    async def get_user(self, actor: str) -> dict[str, Any] | None:
-        """Fetch a GitHub user's profile.
-
-        Returns None if user not found (404). Raises on 401.
-        """
-        resp = await self._request("GET", f"/users/{actor}")
-        return resp.json() if resp is not None else None
-
-    async def get_starred(self, actor: str) -> list[dict[str, Any]]:
-        """Fetch repositories starred by the actor."""
-        params: dict[str, str] = {"per_page": "100"}
-        return await self._paginate(f"/users/{actor}/starred", extra_params=params)
-
-    async def get_commits(
-        self, actor: str, repo_full_name: str, since: str | None = None
-    ) -> list[dict[str, Any]]:
-        """Fetch commits by the actor in a specific repo."""
-        params: dict[str, str] = {"author": actor, "per_page": "100"}
-        if since:
-            params["since"] = since
-        return await self._paginate(f"/repos/{repo_full_name}/commits", extra_params=params)
-
-    async def get_total_stars(self, actor: str) -> tuple[int, int]:
-        """Get total stars across all repos for an actor using Search API.
-
-        One API call instead of paginating all repos just to sum stars.
-
-        Returns:
-            (total_stars, repo_count). Stars are the sum of stargazers_count
-            across all search results. Falls back to summing repo pages if
-            search is unavailable.
-        """
-        try:
-            params: dict[str, str] = {
-                "q": f"user:{actor}+fork:true",
-                "per_page": "100",
-            }
-            results = await self._paginate("/search/repositories", extra_params=params)
-            total_stars = sum(r.get("stargazers_count", 0) for r in results)
-            repo_count = len(results)
-        except Exception:
-            # Fallback: sum stars from the repos endpoint
-            # Fallback: sum stars from the repos endpoint
-            repos = await self.get_repos(actor)
-            total_stars = sum(r.get("stargazers_count", 0) for r in repos)
-            repo_count = len(repos)
-
-        return total_stars, repo_count
-
     # ── Internal methods ──────────────────────────────────────────
 
     async def _wait_if_needed(self) -> bool:

@@ -132,14 +132,6 @@ def _score_repo(repo: dict, weights: dict) -> float:
     return score
 
 
-def _get_window_days_from_dna(user_dna: UserDNA) -> int:
-    """Extract window_days from User DNA — used by builderdna skill."""
-    if user_dna and user_dna.values.activity.ranking:
-        top = user_dna.values.activity.ranking[0]
-        return ACTIVITY_CONFIG.get(top, {}).get("window", 365)
-    return 365
-
-
 async def _run_collect(
     domain: str, output: str, config_path: str,
     user_dna_path: str = "state/user_dna.json",

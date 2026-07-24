@@ -5,6 +5,7 @@ from pathlib import Path
 
 import typer
 
+from config import load_config
 from intelligence.pain.cluster import PainClusterer
 from intelligence.pain.severity import compute_severity
 from models.payload import (
@@ -14,14 +15,11 @@ from observability import RunTelemetry, OutputLevel, vprint, record_command, rec
 from observability.snapshot import save_pain_snapshot
 
 
-def _get_embeddings(texts: list[str]) -> list[list[float]]:
+def _get_embeddings(texts: list[str], model: str, base_url: str) -> list[list[float]]:
     """Get embeddings for a list of texts with exponential backoff retry."""
-    import os
     import time
     from openai import OpenAI, APIError
 
-    base_url = os.environ.get("EMBEDDING_BASE_URL", "http://localhost:11434/v1")
-    model = os.environ.get("EMBEDDING_MODEL", "bge-m3:latest")
     client = OpenAI(base_url=base_url, api_key="ollama")
 
     embeddings = []
@@ -47,9 +45,14 @@ def pain(
     domain: str = typer.Argument(..., help="Domain name"),
     data: str = typer.Option("output/signals.json", "--data", "-d", help="Input signals JSON"),
     output: str = typer.Option("output/pain_clusters.json", "--output", "-o", help="Output JSON file"),
+    config: str = typer.Option("config.yaml", "--config", "-c", help="Config file path"),
 ) -> None:
     """Mine pain points from collected issue signals."""
     tel = RunTelemetry()
+    cfg = load_config(config)
+    embedding_model = cfg.embedding.model
+    embedding_base_url = cfg.embedding.base_url
+
     data_path = Path(data)
     if not data_path.exists():
         vprint(f"[red]Input file not found: {data}[/red]", level=OutputLevel.QUIET)
@@ -77,7 +80,7 @@ def pain(
 
     # Get embeddings and cluster
     try:
-        embeddings = _get_embeddings(texts)
+        embeddings = _get_embeddings(texts, model=embedding_model, base_url=embedding_base_url)
     except Exception as e:
         vprint(f"[yellow]Embedding failed: {e}. Falling back to title-based grouping.[/yellow]",
                level=OutputLevel.NORMAL)

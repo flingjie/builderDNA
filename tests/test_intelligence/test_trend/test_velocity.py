@@ -7,7 +7,6 @@ import pytest
 from intelligence.trend.velocity import (
     compute_acceleration,
     compute_velocity,
-    compute_confidence,
 )
 
 
@@ -117,35 +116,3 @@ class TestComputeAcceleration:
         # recent: none (both are older than 30 days)
         # previous: both (within 60-30 day range)
         assert compute_acceleration(signals, window_days=30) == 0.0
-
-
-# ── compute_confidence ────────────────────────────────────────────────────
-
-
-class TestComputeConfidence:
-    def test_no_repos_returns_zero(self):
-        assert compute_confidence(0, 10.0, 2.0) == 0.0
-
-    def test_full_confidence(self):
-        """10 repos, no variance → 1.0."""
-        score = compute_confidence(10, 5.0, 0.0)
-        assert score == 1.0
-
-    def test_single_repo_full_variance(self):
-        """1 repo with very high variance → low but non-zero."""
-        score = compute_confidence(1, 5.0, 100.0)
-        # count_factor = 0.1, variance_penalty = 1/101 ≈ 0.0099
-        # score = 0.1*0.5 + 0.0099*0.5 ≈ 0.055
-        assert score == pytest.approx(0.05, abs=0.01)
-
-    def test_count_factor_saturation(self):
-        """More than 10 repos still uses count_factor = 1.0."""
-        score_10 = compute_confidence(10, 5.0, 0.0)
-        score_20 = compute_confidence(20, 5.0, 0.0)
-        assert score_10 == score_20 == 1.0
-
-    def test_variance_penalty_reduces_confidence(self):
-        """Higher variance → lower confidence."""
-        low_var = compute_confidence(5, 5.0, 0.5)
-        high_var = compute_confidence(5, 5.0, 10.0)
-        assert low_var > high_var
