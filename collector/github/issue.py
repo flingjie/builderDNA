@@ -35,7 +35,10 @@ async def fetch_issues(
 
     try:
         issues_data = await client._paginate(f"/repos/{repo}/issues", extra_params=params)
-    except Exception:
+    except Exception as e:
+        tel = client.telemetry
+        if tel:
+            tel.add_error(f"/repos/{repo}/issues", str(e))
         return []
 
     return _extract_issues(issues_data, repo)
@@ -75,7 +78,10 @@ async def fetch_demand_issues(
         data = resp.json()
         items = data.get("items", []) if isinstance(data, dict) else []
         return _extract_issues(items, repo)
-    except Exception:
+    except Exception as e:
+        tel = client.telemetry
+        if tel:
+            tel.add_error(f"/search/issues?q=repo:{repo}", str(e))
         return []
 
 
@@ -169,5 +175,8 @@ async def fetch_discussions(
             }
             for n in nodes
         ]
-    except Exception:
+    except Exception as e:
+        tel = client.telemetry
+        if tel:
+            tel.add_error(f"/graphql discussions for {repo}", str(e))
         return []

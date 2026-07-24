@@ -9,7 +9,6 @@ import math
 from pathlib import Path
 
 import typer
-from rich.console import Console
 
 from config import load_config
 from collector.github.client import GitHubClient
@@ -17,13 +16,13 @@ from collector.github.repo import fetch_top_repos
 from collector.github.issue import fetch_issues, DEMAND_LABELS
 from collector.normalizer import normalize_all
 from models.payload import SandboxResult, CollectPayload, RepoSignal, IssueSignal
+from observability import RunTelemetry, OutputLevel, vprint
 from state.user_dna_schema import (
     load_user_dna, UserDNA,
     OUTPUT_DOMAIN_MAP, ACTIVITY_CONFIG,
     REWARD_WEIGHTS, ENVIRONMENT_SOURCE_MIX,
 )
 
-console = Console()
 DEMAND_SET = set(DEMAND_LABELS)
 
 
@@ -145,8 +144,18 @@ async def _run_collect(
     domain: str, output: str, config_path: str,
     user_dna_path: str = "state/user_dna.json",
     window_days: int | None = None,
+    no_cache: bool = False,
+    clear_cache: bool = False,
 ) -> None:
     cfg = load_config(config_path)
+    tel = RunTelemetry()
+
+    # Clear cache if requested
+    if clear_cache:
+        from collector.github.cache import CacheStore
+        store = CacheStore(cfg.github.cache_dir)
+        count = store.clear()
+        vprint(f"[dim]Cleared {count} cache entries[/dim]", level=OutputLevel.NORMAL)
 
     # Load User DNA and apply mapping rules
     user_dna = load_user_dna(user_dna_path)
@@ -154,12 +163,12 @@ async def _run_collect(
         final_domain, topics, w_days, sort_weights, source_mix = _apply_user_dna_rules(
             domain, cfg, user_dna
         )
-        console.print(f"[dim]User DNA loaded → domain={final_domain}, window={w_days}d, "
-                       f"topics={topics[:3]}...[/dim]")
+        vprint(f"[dim]User DNA loaded → domain={final_domain}, window={w_days}d, "
+               f"topics={topics[:3]}...[/dim]", level=OutputLevel.VERBOSE)
     else:
         domain_config = cfg.domains.get(domain)
         if not domain_config:
-            console.print(f"[red]Unknown domain: {domain}[/red]")
+            vprint(f"[red]Unknown domain: {domain}[/red]", level=OutputLevel.QUIET)
             raise typer.Exit(1)
         final_domain = domain
         topics = domain_config.get("topics", [])
@@ -172,16 +181,25 @@ async def _run_collect(
         cache_dir=cfg.github.cache_dir,
         max_concurrent=cfg.github.max_concurrent,
         rate_limit_margin=cfg.github.rate_limit_margin,
+        telemetry=tel,
+        disable_cache=no_cache,
     )
 
     all_repos: list[dict] = []
     all_issues: list[dict] = []
     seen_repos: set[str] = set()
+    topics_with_results: int = 0
 
     try:
         # Step 1: Topic repos
+        vprint(f"[dim]⏳ Step 1/3: Searching {len(topics)} topics for repos...[/dim]",
+               level=OutputLevel.VERBOSE)
+        topics_with_results = 0
         for topic in topics:
             repos = await fetch_top_repos(client, topic)
+            if repos:
+                topics_with_results += 1
+            vprint(f"[dim]  ✓ {topic}: {len(repos)} repos[/dim]", level=OutputLevel.VERBOSE)
             for r in repos:
                 fn = r.get("full_name", "")
                 if fn in seen_repos:
@@ -195,16 +213,22 @@ async def _run_collect(
         sorted_repos = [r for r, _ in scored]
 
         top_names = [r.get("full_name", "") for r in sorted_repos[:5] if r.get("full_name")]
+        vprint(f"[dim]⏳ Step 2/3: Fetching issues from {len(top_names)} repos...[/dim]",
+               level=OutputLevel.VERBOSE)
         issue_tasks = [fetch_issues(client, name, max_issues=30) for name in top_names]
         issue_results = await asyncio.gather(*issue_tasks, return_exceptions=True)
-        for issues in issue_results:
+        for name, issues in zip(top_names, issue_results):
             if isinstance(issues, list):
-                for iss in issues:
-                    iss_labels = iss.get("labels", [])
-                    if (any(lbl in DEMAND_SET for lbl in iss_labels)
-                            or iss.get("reactions", 0) >= 5
-                            or iss.get("comments", 0) >= 10):
-                        all_issues.append(iss)
+                demand_issues = [iss for iss in issues if (
+                    any(lbl in DEMAND_SET for lbl in iss.get("labels", []))
+                    or iss.get("reactions", 0) >= 5
+                    or iss.get("comments", 0) >= 10
+                )]
+                vprint(f"[dim]  ✓ {name}: {len(demand_issues)} demand issues[/dim]",
+                       level=OutputLevel.VERBOSE)
+                all_issues.extend(demand_issues)
+            elif isinstance(issues, Exception):
+                tel.add_error(f"fetch_issues({name})", str(issues))
 
         # Step 3: Vendor + account repos (weighted by environment source_mix)
         vendor_accounts: list[tuple[str, str]] = []
@@ -215,6 +239,8 @@ async def _run_collect(
         for account in cfg.vendors.overseas:
             vendor_accounts.append((account, "overseas"))
 
+        vprint(f"[dim]⏳ Step 3/3: Scanning {len(vendor_accounts)} vendor/account repos...[/dim]",
+               level=OutputLevel.VERBOSE)
         seen_vendor: set[str] = set()
         for account, source_type in vendor_accounts:
             if account in seen_vendor:
@@ -235,7 +261,9 @@ async def _run_collect(
                         seen_repos.add(fn)
                         all_repos.append(r)
             except Exception as e:
-                console.print(f"[yellow]Warning: failed to fetch repos for {account}: {e}[/yellow]")
+                tel.add_error(f"get_repos({account})", str(e))
+                vprint(f"[yellow]Warning: failed to fetch repos for {account}: {e}[/yellow]",
+                       level=OutputLevel.NORMAL)
     finally:
         await client.close()
 
@@ -275,6 +303,17 @@ async def _run_collect(
     # Serialize normalized signals for downstream consumption
     signal_dicts = [s.model_dump() for s in signals]
 
+    # Build stats with telemetry
+    cmd_stats = {
+        "total_signals": len(signals),
+        "repos": len(repo_signals),
+        "issues": len(issue_signals),
+        "topics_searched": len(topics),
+        "topics_with_results": topics_with_results,
+        "vendors_scanned": len(vendor_accounts),
+        "personalized": user_dna is not None,
+    }
+
     result = SandboxResult(
         command="collect",
         domain=final_domain,
@@ -283,20 +322,38 @@ async def _run_collect(
             issues=issue_signals,
             signals=signal_dicts,
         ).model_dump(),
-        stats={
-            "total_signals": len(signals),
-            "repos": len(repo_signals),
-            "issues": len(issue_signals),
-            "topics_searched": len(topics),
-            "vendors_scanned": len(vendor_accounts),
-            "personalized": user_dna is not None,
-        },
+        stats={**cmd_stats, **tel.to_stats()},
     )
 
     output_path = Path(output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(result.model_dump(), indent=2, ensure_ascii=False))
-    console.print(f"[green]Collected {len(repo_signals)} repos + {len(issue_signals)} issues → {output}[/green]")
+
+    # End-of-run summary
+    cache_info = ""
+    if tel.cache_total > 0:
+        cache_info = f", cache: {tel.cache_hits} hits/{tel.cache_misses} misses ({int(tel.cache_hit_rate * 100)}% hit)"
+    rate_info = ""
+    if client.rate_limiter._total_calls > 0:
+        rate_info = f", API: {client.rate_limiter._total_calls} calls"
+        if client.rate_limiter._waited_calls > 0:
+            rate_info += f" (waited {client.rate_limiter._waited_calls}x)"
+    error_info = ""
+    if tel.errors:
+        error_info = f", {len(tel.errors)} errors"
+    if tel.retry_exhausted:
+        error_info += f", {len(tel.retry_exhausted)} retry exhaustions"
+
+    vprint(f"[green]Collected {len(repo_signals)} repos + {len(issue_signals)} issues → {output}[/green]",
+           level=OutputLevel.NORMAL)
+    vprint(f"[dim]Done in {tel.elapsed_seconds}s{cache_info}{rate_info}{error_info}[/dim]",
+           level=OutputLevel.NORMAL)
+    if tel.has_issues():
+        for err in tel.errors:
+            vprint(f"[yellow]  ⚠ {err['url']}: {err['reason']}[/yellow]", level=OutputLevel.NORMAL)
+        for retry in tel.retry_exhausted:
+            vprint(f"[yellow]  ⚠ Retry exhausted: {retry['url']} ({retry['reason']}, {retry['attempts']} attempts)[/yellow]",
+                   level=OutputLevel.NORMAL)
 
 
 def collect(
@@ -305,6 +362,8 @@ def collect(
     config: str = typer.Option("config.yaml", "--config", "-c", help="Config file path"),
     user_dna: str = typer.Option("state/user_dna.json", "--user-dna", help="User DNA file for personalization"),
     window: int = typer.Option(None, "--window", "-w", help="Analysis window in days (overrides DNA)"),
+    no_cache: bool = typer.Option(False, "--no-cache", help="Disable HTTP cache (all requests go to API)"),
+    clear_cache: bool = typer.Option(False, "--clear-cache", help="Clear cache before collecting"),
 ) -> None:
     """Collect GitHub signals for a domain (optionally personalized via User DNA)."""
-    asyncio.run(_run_collect(domain, output, config, user_dna, window))
+    asyncio.run(_run_collect(domain, output, config, user_dna, window, no_cache, clear_cache))

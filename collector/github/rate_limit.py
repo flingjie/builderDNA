@@ -8,6 +8,8 @@ import asyncio
 import time
 from datetime import datetime, timezone
 
+from observability.output import OutputLevel, vprint
+
 
 class RateLimiter:
     """Tracks GitHub API rate limit state and waits proactively."""
@@ -69,8 +71,9 @@ class RateLimiter:
             wait_seconds = max(self._reset - now + 1, 0)
             if wait_seconds > 0:
                 self._waited_calls += 1
-                print(f"[RateLimit] {self._remaining}/{self._limit} remaining — "
-                      f"waiting {wait_seconds:.0f}s until reset at {self.reset_at_iso}")
+                vprint(f"[RateLimit] {self._remaining}/{self._limit} remaining — "
+                       f"waiting {wait_seconds:.0f}s until reset at {self.reset_at_iso}",
+                       level=OutputLevel.NORMAL)
                 await asyncio.sleep(wait_seconds)
                 return True
         return False

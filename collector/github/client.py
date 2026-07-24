@@ -6,12 +6,16 @@ management, and semaphore-based concurrency control.
 """
 
 import asyncio
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 import httpx
 
 from collector.github.cache import CacheStore
 from collector.github.rate_limit import RateLimiter
+from observability.output import OutputLevel, get_console, vprint
+
+if TYPE_CHECKING:
+    from observability.telemetry import RunTelemetry
 
 
 class GitHubClient:
@@ -31,6 +35,8 @@ class GitHubClient:
         cache_dir: str = "snapshots/cache",
         max_concurrent: int = 5,
         rate_limit_margin: int = 50,
+        telemetry: "RunTelemetry | None" = None,
+        disable_cache: bool = False,
     ):
         """Initialize the async GitHub API client.
 
@@ -41,6 +47,8 @@ class GitHubClient:
             cache_dir: Directory for response cache files.
             max_concurrent: Maximum concurrent HTTP requests.
             rate_limit_margin: Pause when X-RateLimit-Remaining falls below this.
+            telemetry: Optional RunTelemetry for observability metrics.
+            disable_cache: If True, bypass all cache reads (writes still happen).
         """
         self._client = httpx.AsyncClient(
             base_url=self.BASE_URL,
@@ -58,10 +66,17 @@ class GitHubClient:
         self.rate_limiter = RateLimiter(safety_margin=rate_limit_margin)
         self._semaphore = asyncio.Semaphore(max_concurrent)
         self._force_refresh: set[str] = set()
+        self._telemetry = telemetry
+        self._disable_cache = disable_cache
 
     async def close(self) -> None:
         """Close the underlying HTTP client."""
         await self._client.aclose()
+
+    @property
+    def telemetry(self) -> "RunTelemetry | None":
+        """Access the telemetry instance for recording errors/stats."""
+        return self._telemetry
 
     async def get_repos(self, actor: str, force_refresh: bool = False) -> list[dict[str, Any]]:
         """Fetch repositories owned by the actor.
@@ -127,6 +142,13 @@ class GitHubClient:
 
     # ── Internal methods ──────────────────────────────────────────
 
+    async def _wait_if_needed(self) -> bool:
+        """Wait if rate limit is approaching, with telemetry tracking."""
+        waited = await self.rate_limiter.wait_if_needed()
+        if waited and self._telemetry:
+            self._telemetry.record_api_waited()
+        return waited
+
     async def _paginate(
         self, path: str, extra_params: dict[str, str] | None = None
     ) -> list[dict[str, Any]]:
@@ -153,7 +175,7 @@ class GitHubClient:
         """Make an HTTP request with caching, rate limiting, and retry.
 
         Flow:
-        1. Check cache (unless force_refresh)
+        1. Check cache (unless force_refresh or disable_cache)
         2. Send conditional request with ETag if cached
         3. On 304 → update cache ts, return cached body
         4. On success → cache response, update rate limit state
@@ -163,14 +185,16 @@ class GitHubClient:
         Returns None for 404 (skip this resource).
         Raises httpx.HTTPStatusError on 401.
         """
-        skip_cache = url in self._force_refresh
+        tel = self._telemetry
+        skip_cache = url in self._force_refresh or self._disable_cache
+        console = get_console()
 
         # Try cache first with conditional request
         if not skip_cache:
             etag = self.cache.get_etag(method, url, params)
             if etag:
                 async with self._semaphore:
-                    await self.rate_limiter.wait_if_needed()
+                    await self._wait_if_needed()
                     req_headers = {"If-None-Match": etag}
                     resp = await self._client.request(
                         method, url, params=params, headers=req_headers,
@@ -182,6 +206,8 @@ class GitHubClient:
                     self.cache.update_from_304(method, url, params, dict(resp.headers))
                     cached = self.cache.get(method, url, params)
                     if cached is not None:
+                        if tel:
+                            tel.record_cache(hit=True)
                         return self._build_cached_response(cached[2], cached[1])
 
                 if resp.status_code == 401:
@@ -194,6 +220,8 @@ class GitHubClient:
                     body_text = resp.text
                     self.cache.set(method, url, params, resp.status_code,
                                    dict(resp.headers), body_text)
+                    if tel:
+                        tel.record_cache(hit=False)
                     return resp
 
                 # Non-cacheable status — fall through to normal request
@@ -201,13 +229,15 @@ class GitHubClient:
         # Normal request (no cache hit or ETag not available)
         for attempt in range(self.max_retries + 1):
             async with self._semaphore:
-                await self.rate_limiter.wait_if_needed()
+                await self._wait_if_needed()
 
                 try:
                     resp = await self._client.request(method, url, params=params)
 
                     # Update rate limit state from response
                     self.rate_limiter.update(dict(resp.headers))
+                    if tel:
+                        tel.record_api_call()
 
                     # 401: bad token — no retry
                     if resp.status_code == 401:
@@ -221,10 +251,13 @@ class GitHubClient:
                     if resp.status_code == 429:
                         retry_after = int(resp.headers.get("Retry-After", "60"))
                         if attempt < self.max_retries:
-                            print(f"[RateLimit] 429 hit — waiting {retry_after}s "
-                                  f"(attempt {attempt + 1}/{self.max_retries})")
+                            vprint(f"[RateLimit] 429 hit — waiting {retry_after}s "
+                                   f"(attempt {attempt + 1}/{self.max_retries})",
+                                   level=OutputLevel.NORMAL)
                             await asyncio.sleep(retry_after)
                             continue
+                        if tel:
+                            tel.add_retry_exhausted(url, "429 rate limit exhausted", attempt)
                         return None
 
                     # 403: secondary rate limit or access denied
@@ -234,10 +267,13 @@ class GitHubClient:
                         if remaining == "0" and retry_after:
                             wait = int(retry_after)
                             if attempt < self.max_retries:
-                                print(f"[RateLimit] Secondary rate limit — "
-                                      f"waiting {wait}s (attempt {attempt + 1}/{self.max_retries})")
+                                vprint(f"[RateLimit] Secondary rate limit — "
+                                       f"waiting {wait}s (attempt {attempt + 1}/{self.max_retries})",
+                                       level=OutputLevel.NORMAL)
                                 await asyncio.sleep(wait)
                                 continue
+                            if tel:
+                                tel.add_retry_exhausted(url, "403 secondary rate limit exhausted", attempt)
                             return None
                         # 403 for other reasons (e.g. access denied)
                         if attempt < self.max_retries:
@@ -261,6 +297,8 @@ class GitHubClient:
                     body_text = resp.text
                     self.cache.set(method, url, params, resp.status_code,
                                    dict(resp.headers), body_text)
+                    if tel:
+                        tel.record_cache(hit=False)
 
                     return resp
 
