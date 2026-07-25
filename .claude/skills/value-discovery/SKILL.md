@@ -48,19 +48,44 @@ Why this works: narratives expose natural language patterns (causal sentences, i
 
 Listen for these signal types in the user's response. When you detect one, ask the corresponding follow-up:
 
-| Signal | Trigger Words/Patterns | Follow-up |
-|--------|----------------------|-----------|
+| Signal | Trigger Condition | Follow-up |
+|--------|-------------------|-----------|
 | **Causal Belief** | "因为"、"所以"、"只有...才"、"必须"、"应该"、"不能" | "你说'[quote belief]'——能展开一下吗？你觉得有没有反例？" |
 | **Identity Statement** | "我是/不是...的人"、"我一直..."、"我从来不..." | "这代表你更看重什么？如果用一两个词概括？" |
 | **Comparison** | "比...更"、"不如"、"宁可" | "如果这两个只能选一个，你选哪个？为什么？" |
-| **Vague Word** | "有价值"、"好的"、"有意义"、"重要的" | "你怎么定义'[fuzzy word]'？什么才算'[fuzzy word]'？" |
+| **Vague Word** | 用户用模糊词描述**自己/自己的价值/偏好**："有价值"、"好的"、"有意义"、"重要的" | "你怎么定义'[fuzzy word]'？什么才算'[fuzzy word]'？" |
 | **Emotion Marker** | "爽"、"烦"、"受不了"、"特别喜欢" | "这个情绪背后——是什么被满足（或被侵犯）了？" |
+| **Judgment Claim** | 用户对**外部对象**做评价（项目、工具、决策、他人选择）："这个没/不行/不靠谱"、"X才是/不算..."、"说到底X就是Y" | "你怎么判断的？你的判断标准是什么？" |
+| **Belief Articulation** | 用户清晰陈述了一条信念（**前置条件**：已有≥2条信念经agent判断在对话中浮现） | "你说'[quote belief]'——这个信念本身，帮你看到了什么？又可能让你忽略了什么？" |
+
+**Judgment Claim vs Vague Word 区分规则：**
+- Judgment Claim：用户评价**外部对象**（项目、工具、决策、他人选择）→ 追问判断标准（criteria）
+- Vague Word：用户用模糊词描述**自己/自己的价值/偏好** → 追问概念定义（belief）
+- 触发条件本身即排他——不需要靠优先级区分
+
+**Belief Articulation 前置条件说明：**
+- "信念已浮现" = Phase 2 中任意信号被 agent 判定背后有信念，即计入 ≥2 的计数
+- 不限于 Causal Belief 和 Identity Statement——任何信号如果 agent 判断隐藏了一个信念，都算
+- 用好奇而非质疑的语气——这个模式是帮助反思，不是挑战
+
+**信号优先级（同一回复触发多个信号时）：**
+```
+Belief Articulation（前置条件满足时）
+  > Judgment Claim
+    > Emotion Marker
+      > Causal Belief / Identity / Comparison / Vague Word（选离价值观最近的）
+```
+一次只问一个问题。
+
+**兜底规则：**
+如果没有十足把握分到哪个信号，宁可只问一个元问题："你能说得更具体吗？"
 
 **Critical rules for Phase 2:**
 1. Ask ONE question at a time. Wait for the answer before following up.
 2. Never ask "你的价值观是什么？" or any direct variant.
 3. Each follow-up must reference the user's own words — quote them back.
 4. If a follow-up reveals a deeper signal, follow THAT thread first (depth before breadth).
+5. **Belief Articulation: only after ≥2 beliefs surfaced.** Using it too early feels like a challenge, not curiosity.
 
 ### Phase 3: Dimension Coverage Check
 
