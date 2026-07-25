@@ -102,6 +102,42 @@ For uncovered dimensions, ask ONE bridging question:
 
 > "你刚才主要聊的是[已覆盖维度]，我还想了解一下——在[未覆盖维度]方面，什么对你比较重要？"
 
+#### Auxiliary Tools (use only when stuck)
+
+These are optional tools — use them ONLY when the user is clearly having trouble articulating. Do NOT scan for them in every response.
+
+**Tool A: Chunk Up** (SoM: Chunking Up)
+
+When to use: the user gives narrow, concrete answers that don't reveal values. They talk about *what* they did but not *why* it mattered.
+
+> "我们换一个角度——不说具体项目，往上看一层：你做这件事，最终在追求什么？那个东西比'[他们提到的具体事物]'更大的是什么？"
+
+Why it works: raising abstraction forces values to surface. Values are always at a higher chunk level than actions.
+
+**退出条件：** 如果用户说 "我也不知道"，不继续 Chunk Up。退回到 Phase 3 维度桥接。用一次无效就换路。
+
+**Tool B: Chunk Down** (SoM: Chunking Down)
+
+When to use: the user gives abstract value words but you can't pin them to anything concrete. They say "我在乎成长" but you can't tell what "成长" means to them.
+
+> "你说的'[abstract value]'——最近有没有一个具体时刻，让你觉得'对，就是这种感觉'？是什么样的场景？"
+
+Why it works: values anchored in specific memories are richer and more reliable than stated labels.
+
+**退出条件：** 如果用户给的场景和之前的抽象值对不上（比如 "我在乎自由" → 描述了一个遵守规则帮团队的场景），这本身就是信号——说明抽象词的定义不准。不要进 Phase 4 Conflict Detection，而是退回做概念澄清：用 Vague Word 模式追问 "'[抽象值]'对你来说更准确是什么意思？" 如果场景和值本身就匹配，正常继续。
+
+**Tool C: Analogy Bridge** (SoM: Analogy/Metaphor)
+
+When to use: the user struggles to articulate a preference even after Chunk Up/Down attempts.
+
+> "我换个问法——如果你的[选择 A]是一把瑞士军刀，[选择 B]是一把厨师刀，你觉得你更像哪种使用场景？"
+
+The analogy must map to their actual choice tension, not a generic metaphor. Pick images from domains they've already mentioned.
+
+**安全阀：** 如果 3 秒内想不到一个映射恰当的类比，直接跳过 Analogy，改用 Chunk Down。不要硬造一个平庸类比——连续两次类比会让用户觉得你在玩文字游戏。
+
+**退出条件：** 如果用户拒绝类比（"都不像"），放弃 Analogy。说 "没关系，让我们换个角度"，退回 Phase 3 维度桥接。不要换一个类比再试。
+
 ### Phase 4: Conflict Detection
 
 If two values appear to conflict (e.g., "freedom" vs "maximize income"), present a trade-off scenario:
