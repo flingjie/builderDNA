@@ -8,7 +8,7 @@ description: >
   "find opportunities in Z", "tech DNA", "builder insights", "trend radar",
   "what should I build", "developer landscape", "tech stack analysis",
   "competitive intelligence for X", or references BuilderDNA/builderdna directly.
-  The skill wraps 5 composable CLI commands (collect → trend → pain → opportunity → report)
+  The skill wraps 6 composable CLI commands (collect → trend → pain → opportunity → report → config)
   so the user never needs to remember flags — you translate intent into the right command chain.
   Reads state/hypotheses.json to track exploration across conversations.
   After every run, present findings clearly and ask if they want to refine.
@@ -49,7 +49,7 @@ All commands run from the project root with `PYTHONPATH=.` prefix.
 
 **Command chaining**: commands pass data via JSON files. `collect` produces `signals.json` → `trend` and `pain` consume it → `opportunity` consumes both → `report` consumes any result.
 
-Run `builderdna --help` to see all 5 commands.
+Run `builderdna --help` to see all 6 commands.
 
 ## Hypothesis Tree Workflow
 
@@ -127,7 +127,7 @@ Read these when needed:
 | File | When to Read | Content |
 |------|-------------|---------|
 | `references/builder-lens.md` | Before builder's perspective analysis | 10-dimension methodology for analyzing project success patterns |
-| `schema.md` | Before reading command outputs | JSON schemas for all 5 commands |
+| `schema.md` | Before reading command outputs | JSON schemas for all 6 commands |
 | `state/hypotheses.json` | Session start | Exploration state tree |
 
 ## Config Management
