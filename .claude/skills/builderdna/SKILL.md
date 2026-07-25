@@ -8,7 +8,7 @@ description: >
   "find opportunities in Z", "tech DNA", "builder insights", "trend radar",
   "what should I build", "developer landscape", "tech stack analysis",
   "competitive intelligence for X", or references BuilderDNA/builderdna directly.
-  The skill wraps 6 composable CLI commands (collect → trend → pain → opportunity → report → config)
+  The skill wraps 7 composable CLI commands (collect → trend → pain → opportunity → report → config → observability)
   so the user never needs to remember flags — you translate intent into the right command chain.
   Reads state/hypotheses.json to track exploration across conversations.
   After every run, present findings clearly and ask if they want to refine.
@@ -108,9 +108,25 @@ PYTHONPATH=. uv run builderdna opportunity --trends output/trends.json --pains o
 
 The `--user-dna` flag is optional on both `collect` and `opportunity` — omitting it gives objective/unpersonalized results (backward compatible).
 
+## Observability — Self-Iteration Check
+
+After running a full analysis pipeline (collect → trend → pain → opportunity), optionally run diagnostics to detect drifts and validate past predictions:
+
+```bash
+# Run all observability checks for the domain
+PYTHONPATH=. uv run builderdna observability --all --domain <domain>
+```
+
+This runs three checks:
+1. **Mismatch detection** — compares current behavior patterns against User DNA, flags potential value drift
+2. **Snapshot comparison** — validates past prediction snapshots against today's data
+3. **Hypothesis pruning** — checks for stale hypotheses that should be reviewed or retired
+
+**When to trigger:** After every 3-5 complete analysis runs, or when the user mentions "check my predictions", "validate assumptions", "任何东西变了吗", "我之前猜的对不对". Results are written to `output/observability_check_<domain>.json` and surfaced to the user.
+
 ## Schema Reference
 
-`schema.md` documents exact JSON schemas for all 5 command outputs. Read it when you need field names or types.
+`schema.md` documents exact JSON schemas for all 7 command outputs. Read it when you need field names or types.
 
 ## Builder's Lens — 深度项目分析
 

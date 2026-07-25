@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-BuilderDNA is a Technology Intelligence Sandbox Toolkit — 6 composable CLI commands that analyze GitHub developer activity. Each command is an independent sandbox: structured JSON in → deterministic compute → structured JSON out. Claude Code handles all semantic reasoning and orchestration, reading JSON outputs from `output/`. No LLM, no web server, no LangGraph pipeline.
+BuilderDNA is a Technology Intelligence Sandbox Toolkit — 7 composable CLI commands that analyze GitHub developer activity. Each command is an independent sandbox: structured JSON in → deterministic compute → structured JSON out. Claude Code handles all semantic reasoning and orchestration, reading JSON outputs from `output/`. No LLM, no web server, no LangGraph pipeline.
 
 ## Commands
 
@@ -30,6 +30,9 @@ PYTHONPATH=. uv run builderdna report --data output/opportunities.json --format 
 # Show resolved configuration (with sensitive values masked)
 PYTHONPATH=. uv run builderdna config --show
 
+# Run self-iteration diagnostics (mismatch detection, snapshot comparison, hypothesis pruning)
+PYTHONPATH=. uv run builderdna observability --all --domain agent
+
 # Run all tests (197 tests)
 uv run pytest tests/ -v
 
@@ -44,7 +47,7 @@ uv run pytest tests/test_signal/test_models.py::TestSignal -v
 config.yaml ──▶ config.py (Config model, env var ${SUBSTITUTION})
      │
      ▼
-cli/main.py ── Typer app, 6 commands
+cli/main.py ── Typer app, 7 commands
      │
      ├─ collect  ──▶ collector/github/ (httpx client, cache, rate limiter)
      │              ▶ collector/normalizer.py (raw API → Signal model)
@@ -61,7 +64,9 @@ cli/main.py ── Typer app, 6 commands
      │
      ├─ report   ──▶ cli/commands/report_cmd.py (rendering only)
      │
-     └─ config   ──▶ cli/commands/config_cmd.py (show resolved config)
+     ├─ config   ──▶ cli/commands/config_cmd.py (show resolved config)
+     │
+     └─ observability ▶ cli/commands/observability_cmd.py (mismatch detection, snapshot comparison, hypothesis pruning)
 
 signals/ ── Unified Signal model + SQLite store
   models.py    — Signal (unified immutable event, all sources normalize to this)
