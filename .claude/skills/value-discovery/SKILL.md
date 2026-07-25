@@ -165,6 +165,12 @@ Also present any extracted Beliefs and Criteria:
 > - "[belief statement]" (confidence: X%)
 > - ...
 
+**If Belief Articulation was used in Phase 2**, add to the belief presentation:
+
+> "另外，我们聊到 '[belief]' 的时候，你说这个信念可能让你忽略了 [X]。你觉得这个盲区对你做决策影响大吗？"
+
+This turns the articulation result into a calibration checkpoint, not just a passing question.
+
 Let the user correct or adjust. The ranking confirmation IS the data — don't override it with your inferences.
 
 ### Termination Conditions
