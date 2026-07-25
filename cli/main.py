@@ -9,6 +9,7 @@ from cli.commands.pain import pain
 from cli.commands.opportunity import opportunity
 from cli.commands.report_cmd import report
 from cli.commands.config_cmd import config
+from cli.commands.observability_cmd import observability
 
 
 app = typer.Typer(
@@ -47,6 +48,7 @@ app.command(name="pain")(pain)
 app.command(name="opportunity")(opportunity)
 app.command(name="report")(report)
 app.command(name="config")(config)
+app.command(name="observability")(observability)
 
 if __name__ == "__main__":
     app()
