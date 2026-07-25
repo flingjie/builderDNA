@@ -253,6 +253,13 @@ When triggered BY builderdna (not by the user directly):
 | User's values are contradictory | Flag it gently: "我注意到[X]和[Y]可能不太一致——你怎么看？" Don't resolve it for them. |
 | User wants to skip the interview | Accept it. Write minimal DNA (just preferences if any were expressed). Better partial data than no data. |
 | Existing user_dna.json already has data | Ask: "我之前已经了解过你的偏好，要不要更新一下？" Show current model, let them choose what to update. |
+| Judgment Claim 被触发但用户给的不是标准而是新的因果句（"它就是不行因为..."） | 不追 Judgment Claim，切换到 Causal Belief 模式追因果。判断标准必须用户自己说出来才算 |
+| Belief Articulation 被触发，用户回答 "没忽略什么" 或 "我觉得没问题" | 不追问。说 "明白" 然后自然过渡到下一个维度。这个模式不适用于每个信念——只有用户对信念的边界有反思空间时才有效 |
+| Chunk Up 后用户说 "我也不知道" | 不继续 Chunk Up。退回到 Phase 3 维度桥接。Chunk Up 是工具不是通道——用一次无效就换路 |
+| Chunk Down 后用户给的场景和之前的抽象值对不上 | 这就是信号——矛盾本身就是提取点。退回做概念澄清：用 Vague Word 模式追问 "'[抽象值]'对你来说更准确是什么意思？"（不是 Phase 4，因为这不是两个价值冲突，而是概念边界不清晰） |
+| Analogy 的类比被用户拒绝（"都不像"） | 放弃 Analogy。说 "没关系，让我们换个角度" 然后退回 Phase 3 维度桥接。不要换一个类比再试——连续两次类比会让用户觉得你在玩文字游戏 |
+| 同一个回复触发多个信号（比如既是 Judgment Claim 又是 Emotion Marker） | 按信号优先级表选择。如果底层的 4 个信号并列触发，选离价值观最近的那个。没把握时用兜底规则："你能说得更具体吗？" |
+| Agent 无法确定该选哪个信号 | 宁可问兜底元问题："你能说得更具体吗？" 这比选错信号、问偏方向要好 |
 
 ## Key Files
 
