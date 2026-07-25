@@ -124,7 +124,7 @@ When to use: the user gives abstract value words but you can't pin them to anyth
 
 Why it works: values anchored in specific memories are richer and more reliable than stated labels.
 
-**退出条件：** 如果用户给的场景和之前的抽象值对不上（比如 "我在乎自由" → 描述了一个遵守规则帮团队的场景），这本身就是信号——说明抽象词的定义不准。不要进 Phase 4 Conflict Detection，而是退回做概念澄清：用 Vague Word 模式追问 "'[抽象值]'对你来说更准确是什么意思？" 如果场景和值本身就匹配，正常继续。
+**退出条件：** 如果用户给的场景和之前的抽象值对不上（比如 "我在乎自由" → 描述了一个遵守规则帮团队的场景），这本身就是信号——说明抽象词的定义不准。不要进 Phase 4 Conflict Detection，而是退回做概念澄清：用 Vague Word 模式追问 "'[抽象值]'对你来说更准确是什么意思？" 如果场景和值本身就匹配，回到 Phase 2 继续收集剩余维度的信号。
 
 **Tool C: Analogy Bridge** (SoM: Analogy/Metaphor)
 
