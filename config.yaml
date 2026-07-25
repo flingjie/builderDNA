@@ -64,3 +64,9 @@ output:
   formats:
     - markdown
     - json
+
+observability:
+  mismatch_threshold: 7       # events before auto-suggest mismatch check
+  expiry_days: 30              # days after last update before pruning
+  min_comparison_age_days: 90  # days before a prediction snapshot is eligible for validation
+  predictions_dir: predictions # directory for prediction snapshots

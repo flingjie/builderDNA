@@ -112,10 +112,11 @@ def load_user_dna(path: str = "state/user_dna.json") -> UserDNA | None:
 
 
 # Domain mapping from output value → topics
+# Only `domain`, `topics_filter`, and `topics_append` are consumed by collect.py.
+# Topics themselves are loaded from config.yaml domains.<name>.topics.
 OUTPUT_DOMAIN_MAP: dict[str, dict] = {
     "devtools": {
         "domain": "devtools",
-        "topics": ["sdk", "cli", "framework", "library", "api", "open-source-tools"],
     },
     "infrastructure": {
         "domain": "agent",
@@ -123,7 +124,6 @@ OUTPUT_DOMAIN_MAP: dict[str, dict] = {
     },
     "end_user": {
         "domain": "consumer",
-        "topics": ["productivity", "creator-tool", "app", "ui", "consumer"],
     },
     "knowledge": {
         "domain": None,  # Keep current domain, append topics
