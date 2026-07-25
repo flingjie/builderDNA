@@ -13,22 +13,22 @@ Claude Code reads these JSON outputs. Every command wraps results in `SandboxRes
 payload.repos[]: { full_name, owner, stars, forks, contributors, velocity, topics[], description, language, created_at }
 payload.issues[]: { repo, issue_number, title, body, comments, participants, reactions, labels[], url }
 
-stats: { total_signals, repos, issues, topics_searched, vendors_scanned }
+stats: { total_signals, repos, issues, topics_searched, topics_with_results, vendors_scanned, personalized }
 
 ## trend -> output/trends.json
 
-payload.trends[]: { topic, stage (accelerating|emerging|mainstream|declining), confidence, growth_velocity, acceleration, evidence_count, top_repos[{full_name, stars, stars_delta, forks, contributors, velocity, description}] }
+payload.trends[]: { topic, stage (accelerating|emerging|mainstream|declining), confidence, growth_velocity, acceleration, evidence_count, classification_reason, top_repos[{full_name, stars, stars_delta, forks, contributors, velocity, description}] }
 stats: { total_trends }
 
 ## pain -> output/pain_clusters.json
 
 payload.clusters[]: { cluster_id, title, severity, frequency, affected_repos[], top_issues[{repo, issue_number, title, pain_score}] }
-stats: { clusters, issues_analyzed }
+stats: { clusters, issues_analyzed, noise_count }
 
 ## opportunity -> output/opportunities.json
 
-payload.opportunities[]: { title, demand_score, competition_score, gap_score, signals[], recommended_action }
-stats: { total, avg_gap }
+payload.opportunities[]: { title, demand_score, competition_score, gap_score, personalized_score, alignment_reason, alignment_multiplier, scoring_breakdown, signals[], recommended_action }
+stats: { total, avg_gap, personalized }
 
 ## report -> output/report-*.md|json
 
