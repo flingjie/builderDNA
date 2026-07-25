@@ -94,7 +94,7 @@ Schema contract: schema.md and models/payload.py — Claude Code reads these.
 
 ## Skills (`.claude/skills/`)
 
-Seven skills are deployed:
+Eight skills are deployed:
 
 | Skill | Purpose | Trigger |
 |-------|---------|---------|
@@ -103,8 +103,9 @@ Seven skills are deployed:
 | `repo-awesome` | Mine awesome-* lists for curated repo discovery | "mine awesome lists for X", "what do awesome lists recommend" |
 | `value-discovery` | Extract user's cognitive decision model via Meta Model interview | "value discovery", "what do I value", "help me understand my preferences" |
 | `observability` | Run self-iteration diagnostics (mismatch, snapshot, hypothesis pruning) | "check my predictions", "validate assumptions", "任何东西变了吗" |
-| `reflect` | Multi-pass adversarial reflection on conversations → self-model updates | "/reflect", "reflect on this conversation", "复盘" |
+| `reflect` | Multi-pass adversarial reflection on conversations → self-model updates (v4 protocol) | "/reflect", "reflect on this conversation", "复盘" |
 | `distill` | Synthesize accumulated reflections into growth reports | "/distill", "synthesize my reflections", "growth report", "蒸馏" |
+| `note` | RAL recording layer — capture daily moments, amplify meaning, weekly connection review | "/note", "记一下", "take a note", "weekly review", "日复盘" |
 
 Evals exist for builderdna (`.claude/skills/builderdna/evals/`) via the skill-creator workflow. Shared evaluation rubrics: `references/repo-scout/`. Most skills are pure Claude-orchestrated — they use `gh` CLI, not the Python codebase. The `builderdna` skill orchestrates the 7 Python CLI sandbox commands.
 
@@ -123,6 +124,7 @@ Evals exist for builderdna (`.claude/skills/builderdna/evals/`) via the skill-cr
 | `state/user_dna_schema.py` | Schema definition + domain/activity/reward mapping rule tables |
 | `state/user_weights.json` | User preference weights for opportunity scoring bias |
 | `state/reflections.jsonl` | Reflection event log for /reflect and /distill skills |
+| `state/records.jsonl` | RAL daily records — event captures, amplifications, daily/weekly reviews (note skill) |
 | `state/hypotheses.json` | Exploration state tracking across conversations (builderdna skill) |
 | `state/watches.json` | Saved repo searches for recurring monitoring (repo-trend skill) |
 | `output/tracked_repos.json` | Persistent repo tracking with diff history (repo-trend skill) |

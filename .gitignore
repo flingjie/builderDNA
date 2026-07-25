@@ -8,6 +8,7 @@ output/*
 predictions/
 state/behavior_log.jsonl
 state/mismatch_report.json
+state/records.jsonl
 .venv/
 builderdna.egg-info/
 *-workspace/

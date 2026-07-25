@@ -32,8 +32,10 @@ Invoke this skill when:
 
 1. **Read `state/reflections.jsonl`** — parse all lines as JSON objects.
 2. **Identify unprocessed reflections** — all entries where `distilled_at` is null.
-3. **Read `state/user_dna.json`** — current self-model for comparison.
-4. **Read `references/reflection-protocol.md`** — for the distill report template.
+3. **Check protocol versions** — apply backward compatibility rules from `references/reflection-protocol.md`. Mixed-version batches are normal. Handle missing fields gracefully. Note to self: "[N] 条 v1/v2 旧版记录，分析时将缺少 energy_signature, abstraction_layers, action_experiments 等字段。"
+4. **Read `state/records.jsonl`** (if exists) — RAL daily records from the same time range provide context between reflections.
+5. **Read `state/user_dna.json`** — current self-model for comparison.
+6. **Read `references/reflection-protocol.md`** — for the distill report template.
 
 If there are ZERO unprocessed reflections:
 
@@ -65,19 +67,24 @@ Analyze the reflections through the Tension + Resolution lens:
 **Identify the central tension(s):**
 - Look for recurring dilemmas across reflections (e.g., "depth vs breadth", "creation vs adoption", "autonomy vs collaboration")
 - Look for emotional spikes that cluster around the same value
+- Cross-reference `energy_signature` across reflections — persistent energizing/draining patterns are strong signals
+- Trace `cross_domain_connections` — tensions that span work, learning, and relationships
 - Look for patterns where the user says one thing but does another
 - Look for decisions that the user struggled with
 
 **Identify resolution(s):**
 - Look for moments where the tension was explicitly resolved (a decision, a realization)
 - Look for value shifts that indicate resolution (e.g., "optimization" overtakes "exploration")
+- Look for `abstraction_layers` that climbed from case → principle — these indicate cognitive resolution
 - Look for new beliefs that resolve old dilemmas
+- Look for `action_experiments` with positive outcomes — behavioral change IS resolution
 - If unresolved, state it honestly: "这个时期的 tension 尚未完全解决"
 
 **Synthesize into a narrative arc:**
-- Beginning: what was the state at the start of this batch?
-- Middle: what challenged or complicated it?
-- End: where did it land? (or: what's still unresolved?)
+- Beginning: what was the state at the start of this batch? (from `user_dna.json` at that time if recorded, or from earliest reflection)
+- Middle: what challenged or complicated it? (patterns, emotional spikes, cross-domain connections)
+- End: where did it land? (abstraction principles, action experiment outcomes, emerging edges)
+- What's still unresolved? (recurring dilemmas with no resolution yet, high-intensity signals still flagged `requires_user_judgment`)
 
 ### Step 3: Compute Proposed DNA Diffs
 
@@ -86,7 +93,8 @@ Based on ALL unprocessed reflections (not just the ones that individually propos
 **Values:**
 - If the same value key shifted in multiple reflections → stronger signal → propose with higher confidence
 - If values shifted in opposite directions across reflections → flag as unresolved tension, don't propose a single diff
-- Weight by emotional intensity: high-emotion shifts get more weight
+- **Weight by emotional intensity**: high-intensity shifts get more weight (per v4: intensity IS evidence, not noise)
+- If `attraction_signals` converge on the same topic across reflections → propose strengthening the linked value
 
 **Beliefs:**
 - New beliefs that appear in multiple reflections → propose adding
@@ -99,6 +107,10 @@ Based on ALL unprocessed reflections (not just the ones that individually propos
 
 **Preferences:**
 - Stable shifts in work_style, complexity, team_size, stage_preference → propose updating
+
+**Action experiment outcomes** (new in v4):
+- If the same `action_experiment` was tried across multiple reflections with positive outcomes → propose converting to a criterion or belief
+- Experiments consistently skipped or failed → may indicate the insight was misattributed
 
 ### Step 4: Generate Distill Report
 
@@ -114,10 +126,21 @@ Present findings conversationally, NOT by dumping the report:
 >
 > **如何演化的**: [narrative arc — 3-4 sentences]
 >
+> **能量地图**:
+> - 持续让你充能的: [energizing patterns across reflections]
+> - 持续消耗你的: [draining patterns across reflections]
+>
+> **跨域联结**: [cross-domain patterns — if a pattern shows up in work AND learning AND relationships, highlight it]
+>
 > **关键变化**:
 > - [value shift with before/after]
 > - [new belief or modified belief]
-> - [emerging pattern]
+> - [emerging edge — ability the user is reaching toward]
+> - [abstraction layers that indicate cognitive resolution]
+>
+> **行动实验回顾**:
+> - [experiment that worked]: [what it confirmed]
+> - [experiment that was skipped]: [what the avoidance says]
 >
 > **建议的模型更新**:
 > - [diff 1]: [rationale]
@@ -173,12 +196,14 @@ After confirmation:
 | Zero unprocessed reflections | Report: no new data. Offer to re-examine history. |
 | No reflections at all | Guide user to run `/reflect` first. |
 | Only one unprocessed reflection | Still produce a full report. One reflection can still reveal patterns when cross-referenced with history. |
+| records.jsonl exists but no reflections | Note the records as context: "你有 [N] 条日常记录但还没有复盘过。建议先运行 `/reflect`。" |
 | reflections.jsonl corrupted | Report degraded data state. Process what's readable. |
 | claude-mem unavailable | Fall back to keyword matching on JSONL. Note degraded mode in report. |
 | User rejects all proposed diffs | Still mark reflections as distilled. Rejection is data. The report is still valuable as a record. |
 | User wants to modify a diff | Apply the user's override. Record both the proposed value and the user's chosen value. |
 | Gap since last distill is very long (30+ reflections) | Suggest processing in chunks: "你有 [N] 条未处理的复盘记录，建议分批次合成。先处理最近 2 周的？" |
 | Previous distill report has unresolved questions | Carry forward unresolved questions into the new report. Track across reports. |
+| Action experiments have been tried across multiple reflections | Promote successful experiments to criteria or beliefs. Failed experiments → investigate whether the underlying insight was misattributed. |
 
 ## Key Files
 
@@ -187,5 +212,6 @@ After confirmation:
 | `references/reflection-protocol.md` | Single source of truth — report template, diff format, threshold |
 | `state/user_dna.json` | Read current model, write accepted diffs |
 | `state/reflections.jsonl` | Read all reflections, mark as distilled |
+| `state/records.jsonl` | RAL daily records — context between reflections (note skill) |
 | `state/distill_reports/` | Write markdown reports |
 | `state/user_dna_schema.py` | Value dimension definitions |
