@@ -30,7 +30,7 @@ PYTHONPATH=. uv run builderdna report --data output/opportunities.json --format 
 # Show resolved configuration (with sensitive values masked)
 PYTHONPATH=. uv run builderdna config --show
 
-# Run all tests (209 tests)
+# Run all tests (197 tests)
 uv run pytest tests/ -v
 
 # Run a single test file/class/function
@@ -67,13 +67,19 @@ signals/ ── Unified Signal model + SQLite store
   models.py    — Signal (unified immutable event, all sources normalize to this)
   store.py     — SQLite-backed persistence with velocity queries
 
+observability/ ── Telemetry + behavior tracking (all 6 commands integrate this)
+  telemetry.py   — RunTelemetry, vprint, record_command
+  behavior.py    — Mismatch detection between predicted and actual values
+  snapshot.py    — Prediction snapshots for future validation
+  hypothesis.py  — HypothesisManager for tracking exploration hypotheses
+
 All commands wrap output in SandboxResult{command, domain, computed_at, payload, stats}.
 Schema contract: schema.md and models/payload.py — Claude Code reads these.
 ```
 
 ## Key Design Decisions
 
-- **LLM-free pipeline**: After refactoring (commits `b514421`, `c7566b6`), all LLM calls were removed. Trend/pain/opportunity use deterministic algorithms (velocity, HDBSCAN, rule engine).
+- **LLM-free pipeline (with one exception)**: After refactoring, all cloud LLM calls were removed. Trend and opportunity use deterministic algorithms (velocity, rule engine). Pain uses local Ollama embeddings (BGE-M3) — the only ML dependency, running entirely offline.
 - **No web layer**: FastAPI was removed. This is a CLI toolkit, not a service.
 - **Two-loop architecture**: Inner loop = deterministic sandbox commands run locally. Outer loop = Claude Code reads JSON outputs and does semantic reasoning.
 - **Config via YAML + env**: `config.yaml` supports `${VAR}` and `${VAR:-default}` substitution. `.env` is auto-loaded at `config.py` import time.
@@ -93,7 +99,7 @@ Six skills are deployed:
 | `reflect` | Multi-pass adversarial reflection on conversations → self-model updates | "/reflect", "reflect on this conversation", "复盘" |
 | `distill` | Synthesize accumulated reflections into growth reports | "/distill", "synthesize my reflections", "growth report", "蒸馏" |
 
-Three skills include evals in `evals/evals.json`. Shared evaluation rubrics: `references/repo-scout/`. Skills are pure Claude-orchestrated — they use `gh` CLI, not the Python codebase.
+Each skill has evals in `.claude/skills/<name>/evals/evals.json` (builderdna, repo-trend, repo-awesome). Shared evaluation rubrics: `references/repo-scout/`. Most skills are pure Claude-orchestrated — they use `gh` CLI, not the Python codebase. The `builderdna` skill is the exception: it orchestrates the 6 Python CLI sandbox commands.
 
 ## Key Files
 
@@ -101,14 +107,18 @@ Three skills include evals in `evals/evals.json`. Shared evaluation rubrics: `re
 |------|---------|
 | `config.py` | Config loading with env var substitution + pydantic validation |
 | `config.yaml` | Accounts, domains (topic tags), vendors, embedding, output config |
-| `models/payload.py` | Output schemas for all 5 commands — the contract Claude Code reads |
+| `models/payload.py` | Output schemas for all 6 commands — the contract Claude Code reads |
 | `signals/models.py` | Unified Signal model — all data sources normalize to this |
 | `signals/store.py` | SQLite-backed persistence with velocity and topic trend queries |
 | `schema.md` | Human-readable schema reference for all SandboxResult payloads |
+| `observability/` | Telemetry, behavior tracking, prediction snapshots, hypothesis management |
 | `state/user_dna.json` | User cognitive model (values, beliefs, criteria, preferences) |
+| `state/user_dna_schema.py` | Schema definition + domain/activity/reward mapping rule tables |
+| `state/user_weights.json` | User preference weights for opportunity scoring bias |
 | `state/reflections.jsonl` | Reflection event log for /reflect and /distill skills |
 | `state/hypotheses.json` | Exploration state tracking across conversations (builderdna skill) |
 | `state/watches.json` | Saved repo searches for recurring monitoring (repo-trend skill) |
+| `output/tracked_repos.json` | Persistent repo tracking with diff history (repo-trend skill) |
 | `.env` | Environment variables: GITHUB_TOKEN, EMBEDDING_BASE_URL (copy from .env.example) |
 
 ## README Warning
