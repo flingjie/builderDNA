@@ -81,6 +81,10 @@ class TopicTrend(BaseModel):
     acceleration: float = 0.0
     evidence_count: int
     top_repos: list[RepoSummary] = Field(default_factory=list)
+    classification_reason: str = Field(
+        default="",
+        description="Why this stage was assigned (e.g. 'acceleration=3.2 (>2.0) + confidence=0.8 (>0.6) → accelerating')",
+    )
 
 
 class TrendPayload(BaseModel):
@@ -131,6 +135,10 @@ class OpportunityCard(BaseModel):
     personalized_score: float | None = Field(default=None, description="gap_score × alignment_multiplier")
     alignment_reason: str = Field(default="", description="Why this opportunity matches user values")
     alignment_multiplier: float = Field(default=1.0, description="Raw multiplier from User DNA alignment")
+    scoring_breakdown: dict = Field(
+        default_factory=dict,
+        description="Decomposed scoring: velocity_contribution, severity_contribution, freq_contribution, etc.",
+    )
 
 
 class OpportunityPayload(BaseModel):

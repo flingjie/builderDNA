@@ -1,11 +1,9 @@
 """trend — compute topic-level trend velocity and staging from signals."""
 import json
 import math
-from datetime import datetime, timezone
 from pathlib import Path
 
 import typer
-from rich.console import Console
 
 from signals.store import SignalStore
 from signals.models import Signal
@@ -13,19 +11,23 @@ from intelligence.trend.velocity import compute_acceleration
 from models.payload import (
     SandboxResult, TrendPayload, TopicTrend, RepoSummary,
 )
+from observability import RunTelemetry, OutputLevel, vprint, record_command, record_output_retention
+from observability.snapshot import save_trend_snapshot
 
-console = Console()
 
+def _resolve_stage(velocity: float, acceleration: float, confidence: float) -> tuple[str, str]:
+    """Assign lifecycle stage based on velocity + acceleration.
 
-def _resolve_stage(velocity: float, acceleration: float, confidence: float) -> str:
-    """Assign lifecycle stage based on velocity + acceleration."""
+    Returns:
+        (stage, reason) — stage string and human-readable justification.
+    """
     if acceleration > 2.0 and confidence > 0.6:
-        return "accelerating"
+        return "accelerating", f"acceleration={acceleration:.1f} (>2.0) + confidence={confidence:.2f} (>0.6) → accelerating"
     if acceleration > 0.5 and confidence > 0.3:
-        return "emerging"
+        return "emerging", f"acceleration={acceleration:.1f} (>0.5) + confidence={confidence:.2f} (>0.3) → emerging"
     if acceleration < -1.0:
-        return "declining"
-    return "mainstream"
+        return "declining", f"acceleration={acceleration:.1f} (<-1.0) → declining"
+    return "mainstream", f"acceleration={acceleration:.1f}, confidence={confidence:.2f} → mainstream (default)"
 
 
 def trend(
@@ -35,9 +37,10 @@ def trend(
     output: str = typer.Option("output/trends.json", "--output", "-o", help="Output JSON file"),
 ) -> None:
     """Compute topic trends from collected signals."""
+    tel = RunTelemetry()
     data_path = Path(data)
     if not data_path.exists():
-        console.print(f"[red]Input file not found: {data}[/red]")
+        vprint(f"[red]Input file not found: {data}[/red]", level=OutputLevel.QUIET)
         raise typer.Exit(1)
 
     raw = json.loads(data_path.read_text())
@@ -86,7 +89,9 @@ def trend(
         sigs = topic_signals.get(t.topic, [])
         accel = compute_acceleration(sigs, window_days=window)
         t.acceleration = round(accel, 2)
-        t.stage = _resolve_stage(t.growth_velocity, accel, t.confidence)
+        stage, reason = _resolve_stage(t.growth_velocity, accel, t.confidence)
+        t.stage = stage
+        t.classification_reason = reason
 
         # Build top_repos from raw signal data
         topic_repos: dict[str, dict] = {}
@@ -123,12 +128,28 @@ def trend(
         command="trend",
         domain=domain,
         payload=TrendPayload(trends=trends, domain=domain, window_days=window).model_dump(),
-        stats={"total_trends": len(trends)},
+        stats={"total_trends": len(trends), **tel.to_stats()},
     )
 
     output_path = Path(output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(result.model_dump(), indent=2, ensure_ascii=False))
-    console.print(f"[green]{len(trends)} trends computed → {output}[/green]")
+    vprint(f"[green]{len(trends)} trends computed → {output}[/green]", level=OutputLevel.NORMAL)
+    vprint(f"[dim]Done in {tel.elapsed_seconds}s[/dim]", level=OutputLevel.NORMAL)
     for t in trends[:5]:
-        console.print(f"  {t.stage:15s} {t.topic:25s} v={t.growth_velocity:.1f}")
+        vprint(f"  {t.stage:15s} {t.topic:25s} v={t.growth_velocity:.1f}", level=OutputLevel.NORMAL)
+        vprint(f"    {t.classification_reason}", level=OutputLevel.VERBOSE)
+
+    # Behavior tracking + prediction snapshot
+    trend_dicts = [t.model_dump() for t in trends]
+    record_command(
+        command="trend",
+        domain=domain,
+        flags={"window": window, "data": data},
+        output_path=output,
+        user_dna_used=False,
+        elapsed_seconds=tel.elapsed_seconds,
+        status="success",
+    )
+    record_output_retention(output)
+    save_trend_snapshot(domain=domain, trends=trend_dicts, window_days=window)

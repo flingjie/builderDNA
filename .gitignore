@@ -3,7 +3,11 @@ __pycache__/
 .env
 snapshots/*.db
 snapshots/cache/
-output/
+output/*
+!output/.gitkeep
+predictions/
+state/behavior_log.jsonl
+state/mismatch_report.json
 .venv/
 builderdna.egg-info/
 *-workspace/

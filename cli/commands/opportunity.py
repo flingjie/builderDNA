@@ -11,7 +11,6 @@ import json
 from pathlib import Path
 
 import typer
-from rich.console import Console
 
 from models.payload import (
     SandboxResult, OpportunityPayload, OpportunityCard,
@@ -21,8 +20,8 @@ from intelligence.opportunity.scoring import (
     compute_demand, compute_competition, compute_gap, recommend_action,
 )
 from intelligence.opportunity.alignment import compute_alignment
-
-console = Console()
+from observability import RunTelemetry, OutputLevel, vprint, record_command, record_output_retention
+from observability.snapshot import save_opportunity_snapshot
 
 
 def _generate_cards(
@@ -46,6 +45,20 @@ def _generate_cards(
         demand = compute_demand([trend], related_pains)
         competition = compute_competition([trend])
         gap = compute_gap(demand, competition)
+
+        # Build scoring breakdown for transparency
+        avg_velocity = trend.get("growth_velocity", 0)
+        avg_severity = sum(p.get("severity", 0) for p in related_pains) / max(1, len(related_pains))
+        total_frequency = sum(p.get("frequency", 0) for p in related_pains)
+        import math as _math
+        scoring_breakdown = {
+            "velocity_contribution": round(min(10, avg_velocity / 10) * 0.4, 1),
+            "severity_contribution": round(min(10, avg_severity * 2) * 0.4, 1),
+            "frequency_contribution": round(min(10, _math.log(total_frequency + 1) * 3) * 0.2, 1),
+            "demand_score": demand,
+            "competition_score": competition,
+            "gap_formula": f"{demand} / max(0.1, {competition}) = {gap}",
+        }
 
         signals = []
         top_repos = trend.get("top_repos", [])
@@ -77,6 +90,7 @@ def _generate_cards(
             personalized_score=personalized_score,
             alignment_reason=alignment_reason,
             alignment_multiplier=alignment_multiplier,
+            scoring_breakdown=scoring_breakdown,
         ))
 
     cards.sort(key=lambda c: c.personalized_score if c.personalized_score is not None else c.gap_score, reverse=True)
@@ -93,13 +107,15 @@ def opportunity(
 
     Optionally applies User DNA for personalized scoring.
     """
+    tel = RunTelemetry()
     trends_path = Path(trends)
     pains_path = Path(pains)
     if not trends_path.exists():
-        console.print(f"[red]Trends file not found: {trends}[/red]")
+        vprint(f"[red]Trends file not found: {trends}[/red]", level=OutputLevel.QUIET)
         raise typer.Exit(1)
     if not pains_path.exists():
-        console.print(f"[yellow]Pain file not found: {pains}. Continuing without pain data.[/yellow]")
+        vprint(f"[yellow]Pain file not found: {pains}. Continuing without pain data.[/yellow]",
+               level=OutputLevel.NORMAL)
         pains_data = {"payload": {"clusters": []}}
     else:
         pains_data = json.loads(pains_path.read_text())
@@ -114,7 +130,7 @@ def opportunity(
     # Load User DNA if available
     dna = load_user_dna(user_dna)
     if dna:
-        console.print(f"[dim]User DNA loaded — applying personalized alignment[/dim]")
+        vprint(f"[dim]User DNA loaded — applying personalized alignment[/dim]", level=OutputLevel.VERBOSE)
 
     cards = _generate_cards(trend_list, pain_list, dna)
 
@@ -126,15 +142,36 @@ def opportunity(
             "total": len(cards),
             "avg_gap": round(sum(c.gap_score for c in cards) / max(1, len(cards)), 2),
             "personalized": dna is not None,
+            **tel.to_stats(),
         },
     )
 
     output_path = Path(output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(result.model_dump(), indent=2, ensure_ascii=False))
-    console.print(f"[green]{len(cards)} opportunities → {output}[/green]")
+    vprint(f"[green]{len(cards)} opportunities → {output}[/green]", level=OutputLevel.NORMAL)
+    vprint(f"[dim]Done in {tel.elapsed_seconds}s[/dim]", level=OutputLevel.NORMAL)
     for c in cards[:5]:
         base = f"gap={c.gap_score:.1f}"
         if c.personalized_score is not None:
             base += f"  personal={c.personalized_score:.1f} (×{c.alignment_multiplier:.2f})"
-        console.print(f"  {base}  {c.title}")
+        vprint(f"  {base}  {c.title}", level=OutputLevel.NORMAL)
+        if c.scoring_breakdown:
+            bd = c.scoring_breakdown
+            vprint(f"    demand={bd.get('demand_score','?')} competition={bd.get('competition_score','?')} "
+                   f"| vel={bd.get('velocity_contribution','?')} sev={bd.get('severity_contribution','?')} "
+                   f"freq={bd.get('frequency_contribution','?')}", level=OutputLevel.VERBOSE)
+
+    # Behavior tracking + prediction snapshot
+    card_dicts = [c.model_dump() for c in cards]
+    record_command(
+        command="opportunity",
+        domain=t_payload.get("domain", ""),
+        flags={"trends": trends, "pains": pains},
+        output_path=output,
+        user_dna_used=dna is not None,
+        elapsed_seconds=tel.elapsed_seconds,
+        status="success",
+    )
+    record_output_retention(output)
+    save_opportunity_snapshot(domain=t_payload.get("domain", ""), cards=card_dicts)
