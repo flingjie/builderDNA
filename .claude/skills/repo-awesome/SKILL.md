@@ -328,34 +328,6 @@ Read these when needed:
 
 ## 11. Conversational Flow
 
-### Mining Session
-
-```
-User: "mine awesome lists for MCP servers"
-You: [No clarifying questions needed — clear intent]
-```
-
-1. Search for awesome lists (Section 1)
-2. Pick top 2-3 lists
-3. Fetch and parse READMEs (Section 2)
-4. Fetch metadata for top repos (Section 3)
-5. Compute curation scores (Section 4)
-6. Present Tier 1 table (Section 5)
-7. Update `output/tracked_repos.json`
-8. Ask: "Deep dive on any?"
-
-### Deep Dive Session
-
-```
-User: "deep dive on #3"
-You: [Run Tier 2 + Tier 3 on that repo]
-```
-Same flow as repo-trend — reuse eval.md.
-
-### Cross-Reference
-
-```
-User: "are any of these trending too?"
-You: [Cross-reference with tracked_repos.json to find repos also discovered by repo-trend]
-```
-"If any repos were previously discovered by repo-trend, note their hotness scores alongside curation scores for comparison."
+### Mining: 1. Search for awesome lists → 2. Pick top 2-3 → 3. Fetch/parse READMEs → 4. Score repos → 5. Present Tier 1 table → 6. Update `tracked_repos.json` → 7. Ask "Deep dive on any?"
+### Deep Dive: Same Tier 2 + Tier 3 flow as repo-trend — reuse `references/repo-scout/eval.md`.
+### Cross-Reference: Compare against repos previously discovered by repo-trend in `tracked_repos.json`. Note hotness scores alongside curation scores for any overlap.

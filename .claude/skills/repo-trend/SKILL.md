@@ -74,27 +74,18 @@ When the user asks to discover repos, construct a GitHub search query from their
 2. **Apply explicit modifiers if provided** — "Python only" → add `language:python`, "stars > 500" → adjust threshold
 3. **Use the keyword form** — join keywords with spaces. GitHub search treats spaces as AND.
 
-### Default Thresholds
+### Defaults & Clarifying
 
 Apply these unless the user overrides:
 
-| Parameter | Default | Rationale |
-|-----------|---------|-----------|
-| Min stars | 100 | Liberal — catches emerging repos |
-| Recency window | 90 days | Liberal — `pushed:>YYYY-MM-DD` |
-| Language | Any | User adds if they care |
-| License | Any | Evaluation tier flags missing licenses |
-| Max results | 20 per query | Enough for variety, fits in context |
+| Parameter | Default |
+|-----------|--------|
+| Min stars | 100 |
+| Recency window | 90 days (`pushed:>YYYY-MM-DD`) |
+| Language | Any |
+| Max results | 20 per query |
 
-### Clarifying Questions Policy
-
-Ask **at most one** clarifying question before searching, and only when the intent is genuinely ambiguous:
-
-- "Do you mean AI Agent frameworks, or any AI-related repo?"
-- "Looking for production-grade (>1000 stars) or emerging projects?"
-- "Any language preference?"
-
-If the query is clear ("find me trending MCP server repos"), search immediately.
+Ask **at most one** clarifying question before searching, and only when genuinely ambiguous (e.g., "AI Agent frameworks, or any AI repo?"). If clear, search immediately.
 
 ---
 
@@ -213,27 +204,11 @@ gh api repos/{owner}/{repo}/contributors --jq '.[:5] | .[] | {login, contributio
 
 ### Step 4: Score Each Dimension
 
-See `references/repo-scout/eval.md` for the full scoring rubric. Compute each dimension:
-
-| Dimension | Weight | Quick Scoring |
-|-----------|--------|---------------|
-| Topic Alignment | 15% | Count domain-relevant topics in `.topics` |
-| README Substance | 20% | Character count: >2000=1.0, >1000=0.7, >500=0.5, <500=0.1 |
-| README Structure | 15% | +0.3 for `## Install`, +0.2 for code examples, +0.2 for API docs |
-| Contributor Diversity | 15% | >=5=1.0, >=3=0.7, 1-2=0.3 |
-| Issue Health | 15% | `open_issues / (subscribers+1)`: <0.3=1.0, <0.5=0.7, <2.0=0.4 |
-| Release Cadence | 10% | Days since push: <7=1.0, <30=0.7, <90=0.4, >90=0.1 |
-| Stars Growth | 10% | Compare to `tracked_repos.json`: >20%/month=1.0, >5%=0.5, 0=no history |
-
-### Step 5: Compute Tier 2 Score
+See `references/repo-scout/eval.md` for the full scoring rubric. Score across 7 weighted dimensions (Topic Alignment, README Substance, README Structure, Contributor Diversity, Issue Health, Release Cadence, Stars Growth), then compute:
 
 ```
 tier2_score = sum(dimension_score * weight) * 10   # normalized 0-10
 ```
-
-### Step 6: Present
-
-Show a breakdown table with per-dimension scores and the aggregate, followed by key observations.
 
 ---
 
@@ -437,50 +412,7 @@ Read these when needed:
 
 ## 11. Conversational Flow
 
-### Discovery Session
-
-```
-User: "find me trending AI Agent repos"
-You: [No clarifying questions needed — clear intent]
-```
-
-1. Run Query A + Query B (Section 2)
-2. Merge, filter, compute scores
-3. Read `output/tracked_repos.json`
-4. Present Tier 1 table
-5. Update `output/tracked_repos.json`
-6. Ask: "Deep dive on any?"
-
-### Deep Dive Session
-
-```
-User: "deep dive on #3 and #5"
-You: [Run Tier 2 on specified repos]
-```
-
-1. Fetch metadata, README, contributors for both repos
-2. Score each dimension
-3. Present Tier 2 score breakdown
-4. Offer Tier 3: "Want me to do a full semantic analysis on either of these?"
-5. Update `evaluation` field in `tracked_repos.json`
-
-### Watch Session
-
-```
-User: "track these" or "watch this search"
-You: "What should I call this watch?" (if not obvious)
-```
-
-1. Create watch entry in `state/watches.json`
-2. Confirm: "Saved as 'AI Agent frameworks'. I'll track this. Say 'check my watches' anytime."
-
-### Diff Session
-
-```
-User: "what changed?" or "anything new?"
-You: [Read tracked_repos.json, compare last_seen timestamps]
-```
-
-1. Show new, changed, and stale repos
-2. Highlight stage transitions
-3. Offer: "Want to deep dive on any of the new ones?"
+### Discovery: 1. Run Query A+B → 2. Merge/filter/score → 3. Present Tier 1 table → 4. Update `tracked_repos.json` → 5. Ask "Deep dive on any?"
+### Deep Dive: 1. Fetch metadata/README/contributors → 2. Score → 3. Present Tier 2 breakdown → 4. Offer Tier 3 → 5. Update tracking
+### Watch: Save search to `state/watches.json`, confirm with label.
+### Diff: Read `tracked_repos.json`, report new/changed/stale repos, highlight stage transitions.

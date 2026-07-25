@@ -1,0 +1,23 @@
+{
+  "skill_name": "value-discovery",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "我最近做了一个开源项目，是个 AI agent 的调试工具。我发现和团队合作的时候总是很不耐烦，觉得他们写的代码太慢了不如我自己做。但我自己写的时候又觉得很爽，尤其是把底层 LLM 调用的链路全部重构那几周——理解底层原理让我觉得特别有价值。虽然项目最后才几百个 star 但我不太在乎。你帮我分析一下我的价值偏好。",
+      "expected_output": "A user_dna.json file with: (1) values in all 4 dimensions ranked and scored, (2) at least 1 belief extracted (hinting at autonomy, depth-over-speed, or creation), (3) at least 1 criterion, (4) work_style preferences populated. The interview should NOT ask '你的价值观是什么？' directly — it should follow the Phase 1 opening question and Phase 2 signal-based follow-ups.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "我想了解下我自己做决策的模式。最近在两个工作机会之间纠结：一个是大厂做 LLM infra，钱多但自由度低；另一个是早期 startup 做 devtools，钱少但可以决定技术方向。我很看重自由，但又觉得大厂的资源能让我做得更好。你帮我理理。",
+      "expected_output": "A user_dna.json file where: (1) the environment dimension captures tension between autonomy and stability/wealth, (2) the output dimension favors devtools, (3) Phase 4 conflict detection is triggered (autonomy vs wealth/stability), (4) at least 1 belief about trade-offs is extracted.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "我觉得我做技术选型的时候有个毛病——总是选最新的、最好玩的技术，不考虑团队能不能跟得上。上次在项目里引入了一个很新的 MCP 库，结果就我一个人会用。但我就是受不了用那些'成熟但无聊'的框架。帮我分析一下这背后是什么在驱动我。",
+      "expected_output": "A user_dna.json file where: (1) activity dimension shows high exploration/creation scores, (2) the Belief Articulation signal is potentially triggered (user self-identifies a pattern), (3) the novelty-seeking pattern is captured in either beliefs or criteria, (4) output dimension likely favors devtools or infrastructure.",
+      "files": []
+    }
+  ]
+}

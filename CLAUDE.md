@@ -94,18 +94,19 @@ Schema contract: schema.md and models/payload.py — Claude Code reads these.
 
 ## Skills (`.claude/skills/`)
 
-Six skills are deployed:
+Seven skills are deployed:
 
 | Skill | Purpose | Trigger |
 |-------|---------|---------|
-| `builderdna` | Run the 6-command analysis pipeline, manage hypotheses | "analyze X's GitHub", "tech DNA", "find opportunities in Z" |
+| `builderdna` | Run the 7-command analysis pipeline, manage hypotheses | "analyze X's GitHub", "tech DNA", "find opportunities in Z" |
 | `repo-trend` | Discover trending repos via GitHub API search, 3-tier eval | "find trending X repos", "evaluate this repo", "check my watches" |
 | `repo-awesome` | Mine awesome-* lists for curated repo discovery | "mine awesome lists for X", "what do awesome lists recommend" |
 | `value-discovery` | Extract user's cognitive decision model via Meta Model interview | "value discovery", "what do I value", "help me understand my preferences" |
+| `observability` | Run self-iteration diagnostics (mismatch, snapshot, hypothesis pruning) | "check my predictions", "validate assumptions", "任何东西变了吗" |
 | `reflect` | Multi-pass adversarial reflection on conversations → self-model updates | "/reflect", "reflect on this conversation", "复盘" |
 | `distill` | Synthesize accumulated reflections into growth reports | "/distill", "synthesize my reflections", "growth report", "蒸馏" |
 
-Each skill has evals in `.claude/skills/<name>/evals/evals.json` (builderdna, repo-trend, repo-awesome). Shared evaluation rubrics: `references/repo-scout/`. Most skills are pure Claude-orchestrated — they use `gh` CLI, not the Python codebase. The `builderdna` skill is the exception: it orchestrates the 6 Python CLI sandbox commands.
+Evals exist for builderdna (`.claude/skills/builderdna/evals/`) via the skill-creator workflow. Shared evaluation rubrics: `references/repo-scout/`. Most skills are pure Claude-orchestrated — they use `gh` CLI, not the Python codebase. The `builderdna` skill orchestrates the 7 Python CLI sandbox commands.
 
 ## Key Files
 

@@ -49,7 +49,7 @@ All commands run from the project root with `PYTHONPATH=.` prefix.
 
 **Command chaining**: commands pass data via JSON files. `collect` produces `signals.json` → `trend` and `pain` consume it → `opportunity` consumes both → `report` consumes any result.
 
-Run `builderdna --help` to see all 6 commands.
+Run `builderdna --help` to see all 7 commands.
 
 ## Hypothesis Tree Workflow
 
@@ -110,7 +110,7 @@ The `--user-dna` flag is optional on both `collect` and `opportunity` — omitti
 
 ## Observability — Self-Iteration Check
 
-After running a full analysis pipeline (collect → trend → pain → opportunity), optionally run diagnostics to detect drifts and validate past predictions:
+After running a full analysis pipeline (collect → trend → pain → opportunity), optionally run diagnostics. **For interactive observability sessions, invoke the `observability` skill** — it handles result interpretation and user interaction.
 
 ```bash
 # Run all observability checks for the domain
@@ -122,7 +122,7 @@ This runs three checks:
 2. **Snapshot comparison** — validates past prediction snapshots against today's data
 3. **Hypothesis pruning** — checks for stale hypotheses that should be reviewed or retired
 
-**When to trigger:** After every 3-5 complete analysis runs, or when the user mentions "check my predictions", "validate assumptions", "任何东西变了吗", "我之前猜的对不对". Results are written to `output/observability_check_<domain>.json` and surfaced to the user.
+**When to trigger:** After every 3-5 complete analysis runs, or when the user mentions "check my predictions", "validate assumptions", "任何东西变了吗", "我之前猜的对不对". Results are written to `output/observability_check_<domain>.json`.
 
 ## Schema Reference
 
@@ -143,7 +143,7 @@ Read these when needed:
 | File | When to Read | Content |
 |------|-------------|---------|
 | `references/builder-lens.md` | Before builder's perspective analysis | 10-dimension methodology for analyzing project success patterns |
-| `schema.md` | Before reading command outputs | JSON schemas for all 6 commands |
+| `schema.md` | Before reading command outputs | JSON schemas for all 7 commands |
 | `state/hypotheses.json` | Session start | Exploration state tree |
 
 ## Config Management
