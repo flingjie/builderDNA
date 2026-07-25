@@ -16,13 +16,13 @@ class Signal(BaseModel):
     id: str = Field(default_factory=lambda: uuid4().hex[:8])
     source: Literal["github"] = "github"
     type: Literal[
-        "repo_created",       # new repository
-        "star_growth",        # star increase event
-        "issue_opened",       # issue created (contains body text)
-        "issue_commented",    # issue discussion activity
-        "release",            # version release
-        "fork",               # fork event
-        "discussion",         # discussion created
+        "repo_created",       # ✅ active: new repository
+        "star_growth",        # ✅ active: star increase event
+        "issue_opened",       # ✅ active: issue created (contains body text)
+        "issue_commented",    # reserved: issue discussion activity
+        "release",            # reserved: version release
+        "fork",               # reserved: fork event
+        "discussion",         # reserved: discussion created
     ]
     actor: str                                # developer or org login
     target_repo: str                          # full_name e.g. "org/repo"

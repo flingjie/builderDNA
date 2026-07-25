@@ -85,6 +85,7 @@ Schema contract: schema.md and models/payload.py — Claude Code reads these.
 - **Config via YAML + env**: `config.yaml` supports `${VAR}` and `${VAR:-default}` substitution. `.env` is auto-loaded at `config.py` import time.
 - **Collector cache**: `collector/github/cache.py` provides filesystem-based HTTP response caching. Rate limiter in `collector/github/rate_limit.py` proactively manages GitHub API quotas.
 - **SQLite for signals**: `signals/store.py` persists normalized signals to SQLite for velocity queries across time windows.
+- **Known limitation**: `contributors` field is always 0. GitHub Search API doesn't return contributor counts; fetching them would require N additional API calls (one per repo). The field exists for future enhancement.
 
 ## Skills (`.claude/skills/`)
 
