@@ -43,7 +43,7 @@ class GitHubConfig(BaseModel):
 class EmbeddingConfig(BaseModel):
     """Embedding model configuration (local Ollama, no API key needed)."""
 
-    model: str = Field(default="bge-m3:latest", description="Embedding model ID")
+    model: str = Field(default="bge-m3:latest", description="Embedding model ID (config.yaml overrides)")
     base_url: str = Field(default="http://localhost:11434/v1", description="Embedding API base URL")
 
 

@@ -28,8 +28,8 @@ Claude Code handles all semantic reasoning and orchestration.
 Claude Code (you) — reads hypotheses.json, decides what to run, interprets results
       │
       ▼
-5 sandbox CLI commands (each independent, JSON-in, JSON-out)
-  collect → trend → pain → opportunity → report
+7 sandbox CLI commands (each independent, JSON-in, JSON-out)
+  collect → trend → pain → opportunity → report → config → observability
       │
       ▼
 Global memory — SQLite + output/*.json + state/*.json + claude-mem
@@ -41,11 +41,13 @@ All commands run from the project root with `PYTHONPATH=.` prefix.
 
 | User says | You run |
 |-----------|---------|
-| "collect signals for X" / "pull GitHub data for Y" | `PYTHONPATH=. builderdna collect <domain> --window N` |
-| "what's trending in X" / "show me trends" | `PYTHONPATH=. builderdna trend <domain> --data output/signals.json` |
-| "what problems are developers having" / "find pain points" | `PYTHONPATH=. builderdna pain <domain> --data output/signals.json` |
-| "find opportunities" / "what can I build" | `PYTHONPATH=. builderdna opportunity --trends output/trends.json --pains output/pain_clusters.json` |
-| "generate a report" / "format the results" | `PYTHONPATH=. builderdna report --data output/opportunities.json --format md` |
+| "collect signals for X" / "pull GitHub data for Y" | `PYTHONPATH=. uv run builderdna collect <domain> --window N` |
+| "what's trending in X" / "show me trends" | `PYTHONPATH=. uv run builderdna trend <domain> --data output/signals.json` |
+| "what problems are developers having" / "find pain points" | `PYTHONPATH=. uv run builderdna pain <domain> --data output/signals.json` |
+| "find opportunities" / "what can I build" | `PYTHONPATH=. uv run builderdna opportunity --trends output/trends.json --pains output/pain_clusters.json` |
+| "generate a report" / "format the results" | `PYTHONPATH=. uv run builderdna report --data output/opportunities.json --format md` |
+| "show config" / "what's my setup" | `PYTHONPATH=. uv run builderdna config --show` |
+| "check my predictions" / "validate assumptions" / "run diagnostics" | `PYTHONPATH=. uv run builderdna observability --all --domain <domain>` |
 
 **Command chaining**: commands pass data via JSON files. `collect` produces `signals.json` → `trend` and `pain` consume it → `opportunity` consumes both → `report` consumes any result.
 

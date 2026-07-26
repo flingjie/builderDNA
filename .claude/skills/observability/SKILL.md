@@ -6,7 +6,7 @@ description: >
   behavior mismatch detection, hypothesis pruning. Also use when the user says
   "check my predictions", "validate assumptions", "anything changed?", "verify
   past analysis", "我之前猜的对不对", "任何东西变了吗", "验证一下之前的预测",
-  or references observability/observation directly.
+  or references observability directly.
   This skill wraps the `builderdna observability` CLI command (3 checks:
   mismatch detection, snapshot comparison, hypothesis pruning) and interprets
   the JSON results. Auto-suggest after every 3-5 analysis pipeline runs.

@@ -72,7 +72,7 @@ signals/ ── Unified Signal model + SQLite store
   models.py    — Signal (unified immutable event, all sources normalize to this)
   store.py     — SQLite-backed persistence with velocity queries
 
-observability/ ── Telemetry + behavior tracking (all 6 commands integrate this)
+observability/ ── Telemetry + behavior tracking (integrated into all other commands)
   telemetry.py   — RunTelemetry, vprint, record_command
   behavior.py    — Mismatch detection between predicted and actual values
   snapshot.py    — Prediction snapshots for future validation
@@ -119,7 +119,7 @@ Evals exist for builderdna (`.claude/skills/builderdna/evals/`) via the skill-cr
 |------|---------|
 | `config.py` | Config loading with env var substitution + pydantic validation |
 | `config.yaml` | Accounts, domains (topic tags), vendors, embedding, output config |
-| `models/payload.py` | Output schemas for all 6 commands — the contract Claude Code reads |
+| `models/payload.py` | Output schemas for all data-producing commands — the contract Claude Code reads |
 | `signals/models.py` | Unified Signal model — all data sources normalize to this |
 | `signals/store.py` | SQLite-backed persistence with velocity and topic trend queries |
 | `schema.md` | Human-readable schema reference for all SandboxResult payloads |
@@ -129,11 +129,13 @@ Evals exist for builderdna (`.claude/skills/builderdna/evals/`) via the skill-cr
 | `state/user_weights.json` | User preference weights for opportunity scoring bias |
 | `state/reflections.jsonl` | Reflection event log for /reflect and /distill skills |
 | `state/digest_gaps.jsonl` | Feynman verification gap reports — blind-spot tracking (digest skill, created on first use) |
+| `state/distill_reports/` | Growth reports from /distill (YYYY-MM-DD_distill.md) |
 | `state/records.jsonl` | RAL daily records — event captures, amplifications, daily/weekly reviews (note skill) |
 | `state/hypotheses.json` | Exploration state tracking across conversations (builderdna skill) |
 | `state/behavior_log.jsonl` | Telemetry behavior log — mismatch detection data (observability command) |
 | `state/watches.json` | Saved repo searches for recurring monitoring (repo-trend skill) |
 | `output/tracked_repos.json` | Persistent repo tracking with diff history (repo-trend skill) |
+| `references/cases/` | Case studies and examples for builder's perspective analysis |
 | `.env` | Environment variables: GITHUB_TOKEN, EMBEDDING_BASE_URL (copy from .env.example) |
 
 ## README Warning
