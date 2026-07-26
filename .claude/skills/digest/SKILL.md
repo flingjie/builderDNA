@@ -438,7 +438,7 @@ After presenting the in-conversation report, append to `state/digest_gaps.jsonl`
 **Overall score:** `mastered` (0 gaps, passed mastery check) | `solid` (0-1 gaps, mostly L3/L4) | `partial` (2-3 gaps) | `fragile` (4+ gaps or failed L1/L2)
 
 **After saving:**
-> "已保存。累计 [N] 次校验。distill 集成待实现——届时反复出现的同一层 gap 将被识别为结构性盲区。"
+> "已保存。累计 [N] 次校验。distill 会读取这些记录做盲区模式分析。"
 
 ---
 
@@ -543,9 +543,9 @@ You are not hostile. You are not cruel. You are PRECISE. A surgeon doesn't say "
 
 ---
 
-## Integration with /distill (Pending)
+## Integration with /distill
 
-When the user runs `/distill`, digest gap records in `state/digest_gaps.jsonl` will become additional synthesis material:
+When the user runs `/distill`, digest gap records in `state/digest_gaps.jsonl` are read as input (see distill skill Step 0 + Step 3.5). Distill analyzes these independently from behavioral reflections:
 
 - Repeated gaps at the same layer → structural blind spot at that reasoning depth
 - Persistent gaps (≥2 re-tests) → deeply entrenched misunderstanding, not a one-off gap
@@ -553,7 +553,7 @@ When the user runs `/distill`, digest gap records in `state/digest_gaps.jsonl` w
 - Mastery records → positive signal: what the user truly understands well
 - Insight moments from digest sessions → raw material for self-model updates
 
-**Status: distill integration is documented but NOT YET IMPLEMENTED in the distill skill.** The `digest_gaps.jsonl` file is being populated. Distill will read it alongside `state/reflections.jsonl` and `state/records.jsonl` once integration is built.
+Analysis results are written to `state/user_dna.json` under `cognitive_patterns` (if the user confirms the proposed diffs). Digest data is read-only by distill — never marked as processed.
 
 ---
 

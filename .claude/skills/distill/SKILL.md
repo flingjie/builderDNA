@@ -35,7 +35,8 @@ Invoke this skill when:
 3. **Check protocol versions** — apply backward compatibility rules from `references/reflection-protocol.md`. Mixed-version batches are normal. Handle missing fields gracefully. Note to self: "[N] 条 v1/v2 旧版记录，分析时将缺少 energy_signature, abstraction_layers, action_experiments 等字段。"
 4. **Read `state/records.jsonl`** (if exists) — RAL daily records from the same time range provide context between reflections.
 5. **Read `state/user_dna.json`** — current self-model for comparison.
-6. **Read `references/reflection-protocol.md`** — for the distill report template.
+6. **Read `state/digest_gaps.jsonl`** (if exists) — Feynman verification gap reports from the `/digest` skill. Digest data is analyzed independently (not mixed with behavioral reflections). All records are read — no filtering or marking. Digest is read-only here.
+7. **Read `references/reflection-protocol.md`** — for the distill report template.
 
 If there are ZERO unprocessed reflections:
 
@@ -112,6 +113,100 @@ Based on ALL unprocessed reflections (not just the ones that individually propos
 - If the same `action_experiment` was tried across multiple reflections with positive outcomes → propose converting to a criterion or belief
 - Experiments consistently skipped or failed → may indicate the insight was misattributed
 
+### Step 3.5: Analyze Digest Cognitive Patterns
+
+If `state/digest_gaps.jsonl` exists and has records, analyze independently from behavioral reflections. Digest data is read-only — never mark as processed.
+
+**Record count thresholds:**
+
+| Condition | Behavior |
+|-----------|----------|
+| 0 records | Skip this step entirely. No cognitive section in report. |
+| 1-2 records | Include a brief note but mark "样本不足" — don't draw pattern conclusions. |
+| 3+ records | Full analysis with heatmap, structural blind spots, persistent gaps, mastery. |
+
+**When skipping or noting insufficient data, include a short inline message in the conversational summary:**
+
+> "认知盲区: [1-2 条记录 → "数据还太少，暂不分析模式。"] [0 条 → skip entirely]"
+
+**Full analysis (3+ records):**
+
+**A. Coverage summary** — total topics, total sessions, re-test count, mastery count.
+
+**B. Layer heatmap:**
+
+| 层级 | 出现次数 | 严重度分布 | 典型主题 |
+|------|---------|-----------|---------|
+| L1 核心概念 | [N] | [分布] | [topics] |
+| L2 推理链条 | [N] | [分布] | [topics] |
+| L3 对比替代 | [N] | [分布] | [topics] |
+| L4 边界失效 | [N] | [分布] | [topics] |
+| L5 教给初学者 | [N] | [分布] | [topics] |
+
+**C. Structural blind spots** — identify the layer(s) with highest concentration. For each significant pattern:
+
+- Name the pattern: "L2 推理链条是你最薄弱的环节（[N]/[total] 个主题卡在这里）"
+- Segmented analysis: are L2 gaps concentrated in a specific domain (e.g., algorithm principles vs. repos)? If so, the issue may be domain-specific, not structural.
+- **End with a question, not an assertion:** "你觉得这更像是（a）你习惯跳跃式思维，还是（b）这些 topic 的推导本身确实复杂，需要更多练习时间？"
+
+**Rule for interpretation:** describe the pattern with domain-segmented context. Never use personality-type language ("you're an intuitive thinker"). Always frame as a question inviting the user's self-assessment.
+
+**D. Persistent gaps** (≥2 re-tests, same gap still unresolved):
+
+> "以下 gap 在多次 re-test 后仍然存在——这是最值得关注的信号："
+>
+> | Topic | Gap | 出现次数 | 层级 |
+> |-------|-----|---------|------|
+> | ... | ... | [N] | L2 |
+
+If no re-test data exists: "暂无 re-test 数据——持续 gap 分析将在首次 `digest --retest` 后出现。"
+
+**E. Mastery areas**:
+
+> "基于 mastery 记录，你在以下领域表现出深度理解："
+> - [topic A] — 5 层全过 + mastery check
+> - [topic B]
+
+If no mastery records: "当前所有校验均有盲区——没有 mastery 记录。第一个 mastery 会是一个重要的正向锚点。"
+
+**F. Potential behavioral link (open question, never an assertion):**
+
+> "你在 [layer] 上反复卡住，和你之前的 [behavioral pattern from Step 2]——这两者你觉得有关联吗？"
+
+This section MUST end with an open question. Never claim causality.
+
+### Step 3.6: Compute Proposed Cognitive Pattern Diffs
+
+Based on digest analysis, propose updates to `state/user_dna.json` under a new `cognitive_patterns` field:
+
+```json
+{
+  "cognitive_patterns": {
+    "weak_layers": ["L2"],
+    "strong_layers": ["L1", "L5"],
+    "domain_blindspots": [
+      {"domain": "算法推导", "layer": "L2", "persistence": "recurring", "note": "re-test 3次仍未通过"}
+    ],
+    "domain_mastery": [
+      {"domain": "分布式系统设计", "layer": "all", "last_verified": "2026-07-26"}
+    ],
+    "structural_note": "倾向于概念性理解，推导步骤需刻意练习",
+    "last_updated": "2026-07-26"
+  }
+}
+```
+
+**Rules:**
+- `weak_layers` / `strong_layers` — derived from heatmap. Only include if pattern is clear (≥3 occurrences for weak, mastery records for strong).
+- `domain_blindspots` — only for persistent gaps (≥2 re-tests unresolved). One entry per specific gap. `persistence`: "recurring" (≥2) or "persistent" (≥3). `note`: one-line description from Claude's analysis.
+- `domain_mastery` — one entry per mastery record in digest data.
+- `structural_note` — only if a clear cross-domain pattern exists. If the pattern is domain-specific, skip the structural note.
+- `last_updated` — current timestamp.
+
+**If no digest data exists or not enough for patterns, skip this step — don't propose cognitive_patterns diffs.**
+
+Present cognitive pattern diffs alongside behavioral diffs in Step 5. Same confirmation flow: accept/reject/modify.
+
 ### Step 4: Generate Distill Report
 
 Write the full markdown report to `state/distill_reports/YYYY-MM-DD_distill.md` using the template from `references/reflection-protocol.md`.
@@ -148,6 +243,9 @@ Present findings conversationally, NOT by dumping the report:
 >
 > "详细报告已保存到 `state/distill_reports/YYYY-MM-DD_distill.md`。"
 >
+> [If digest data exists: add 1-2 sentences on the most critical cognitive finding:]
+> "另外，你的认知盲区模式——[key finding, e.g.: "L2 推理链条是你最薄弱的环节，4/10 个主题卡在这里。"]. 完整分析见报告的'认知盲区分析'章节。"
+>
 > "请逐条确认模型更新——接受、拒绝、还是修改？"
 
 ### Step 6: Confirmation & Apply
@@ -163,9 +261,8 @@ Wait for user response. Process each diff:
 
 After confirmation:
 
-1. **Apply accepted diffs to user_dna.json** — Read current file, merge changes, write back.
-
-2. **Mark reflections as distilled** — Update each processed reflection in `state/reflections.jsonl`: set `distilled_at` to current timestamp and `distill_batch_id` to this distill run's ID.
+1. **Apply accepted diffs to user_dna.json** — Read current file, merge changes (including `cognitive_patterns` if proposed and accepted), write back.
+2. **Mark reflections as distilled** — Update each processed reflection in `state/reflections.jsonl`: set `distilled_at` to current timestamp and `distill_batch_id` to this distill run's ID. (Digest records are NOT marked — they are read-only.)
 
 3. **Index distill report in claude-mem** (if available):
    ```json
@@ -204,6 +301,13 @@ After confirmation:
 | Gap since last distill is very long (30+ reflections) | Suggest processing in chunks: "你有 [N] 条未处理的复盘记录，建议分批次合成。先处理最近 2 周的？" |
 | Previous distill report has unresolved questions | Carry forward unresolved questions into the new report. Track across reports. |
 | Action experiments have been tried across multiple reflections | Promote successful experiments to criteria or beliefs. Failed experiments → investigate whether the underlying insight was misattributed. |
+| digest_gaps.jsonl has 0 records | Skip cognitive analysis entirely. Report has no "认知盲区分析" chapter. |
+| digest_gaps.jsonl has 1-2 records | Include brief note + "样本不足" caveat. List mastery records if any. Don't generate cognitive_patterns diffs. |
+| digest_gaps.jsonl has 3+ records but all are gaps (no mastery) | Full analysis. "已掌握领域" section: "当前所有校验均有盲区。第一个 mastery 记录会是一个重要的正向锚点。" |
+| digest_gaps.jsonl has records but no re-tests | "持续 gap" section: "暂无 re-test 数据——持续 gap 分析将在首次 `digest --retest` 后出现。" |
+| digest_gaps.jsonl is corrupt | Report degraded data state. Process what's readable. Skip cognitive analysis if >50% corrupt. |
+| User rejects cognitive_patterns diffs | Don't write `cognitive_patterns` to DNA. Record rejection in distill report metadata. |
+| digest_gaps.jsonl has records from a domain the user never talks about in reflections | Still include in analysis — this is expected. Cognitive verification and behavioral reflection are different activities. |
 
 ## Key Files
 
@@ -213,5 +317,6 @@ After confirmation:
 | `state/user_dna.json` | Read current model, write accepted diffs |
 | `state/reflections.jsonl` | Read all reflections, mark as distilled |
 | `state/records.jsonl` | RAL daily records — context between reflections (note skill) |
+| `state/digest_gaps.jsonl` | Feynman verification gap reports — cognitive patterns (digest skill, read-only by distill) |
 | `state/distill_reports/` | Write markdown reports |
 | `state/user_dna_schema.py` | Value dimension definitions |

@@ -104,7 +104,7 @@ Nine skills are deployed:
 | `value-discovery` | Extract user's cognitive decision model via Meta Model interview | "value discovery", "what do I value", "help me understand my preferences" |
 | `observability` | Run self-iteration diagnostics (mismatch, snapshot, hypothesis pruning) | "check my predictions", "validate assumptions", "任何东西变了吗" |
 | `reflect` | Multi-pass adversarial reflection on conversations → self-model updates (v4 protocol) | "/reflect", "reflect on this conversation", "复盘" |
-| `distill` | Synthesize accumulated reflections into growth reports | "/distill", "synthesize my reflections", "growth report", "蒸馏" |
+| `distill` | Synthesize accumulated reflections + digest gap reports into growth reports, propose self-model updates (including cognitive_patterns) | "/distill", "synthesize my reflections", "growth report", "蒸馏" |
 | `note` | RAL recording layer — capture daily moments, amplify meaning, weekly connection review | "/note", "记一下", "take a note", "weekly review", "日复盘" |
 | `digest` | 5-layer Feynman adversarial interview — verify true understanding of a book/principle/repo by exposing blind spots | "/digest", "校验我对...的掌握", "verify my grasp of", "费曼校验" |
 
@@ -121,7 +121,7 @@ Evals exist for builderdna (`.claude/skills/builderdna/evals/`) via the skill-cr
 | `signals/store.py` | SQLite-backed persistence with velocity and topic trend queries |
 | `schema.md` | Human-readable schema reference for all SandboxResult payloads |
 | `observability/` | Telemetry, behavior tracking, prediction snapshots, hypothesis management |
-| `state/user_dna.json` | User cognitive model (values, beliefs, criteria, preferences) |
+| `state/user_dna.json` | User cognitive model (values, beliefs, criteria, preferences, cognitive_patterns) |
 | `state/user_dna_schema.py` | Schema definition + domain/activity/reward mapping rule tables |
 | `state/user_weights.json` | User preference weights for opportunity scoring bias |
 | `state/reflections.jsonl` | Reflection event log for /reflect and /distill skills |
