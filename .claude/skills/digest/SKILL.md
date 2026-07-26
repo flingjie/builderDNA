@@ -34,17 +34,27 @@ The name "digest" is intentional — this is the mental equivalent of breaking d
 
 **You are not here to be liked.** You are here to find what's not understood. Be precise, be relentless, be fair — but never soften the feedback.
 
-## When to Use
+## Trigger
 
-| Trigger | Action |
-|---------|--------|
-| "/digest", "校验我对 X 的掌握" | Start full 5-layer protocol |
-| "/digest [X] --retest", "重新校验 X" | Re-test mode — verify previously identified gaps |
-| "验证我对 X 的理解" | Start full 5-layer protocol |
-| "我到底有没有真的懂 X" | Start full 5-layer protocol |
-| "费曼校验 X" | Start full 5-layer protocol |
+Invoke this skill when the user:
+- Types `/digest` or `/digest [topic] --retest`
+- Asks to "校验我对 X 的掌握", "验证我对 X 的理解", "我到底有没有真的懂 X"
+- Says "费曼校验", "verify my grasp of", "test my understanding of X"
 
 Do NOT invoke this when the user wants to learn something new, get a tutorial, or have a casual discussion. This is a verification tool — the user should already believe they understand the topic.
+
+## Integrity on Every File Open
+
+Before any read or write of `state/digest_gaps.jsonl`, run integrity checks (same pattern as note/reflect):
+
+1. Parse each line as JSON — skip unparseable lines, count as corrupt
+2. Check required fields (`id`, `date`, `topic`, `topic_type`, `overall_score`) — if repairable, repair; otherwise skip
+3. Detect duplicate `id` values — keep first occurrence
+4. Report: "digest_gaps.jsonl: [N] 条, [M] 条损坏已跳过"
+5. If >50% lines are corrupt, warn: "校验记录文件严重损坏，建议手动检查 state/digest_gaps.jsonl。"
+6. After writing: serialize first, verify the JSON is valid, then append with trailing `\n`. Verify line count after write.
+
+If file doesn't exist, create it. Not an error.
 
 ---
 
@@ -52,13 +62,9 @@ Do NOT invoke this when the user wants to learn something new, get a tutorial, o
 
 ### Step 0: Anti-Confirmation
 
-When the user triggers digest with a topic, respond with a brief confirmation before starting:
+When the user triggers digest with a topic, first infer the type, then gather baseline knowledge, THEN declare:
 
-> "收到。主题: [topic name]，类型: [book|principle|repo]（推断），知识基准: [自身知识|将读取该repo|建议提供原文]，置信度: [high|medium|low]。
->
-> 五层追问，预计 15-25 分钟。准备好了就开始 L1。"
-
-The user must explicitly confirm before you begin. This prevents misalignment on the topic scope.
+**Step 0a: Infer type and read baseline (if repo)**
 
 **Type inference:**
 - If the topic is a GitHub repo URL or "user/repo" format → `repo`
@@ -66,17 +72,32 @@ The user must explicitly confirm before you begin. This prevents misalignment on
 - If the topic is a named theory/algorithm/principle → `principle`
 - If ambiguous, ask: "这是书、原理、还是代码仓库？"
 
-**Knowledge baseline inference + confidence declaration:**
+**Repo baseline (do this BEFORE confidence declaration):**
+- If repo → attempt to read via `gh` CLI immediately (see Repo Reading Depth). The reading result informs the confidence declaration.
+- If private → can't read. Ask user to provide key files, or proceed with medium confidence based on Claude's general knowledge of the repo.
+
+**Book/principle baseline:**
+- Well-known → high confidence, use Claude's own knowledge
+- Niche/obscure → low confidence
+
+**Step 0b: Declare confidence and present confirmation**
+
+Now present the confirmation. Confidence is informed by what was (or wasn't) read:
 
 | Confidence | Condition | Role Behavior |
 |-----------|-----------|---------------|
-| **high** | Well-known book, widely-taught principle, popular repo | Full strict-professor mode. Make pass/fail judgments confidently. |
-| **medium** | Familiar domain but this specific topic has nuances I might miss | Ask probes and evaluate, but annotate uncertain judgments: "我的判断是——但我对这个细节可能不准。如果你觉得我搞错了，说'基准不对'。" |
-| **low** | Niche/obscure content, new/evolving field | Downgrade to interviewer role. Ask the five-layer questions, probe for depth, but do NOT make pass/fail judgments. Instead, record the user's answers and highlight areas where probing revealed internal inconsistency. End with: "我对这个主题的知识不完整，无法独立评判——以下是我的追问记录和你回答中的潜在弱点，你自己判断。" |
+| **high** | Well-known book, widely-taught principle, OR repo successfully read and well-understood | Full strict-professor mode. Make pass/fail judgments confidently. |
+| **medium** | Familiar domain but nuances uncertain, OR repo partially read/private | Ask probes and evaluate, but annotate uncertain judgments: "我的判断是——但我对这个细节可能不准。如果你觉得我搞错了，说'基准不对'。" |
+| **low** | Niche/obscure content, new/evolving field, OR repo inaccessible and unknown to Claude | Downgrade to interviewer role. Ask the five-layer questions, probe for depth, but do NOT make pass/fail judgments. Instead, record the user's answers and highlight areas where probing revealed internal inconsistency. End with: "我对这个主题的知识不完整，无法独立评判——以下是我的追问记录和你回答中的潜在弱点，你自己判断。" |
 
-- Well-known books/principles → high confidence, use Claude's own knowledge
-- Specific repos → attempt to read via `gh` CLI first (see Repo Reading Depth below); if private, ask user to provide key files
-- Niche/obscure content → low confidence: state "我对这个主题的知识可能不完整。如果我判断不准，随时说'基准不对'打断我。"
+**For medium confidence — judgment annotation template:**
+When declaring pass/fail at medium confidence, add the annotation:
+> "我的判断是 L[N] 通过——但我对这个细节不百分之百确定。如果你觉得我错了，说'基准不对'。"
+
+**Present confirmation:**
+> "收到。主题: [topic name]，类型: [book|principle|repo]（推断），知识基准: [自身知识|已读取该repo (深度: deep/medium/surface)|建议提供原文]，置信度: [high|medium|low]。
+>
+> 五层追问，预计 15-25 分钟。准备好了就开始 L1。"
 
 ### Step 0.5: Scope Selection (for large topics)
 
@@ -93,6 +114,11 @@ If the topic is a large-scope book (multi-chapter) or a large repo (multi-module
 >
 > "选一个开始。你可以之后对其他部分重新运行 digest。"
 
+**If Claude doesn't know the book's structure well enough to list chapters:**
+> "我对这本书的章节结构不够熟悉。你希望校验的是哪个部分（比如某个具体章节或主题）？或者直接开始全局校验？"
+
+If user says "全局", proceed without scope narrowing. Note in the gap report: `scope: "global (no chapter data available)"`.
+
 **For repos:**
 > "这个 repo 涉及多个模块。你最想校验你对哪个部分的理解？"
 >
@@ -103,6 +129,11 @@ If the topic is a large-scope book (multi-chapter) or a large repo (multi-module
 > - ...（列出 3-5 个关键子系统）
 >
 > "选一个开始。你可以之后对其他模块重新运行 digest。"
+
+**If gh CLI fails or repo structure can't be read:**
+> "无法读取 repo 结构——直接开始全局校验。如果某个模块你特别想校验，告诉我就好。"
+>
+> Skip Step 0.5 entirely. Note in the gap report: `scope: "global (repo structure unreadable)"`.
 
 **For principles:** Usually manageable as one scope. Skip this step.
 
@@ -385,6 +416,7 @@ After presenting the in-conversation report, append to `state/digest_gaps.jsonl`
 
 ```json
 {
+  "id": "uuid",
   "date": "2026-07-26",
   "topic": "DDIA > 第5章 分区",
   "topic_type": "book",
@@ -392,7 +424,7 @@ After presenting the in-conversation report, append to `state/digest_gaps.jsonl`
   "layers_completed": 5,
   "backtracks_used": 0,
   "gaps": [
-    {"layer": "L2", "gap": "无法解释 mutual reachability distance 的计算过程", "severity": "核心", "status": "open"}
+    {"layer": "L2", "gap": "无法解释 mutual reachability distance 的计算过程", "severity": "核心", "status": "open", "probe": "你说 mutual reachability 是核心——展开这一步的计算过程"}
   ],
   "passed_layers": ["L1", "L3", "L5"],
   "insight_moments": [
@@ -416,7 +448,7 @@ When the user returns after addressing previously identified gaps:
 
 ### Step 1: Load Previous Gap Report
 
-Read `state/digest_gaps.jsonl`. Find the most recent entry for this topic (fuzzy match on `topic` field). If none found:
+Read `state/digest_gaps.jsonl`. Find the most recent entry for this topic (match on `topic` field, normalized). If none found:
 > "没有找到 [topic] 的历史校验记录。直接开始新校验？"
 
 ### Step 2: Present Gap Summary
@@ -432,12 +464,21 @@ Read `state/digest_gaps.jsonl`. Find the most recent entry for this topic (fuzzy
 
 ### Step 3: Targeted Re-Verification
 
-For each previously-open gap:
-- Ask the SAME question (or a close variant) that exposed the gap last time
+**Phase A: Gap re-test.** For each previously-open gap:
+- Use the stored `probe` field to ask the same question (or a close variant) that exposed the gap last time
 - If the user now answers it solidly → mark `resolved`
 - If the user still struggles → mark `persistent`
 
-Also run a condensed pass through the five layers — not as exhaustive as a fresh run, but one core question per layer plus checking if new gaps have appeared.
+**When no probe is stored (legacy record or probe was implicit):** reconstruct the probe from the `gap` description — ask the question that most directly targets that gap.
+
+**Phase B: Condensed layer pass.** Run one question per layer to check for new gaps:
+- **L1**: Re-ask the core concept opening question. Has the understanding shifted?
+- **L2**: Ask one forward-chain probe (pick the most revealing from the original probes) + the reverse probe. Don't redo all 2-4 probes.
+- **L3**: Ask the type-specific opening question. Any new comparisons the user can now make?
+- **L4**: Ask one edge-case probe — ideally a different one than last time, to test breadth.
+- **L5**: Ask for a new metaphor. If the user's understanding deepened, the metaphor should be better.
+
+For layers that had a gap in the original session: skip the condensed question — Phase A already served as that layer's re-test.
 
 ### Step 4: Re-Test Report
 
@@ -451,7 +492,7 @@ Present alongside the original:
 
 > "进步总结: 上次 [score] → 本次 [new_score]。1 个 gap 已修复，1 个持续存在，1 个新发现。"
 
-Save to `state/digest_gaps.jsonl` as a new entry with `retest_of: "<previous entry date>"`. Update gap statuses: `resolved` / `persistent` / `open` (for newly found gaps).
+Save to `state/digest_gaps.jsonl` as a new entry with `retest_of: "<previous entry's id>"`. Update gap statuses: `resolved` / `persistent` / `open` (for newly found gaps).
 
 **Persistent gaps (appearing in ≥2 re-tests) are the most valuable signal for `/distill`** — they indicate structural blind spots, not one-off knowledge gaps.
 
@@ -482,6 +523,7 @@ On the very first `/digest` (no `state/digest_gaps.jsonl` or empty file):
 | User asks a question back to you mid-interview | Don't answer as a tutor. Redirect: "我的工作是校验你的理解，不是代替你理解。你觉得答案是什么？" |
 | 3rd backtrack triggered | Terminate: "你的基础理解存在结构性不连贯。建议重新学习核心概念后再回来校验。" Save current gap report. |
 | Re-test but no previous record found | "没有找到 [topic] 的历史校验记录。直接开始新校验？" |
+| Re-test but `retest_of` id not found (record deleted/corrupt) | "找不到关联的上次记录（可能已损坏或删除）。会作为独立新校验进行，但已知的上次 gap 有：[list from memory if available]。" |
 
 ---
 
