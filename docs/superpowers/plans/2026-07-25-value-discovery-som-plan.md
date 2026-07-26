@@ -11,7 +11,7 @@
 ## Global Constraints
 
 - Only file changed: `.claude/skills/value-discovery/skill.md`
-- No changes to `state/user_dna_schema.py`, `state/user_dna.json`, or any Python code
+- No changes to `models/user_dna_schema.py`, `state/user_dna.json`, or any Python code
 - No test changes needed (skill is Claude-orchestrated, not Python)
 - Skill must remain valid YAML frontmatter + valid Markdown
 - All Chinese text in the skill must stay in Chinese (protocol language)

@@ -15,7 +15,7 @@ import typer
 from models.payload import (
     SandboxResult, OpportunityPayload, OpportunityCard,
 )
-from state.user_dna_schema import load_user_dna
+from models.user_dna_schema import load_user_dna
 from intelligence.opportunity.scoring import (
     compute_demand, compute_competition, compute_gap, recommend_action,
 )

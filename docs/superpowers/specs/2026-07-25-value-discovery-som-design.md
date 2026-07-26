@@ -77,7 +77,7 @@ One question per turn. Never fire multiple follow-ups at once.
 
 ## No Schema Changes
 
-`state/user_dna_schema.py` and `state/user_dna.json` are unchanged. The output contract stays identical — richer inputs produce better data through the same output channels. Evidence log entries for new signal types use the same format as existing entries.
+`models/user_dna_schema.py` and `state/user_dna.json` are unchanged. The output contract stays identical — richer inputs produce better data through the same output channels. Evidence log entries for new signal types use the same format as existing entries.
 
 ## Implementation Plan
 

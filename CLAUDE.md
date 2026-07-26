@@ -125,7 +125,7 @@ Evals exist for builderdna (`.claude/skills/builderdna/evals/`) via the skill-cr
 | `schema.md` | Human-readable schema reference for all SandboxResult payloads |
 | `observability/` | Telemetry, behavior tracking, prediction snapshots, hypothesis management |
 | `state/user_dna.json` | User cognitive model (values, beliefs, criteria, preferences, cognitive_patterns) |
-| `state/user_dna_schema.py` | Schema definition + domain/activity/reward mapping rule tables |
+| `models/user_dna_schema.py` | Schema definition + domain/activity/reward mapping rule tables |
 | `state/user_weights.json` | User preference weights for opportunity scoring bias |
 | `state/reflections.jsonl` | Reflection event log for /reflect and /distill skills |
 | `state/digest_gaps.jsonl` | Feynman verification gap reports — blind-spot tracking (digest skill, created on first use) |

@@ -6,12 +6,9 @@ snapshots/cache/
 output/*
 !output/.gitkeep
 predictions/
-state/behavior_log.jsonl
-state/mismatch_report.json
-state/records.jsonl
-state/digest_gaps.jsonl
-state/reflections.jsonl
-state/user_dna.json
+state/*
+!state/.gitkeep
+!state/distill_reports/.gitkeep
 .venv/
 builderdna.egg-info/
 *-workspace/

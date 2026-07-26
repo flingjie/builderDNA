@@ -706,7 +706,7 @@ If the user declines, wait until the next `/reflect` completes before suggesting
 | `state/reflections.jsonl` | Full reflection event log | `/reflect` | `/distill` |
 | `state/records.jsonl` | RAL daily event captures | `/note` | `/reflect`, `/note` |
 | `state/distill_reports/` | Distill markdown reports | `/distill` | User (readable) |
-| `state/user_dna_schema.py` | Pydantic schema contract | (read-only reference) | All skills |
+| `models/user_dna_schema.py` | Pydantic schema contract | (read-only reference) | All skills |
 
 ---
 

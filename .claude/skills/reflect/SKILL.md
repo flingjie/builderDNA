@@ -300,4 +300,4 @@ Follow the edge case table in `references/reflection-protocol.md`. Key reminders
 | `references/reflection-protocol.md` | Single source of truth — lens prompts, schemas, adversary rules |
 | `state/user_dna.json` | Read as context, write accepted diffs |
 | `state/reflections.jsonl` | Append full reflection event |
-| `state/user_dna_schema.py` | Value dimension definitions and mapping rules |
+| `models/user_dna_schema.py` | Value dimension definitions and mapping rules |

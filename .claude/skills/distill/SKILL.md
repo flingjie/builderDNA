@@ -320,4 +320,4 @@ After confirmation:
 | `state/records.jsonl` | RAL daily records — context between reflections (note skill) |
 | `state/digest_gaps.jsonl` | Feynman verification gap reports — cognitive patterns (digest skill, read-only by distill) |
 | `state/distill_reports/` | Write markdown reports |
-| `state/user_dna_schema.py` | Value dimension definitions |
+| `models/user_dna_schema.py` | Value dimension definitions |

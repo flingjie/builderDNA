@@ -10,7 +10,7 @@ Each dimension contributes equally. The multiplier starts at 0.5 (neutral = 1.0)
 """
 import math
 
-from state.user_dna_schema import (
+from models.user_dna_schema import (
     UserDNA, Values,
     OUTPUT_DOMAIN_MAP,
 )

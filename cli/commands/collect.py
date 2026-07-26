@@ -17,7 +17,7 @@ from collector.github.issue import fetch_issues, DEMAND_LABELS
 from collector.normalizer import normalize_all
 from models.payload import SandboxResult, CollectPayload, RepoSignal, IssueSignal
 from observability import RunTelemetry, OutputLevel, vprint, record_command, record_output_retention
-from state.user_dna_schema import (
+from models.user_dna_schema import (
     load_user_dna, UserDNA,
     OUTPUT_DOMAIN_MAP, ACTIVITY_CONFIG,
     REWARD_WEIGHTS, ENVIRONMENT_SOURCE_MIX,

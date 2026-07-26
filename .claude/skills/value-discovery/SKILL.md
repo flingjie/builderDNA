@@ -183,7 +183,7 @@ End the interview when ANY of:
 
 ## Output: Write to state/user_dna.json
 
-After the interview, write the extracted model to `state/user_dna.json`. Use this exact schema from `state/user_dna_schema.py`:
+After the interview, write the extracted model to `state/user_dna.json`. Use this exact schema from `models/user_dna_schema.py`:
 
 ```json
 {
@@ -266,5 +266,5 @@ When triggered BY builderdna (not by the user directly):
 | File | Purpose |
 |------|---------|
 | `state/user_dna.json` | Output — the user's cognitive model |
-| `state/user_dna_schema.py` | Schema definition + mapping rule tables |
+| `models/user_dna_schema.py` | Schema definition + mapping rule tables |
 | `config.yaml` | Domain definitions (devtools, consumer, etc.) | 
