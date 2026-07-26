@@ -10,6 +10,8 @@ state/behavior_log.jsonl
 state/mismatch_report.json
 state/records.jsonl
 state/digest_gaps.jsonl
+state/reflections.jsonl
+state/user_dna.json
 .venv/
 builderdna.egg-info/
 *-workspace/
