@@ -94,7 +94,7 @@ Schema contract: schema.md and models/payload.py — Claude Code reads these.
 
 ## Skills (`.claude/skills/`)
 
-Eight skills are deployed:
+Nine skills are deployed:
 
 | Skill | Purpose | Trigger |
 |-------|---------|---------|
@@ -106,6 +106,7 @@ Eight skills are deployed:
 | `reflect` | Multi-pass adversarial reflection on conversations → self-model updates (v4 protocol) | "/reflect", "reflect on this conversation", "复盘" |
 | `distill` | Synthesize accumulated reflections into growth reports | "/distill", "synthesize my reflections", "growth report", "蒸馏" |
 | `note` | RAL recording layer — capture daily moments, amplify meaning, weekly connection review | "/note", "记一下", "take a note", "weekly review", "日复盘" |
+| `digest` | 5-layer Feynman adversarial interview — verify true understanding of a book/principle/repo by exposing blind spots | "/digest", "校验我对...的掌握", "verify my grasp of", "费曼校验" |
 
 Evals exist for builderdna (`.claude/skills/builderdna/evals/`) via the skill-creator workflow. Shared evaluation rubrics: `references/repo-scout/`. Most skills are pure Claude-orchestrated — they use `gh` CLI, not the Python codebase. The `builderdna` skill orchestrates the 7 Python CLI sandbox commands.
 
@@ -124,6 +125,7 @@ Evals exist for builderdna (`.claude/skills/builderdna/evals/`) via the skill-cr
 | `state/user_dna_schema.py` | Schema definition + domain/activity/reward mapping rule tables |
 | `state/user_weights.json` | User preference weights for opportunity scoring bias |
 | `state/reflections.jsonl` | Reflection event log for /reflect and /distill skills |
+| `state/digest_gaps.jsonl` | Feynman verification gap reports — blind-spot tracking (digest skill) |
 | `state/records.jsonl` | RAL daily records — event captures, amplifications, daily/weekly reviews (note skill) |
 | `state/hypotheses.json` | Exploration state tracking across conversations (builderdna skill) |
 | `state/watches.json` | Saved repo searches for recurring monitoring (repo-trend skill) |
