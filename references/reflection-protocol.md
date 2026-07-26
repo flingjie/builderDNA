@@ -806,6 +806,17 @@ When amplifying a record, suggest relevant domain tags from the user's existing 
 
 This is Version 6 of the reflection protocol. All NEW reflection events include `"protocol_version": 6`. Existing events from earlier protocol versions are still valid and loadable with the rules below.
 
+### Naming convention
+
+This project uses two distinct version fields:
+
+| Field | Scope | Examples |
+|-------|-------|----------|
+| `protocol_version` | Reflection events in `reflections.jsonl`, digest gap reports in `digest_gaps.jsonl` | `"protocol_version": 6`, `"protocol_version": 2` |
+| `version` | Persistent state files that track their own schema independently | `user_dna.json` (`"version": 1`), `hypotheses.json` (`"version": 1`), `watches.json` (`"version": 1`) |
+
+They evolve at different rates: `protocol_version` tracks the reflection/digest process format (frequently updated), while `version` tracks the data schema of each state file (rarely changed). A v1 `user_dna.json` is valid regardless of whether reflections are produced under v6 of the protocol.
+
 ### Backward Compatibility
 
 When loading reflections.jsonl, events may have been written under older protocol versions. Handle them safely:
@@ -824,6 +835,8 @@ When loading reflections.jsonl, events may have been written under older protoco
 5. `protocol_version` missing entirely → assume v1 (earliest possible).
 
 **No auto-migration:** Old reflections are NOT rewritten. They stay in their original protocol version. This avoids data corruption risk.
+
+**Production note (2026-07-26):** The ONLY reflection in `state/reflections.jsonl` is a v1 record produced during initial skill bootstrapping. The v6 protocol has never been exercised with a real reflection. When `/reflect` runs for the first time under v6, watch for: preprocessing (Step 0.5) producing correct segment boundaries, `energy_signature` and `cross_domain_connections` populated correctly, action experiment lifecycle fields (`status`, `activated_at`, `expires_at`) written consistently. The backward-compatibility rules handle mixed-version batches, but the v6-only path is untested in production.
 
 ## Changelog
 

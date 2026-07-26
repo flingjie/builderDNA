@@ -515,8 +515,8 @@ On the very first `/digest` (no `state/digest_gaps.jsonl` or empty file):
 | User rambles/avoids the question | Interrupt gently: "我注意到你没有直接回答我的问题。我问的是 [restate]。" If they ramble again after one warning, mark as gap. |
 | User gives textbook-perfect answers | Go deeper. Ask about implications they didn't state, edge cases they didn't mention. Perfect recall ≠ understanding. |
 | User gets frustrated/defensive | Acknowledge without softening the standard: "我理解这很吃力。但正是在你觉得最不舒服的地方，才能找到真盲区。要不要继续，还是先保存当前的gap报告？" |
-| digEST_gaps.jsonl has corrupt lines | Skip unparseable lines. Report count. If >50% corrupt, recommend manual recovery. |
-| digEST_gaps.jsonl doesn't exist | Create it. Not an error. |
+| digest_gaps.jsonl has corrupt lines | Skip unparseable lines. Report count. If >50% corrupt, recommend manual recovery. |
+| digest_gaps.jsonl doesn't exist | Create it. Not an error. |
 | gh CLI fails for repo topic | Can't read the repo. State: "无法访问该repo——我会用自己的知识做基准，但可能不准确。置信度降为 medium。如果我的判断有误，随时说'基准不对'。" |
 | User tells you "基准不对" | Stop immediately. Ask: "哪里不对？正确的理解是什么？" Recalibrate and continue. |
 | Multiple topics in one request | "一次校验一个主题最有效。你想先从 [topic A] 还是 [topic B] 开始？" |
@@ -554,6 +554,32 @@ When the user runs `/distill`, digest gap records in `state/digest_gaps.jsonl` a
 - Insight moments from digest sessions → raw material for self-model updates
 
 Analysis results are written to `state/user_dna.json` under `cognitive_patterns` (if the user confirms the proposed diffs). Digest data is read-only by distill — never marked as processed.
+
+---
+
+## Protocol Version History
+
+### v2 (2026-07-26): "Grilling Improvements"
+
+Added after an adversarial grilling session on the initial design:
+
+- **Adaptive repo reading depth**: ≤50 files deep read, 50-200 medium, >200 surface scan. Repo is read BEFORE confidence is declared.
+- **Confidence-based role downgrade**: High (strict professor), Medium (annotated judgments, ask user to verify), Low (pure interviewer, state knowledge bounds explicitly). Triggered when topic is niche or repo is unreadable.
+- **Re-test mode** (`/digest [topic] --retest`): Gap lifecycle tracking (open → resolved → persistent). Condensed layer pass (1 question per layer, different edge case for L4, new metaphor for L5). Persistent gaps (≥2 re-tests) are the strongest blind-spot signal for `/distill`.
+- **Mastery check**: After all 5 layers pass, a suspicion round asks "layers you feel LEAST confident about" then drills them harder. Mastery report only if the suspicion round also passes. Prevents false-positive "all clear."
+- **Backtracking**: User can skip a question and return later (max 2 per session). 3rd backtrack triggers session termination — understanding is too fragmented to meaningfully assess.
+- **Type-specific probes**: Book, principle, and repo each get tailored L3-L5 questions (e.g., repo L3 asks about architecture comparisons, not just "what else could they have used").
+- **Reverse probe embedded in L2**: After forward explanation, ask "if we remove/break X, how does the conclusion change?" — part of L2, not a separate step.
+- **Progress indicators**: Each completed layer announced: "L2 完成。" Layer attempted but failed: "L3 未通过——[reason]."
+- **Scope selection**: User can specify scope (chapter, section, module) for focused verification.
+- **L1 failure → Guided Exploration**: No longer terminates the session. Instead, Claude walks the user through the core concept step by step, then re-tests.
+
+### v1 (2026-07-26): Initial Design
+
+- 5-layer Feynman verification protocol (Core Concept → Reasoning Chain → Alternatives → Boundaries → Teach a Beginner)
+- 3 pass criteria: no fuzzy jumps, no circular definitions, withstands follow-up
+- Tone rules (surgeon, not cheerleader)
+- Gap report output to `state/digest_gaps.jsonl`
 
 ---
 

@@ -1,14 +1,15 @@
 ---
 name: distill
 description: >
-  Use when the user wants to synthesize accumulated reflections into a growth
-  report and propose self-model updates. Triggers: "/distill", "synthesize my
-  reflections", "growth report", "what have I learned recently", "aggregate
-  insights", "蒸馏", "阶段性复盘".
+  Use when the user wants to synthesize accumulated reflections and digest gap
+  reports into a growth report and propose self-model updates. Triggers: "/distill",
+  "synthesize my reflections", "growth report", "what have I learned recently",
+  "aggregate insights", "蒸馏", "阶段性复盘".
   Can also be auto-suggested after /reflect when the cumulative impact score
-  crosses the threshold. Gathers all unprocessed reflections, performs semantic
-  search via claude-mem, produces a Tension + Resolution narrative, and proposes
-  user_dna.json diffs. Writes a markdown report to state/distill_reports/ and
+  crosses the threshold. Gathers all unprocessed reflections, reads digest_gaps.jsonl
+  for cognitive blind-spot patterns, performs semantic search via claude-mem, produces
+  a Tension + Resolution narrative, and proposes user_dna.json diffs (including
+  cognitive_patterns). Writes a markdown report to state/distill_reports/ and
   presents a conversational summary for user confirmation.
 ---
 

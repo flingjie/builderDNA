@@ -53,7 +53,7 @@ cli/main.py ── Typer app, 7 commands
      │              ▶ collector/normalizer.py (raw API → Signal model)
      │              ▶ output: models/payload.py → RepoSignal, IssueSignal
      │
-     ├─ trend    ──▶ intelligence/trend/ (velocity, growth rate, clustering)
+     ├─ trend    ──▶ intelligence/trend/ (velocity analysis)
      │              ▶ output: models/payload.py → TopicTrend, RepoSummary
      │
      ├─ pain     ──▶ intelligence/pain/ (HDBSCAN + BGE-M3 embeddings via Ollama)
@@ -77,6 +77,7 @@ observability/ ── Telemetry + behavior tracking (all 6 commands integrate th
   behavior.py    — Mismatch detection between predicted and actual values
   snapshot.py    — Prediction snapshots for future validation
   hypothesis.py  — HypothesisManager for tracking exploration hypotheses
+  output.py      — OutputLevel enum, verbosity control, console formatting
 
 All commands wrap output in SandboxResult{command, domain, computed_at, payload, stats}.
 Schema contract: schema.md and models/payload.py — Claude Code reads these.
@@ -94,7 +95,7 @@ Schema contract: schema.md and models/payload.py — Claude Code reads these.
 
 ## Skills (`.claude/skills/`)
 
-Nine skills are deployed:
+Nine skills are deployed (12 directories — 3 `*-workspace/` dirs are skill-creator eval artifacts, not skills):
 
 | Skill | Purpose | Trigger |
 |-------|---------|---------|
@@ -109,6 +110,8 @@ Nine skills are deployed:
 | `digest` | 5-layer Feynman adversarial interview — verify true understanding of a book/principle/repo by exposing blind spots | "/digest", "校验我对...的掌握", "verify my grasp of", "费曼校验" |
 
 Evals exist for builderdna (`.claude/skills/builderdna/evals/`) via the skill-creator workflow. Shared evaluation rubrics: `references/repo-scout/`. Most skills are pure Claude-orchestrated — they use `gh` CLI, not the Python codebase. The `builderdna` skill orchestrates the 7 Python CLI sandbox commands.
+
+**Skill path note:** Several skills (`reflect`, `distill`, `note`, `repo-trend`, `repo-awesome`, `builderdna`) reference files under `references/` at the project root (e.g., `references/reflection-protocol.md`, `references/repo-scout/eval.md`). These paths resolve because skills are always invoked from the project root — skills are not standalone/portable.
 
 ## Key Files
 
@@ -125,9 +128,10 @@ Evals exist for builderdna (`.claude/skills/builderdna/evals/`) via the skill-cr
 | `state/user_dna_schema.py` | Schema definition + domain/activity/reward mapping rule tables |
 | `state/user_weights.json` | User preference weights for opportunity scoring bias |
 | `state/reflections.jsonl` | Reflection event log for /reflect and /distill skills |
-| `state/digest_gaps.jsonl` | Feynman verification gap reports — blind-spot tracking (digest skill) |
+| `state/digest_gaps.jsonl` | Feynman verification gap reports — blind-spot tracking (digest skill, created on first use) |
 | `state/records.jsonl` | RAL daily records — event captures, amplifications, daily/weekly reviews (note skill) |
 | `state/hypotheses.json` | Exploration state tracking across conversations (builderdna skill) |
+| `state/behavior_log.jsonl` | Telemetry behavior log — mismatch detection data (observability command) |
 | `state/watches.json` | Saved repo searches for recurring monitoring (repo-trend skill) |
 | `output/tracked_repos.json` | Persistent repo tracking with diff history (repo-trend skill) |
 | `.env` | Environment variables: GITHUB_TOKEN, EMBEDDING_BASE_URL (copy from .env.example) |

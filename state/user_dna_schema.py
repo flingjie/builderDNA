@@ -79,6 +79,33 @@ class EvidenceEntry(BaseModel):
     confidence: float = Field(default=0.5, ge=0.0, le=1.0)
 
 
+# ── Cognitive Patterns (from digest skill, synthesized by distill) ──
+
+class DomainBlindspot(BaseModel):
+    """A specific gap that persists across digest re-tests."""
+    domain: str = Field(description="Domain where the gap appears, e.g. '算法推导'")
+    layer: str = Field(description="Which layer the gap is in: L1-L5")
+    persistence: str = Field(default="recurring", description="recurring (≥2 re-tests) or persistent (≥3)")
+    note: str = Field(default="", description="One-line description from Claude's analysis")
+
+
+class DomainMastery(BaseModel):
+    """A domain where the user demonstrated mastery (5 layers + mastery check)."""
+    domain: str = Field(description="Domain name")
+    layer: str = Field(default="all", description="Layer scope — usually 'all' for mastery records")
+    last_verified: str = Field(default="", description="Date of the mastery verification")
+
+
+class CognitivePatterns(BaseModel):
+    """Cognitive blind-spot patterns synthesized from digest verification data."""
+    weak_layers: list[str] = Field(default_factory=list, description="Layers with recurring gaps, e.g. ['L2']")
+    strong_layers: list[str] = Field(default_factory=list, description="Layers consistently passed, e.g. ['L1', 'L5']")
+    domain_blindspots: list[DomainBlindspot] = Field(default_factory=list)
+    domain_mastery: list[DomainMastery] = Field(default_factory=list)
+    structural_note: str = Field(default="", description="Cross-domain pattern note, if any")
+    last_updated: str = Field(default="")
+
+
 # ── Top-level User DNA ──
 
 class UserDNA(BaseModel):
@@ -89,6 +116,7 @@ class UserDNA(BaseModel):
     beliefs: list[Belief] = Field(default_factory=list)
     criteria: list[Criterion] = Field(default_factory=list)
     preferences: Preferences = Field(default_factory=Preferences)
+    cognitive_patterns: CognitivePatterns = Field(default_factory=CognitivePatterns)
     evidence_log: list[EvidenceEntry] = Field(default_factory=list)
 
 

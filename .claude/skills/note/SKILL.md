@@ -58,6 +58,7 @@ All records live in `state/records.jsonl` — one JSON object per line. Schema:
   "id": "uuid",
   "timestamp": "ISO 8601",
   "layer": "active|accumulating|archived",
+  "type": "event|daily_review|weekly_review",
   "event": "one-line description of what happened",
   "feeling": null,
   "amplification": null,
@@ -70,6 +71,7 @@ All records live in `state/records.jsonl` — one JSON object per line. Schema:
 }
 ```
 
+- `type` is `event` for recorded moments, `daily_review` for end-of-day synthesis, `weekly_review` for connection reviews
 - `amplification` is null until the amplify step
 - `processed_at` is set when /reflect loads this record
 - `linked_records` connects records that share a thread (filled during weekly review)
