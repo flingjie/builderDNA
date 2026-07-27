@@ -68,5 +68,6 @@ What other options did we evaluate? Why were they rejected? (One paragraph per a
 | ADR-001 | Dual-Loop Architecture (Claude Code + Python Sandbox) | Planned | — |
 | ADR-002 | Python + Typer + uv Technology Stack | Planned | — |
 | ADR-003 | Local Ollama Embeddings for Pain Analysis | Planned | — |
-| [ADR-004](ADR-004-goap-astar-planner.md) | GOAP A* Planner in Skill Layer | Accepted | 2026-07-27 |
+| [ADR-004](ADR-004-goap-astar-planner.md) | GOAP A* Planner in Skill Layer | Superseded | 2026-07-27 |
 | [ADR-005](ADR-005-adr-system-introduction.md) | ADR System Introduction | Implemented | 2026-07-27 |
+| [ADR-006](ADR-006-simplify-goap-to-short-circuit.md) | Replace GOAP A* with Goal-Driven Short-Circuit Pipeline | Accepted | 2026-07-27 |

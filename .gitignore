@@ -13,3 +13,4 @@ state/*
 builderdna.egg-info/
 *-workspace/
 .claude/worktrees/
+.venv/

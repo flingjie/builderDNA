@@ -1,8 +1,8 @@
 # ADR-004 — GOAP A* Planner in the Skill Layer
 
-**Status**: Accepted
+**Status**: Superseded by [ADR-006](ADR-006-simplify-goap-to-short-circuit.md)
 **Date**: 2026-07-27
-**Related**: ADR-005 (ADR System Introduction), design session 2026-07-27
+**Related**: ADR-005 (ADR System Introduction), ADR-006 (Simplify to Short-Circuit Pipeline), design session 2026-07-27
 
 ## Context
 
