@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "collect": {
+    "high_quality_queries": [],
+    "effective_windows": [],
+    "domain_best_practices": {}
+  },
+  "trend": {
+    "effective_topics": {},
+    "good_windows": {}
+  }
+}
