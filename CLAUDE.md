@@ -77,9 +77,15 @@ observability/ ── Telemetry + behavior tracking (integrated into all other c
   behavior.py    — Mismatch detection between predicted and actual values
   snapshot.py    — Prediction snapshots for future validation
   hypothesis.py  — HypothesisManager for tracking exploration hypotheses
+  diagnostics.py — Cross-run diagnostics: parameter sensitivity, bootstrap, comparison
   output.py      — OutputLevel enum, verbosity control, console formatting
 
-All commands wrap output in SandboxResult{command, domain, computed_at, payload, stats}.
+adapters/ ── Embed BuilderDNA in agent frameworks
+  interface.py   — Abstract BuilderDNAAdapter (analyze_domain, get_trends, get_diagnostics)
+  cli.py         — CLIAdapter: subprocess-based, process isolation
+  claude_code.py — ClaudeCodeAdapter: direct Python imports for Claude Code skills
+
+All commands wrap output in SandboxResult{command, domain, computed_at, payload, stats, diagnostics}.
 Schema contract: schema.md and models/payload.py — Claude Code reads these.
 ```
 
@@ -95,7 +101,7 @@ Schema contract: schema.md and models/payload.py — Claude Code reads these.
 
 ## Skills (`.claude/skills/`)
 
-Nine skills are deployed (12 directories — 3 `*-workspace/` dirs are skill-creator eval artifacts, not skills):
+Ten skills are deployed (13 directories — 3 `*-workspace/` dirs are skill-creator eval artifacts, not skills):
 
 | Skill | Purpose | Trigger |
 |-------|---------|---------|
@@ -104,6 +110,7 @@ Nine skills are deployed (12 directories — 3 `*-workspace/` dirs are skill-cre
 | `repo-awesome` | Mine awesome-* lists for curated repo discovery | "mine awesome lists for X", "what do awesome lists recommend" |
 | `value-discovery` | Extract user's cognitive decision model via Meta Model interview | "value discovery", "what do I value", "help me understand my preferences" |
 | `observability` | Run self-iteration diagnostics (mismatch, snapshot, hypothesis pruning) | "check my predictions", "validate assumptions", "任何东西变了吗" |
+| `optimize` | Diagnose→Propose→Apply→Verify loop — read diagnostics, generate improvement proposals, apply and re-run | "/optimize", "improve the analysis", "fix low confidence", "优化分析" |
 | `reflect` | Multi-pass adversarial reflection on conversations → self-model updates (v4 protocol) | "/reflect", "reflect on this conversation", "复盘" |
 | `distill` | Synthesize accumulated reflections + digest gap reports into growth reports, propose self-model updates (including cognitive_patterns) | "/distill", "synthesize my reflections", "growth report", "蒸馏" |
 | `note` | RAL recording layer — capture daily moments, amplify meaning, weekly connection review | "/note", "记一下", "take a note", "weekly review", "日复盘" |
@@ -120,20 +127,23 @@ Evals exist for builderdna (`.claude/skills/builderdna/evals/`) via the skill-cr
 | `config.py` | Config loading with env var substitution + pydantic validation |
 | `config.yaml` | Accounts, domains (topic tags), vendors, embedding, output config |
 | `models/payload.py` | Output schemas for all data-producing commands — the contract Claude Code reads |
+| `models/user_dna_schema.py` | Schema definition + domain/activity/reward mapping rule tables |
+| `schema.md` | Human-readable schema reference for all SandboxResult payloads (including diagnostics) |
 | `signals/models.py` | Unified Signal model — all data sources normalize to this |
 | `signals/store.py` | SQLite-backed persistence with velocity and topic trend queries |
-| `schema.md` | Human-readable schema reference for all SandboxResult payloads |
-| `observability/` | Telemetry, behavior tracking, prediction snapshots, hypothesis management |
+| `observability/` | Telemetry, behavior tracking, prediction snapshots, hypothesis management, diagnostics |
+| `adapters/` | Embed BuilderDNA in agent frameworks: interface.py, cli.py, claude_code.py |
+| `state/bootstrap.json` | Bootstrap state — records successful run parameters for optimize skill hints |
 | `state/user_dna.json` | User cognitive model (values, beliefs, criteria, preferences, cognitive_patterns) |
-| `models/user_dna_schema.py` | Schema definition + domain/activity/reward mapping rule tables |
 | `state/user_weights.json` | User preference weights for opportunity scoring bias |
 | `state/reflections.jsonl` | Reflection event log for /reflect and /distill skills |
 | `state/digest_gaps.jsonl` | Feynman verification gap reports — blind-spot tracking (digest skill, created on first use) |
 | `state/distill_reports/` | Growth reports from /distill (YYYY-MM-DD_distill.md) |
 | `state/records.jsonl` | RAL daily records — event captures, amplifications, daily/weekly reviews (note skill) |
-| `state/hypotheses.json` | Exploration state tracking across conversations (builderdna skill) |
 | `state/behavior_log.jsonl` | Telemetry behavior log — mismatch detection data (observability command) |
+| `state/hypotheses.json` | Exploration state tracking across conversations (builderdna skill) |
 | `state/watches.json` | Saved repo searches for recurring monitoring (repo-trend skill) |
+| `output/proposals/` | Optimization proposals from /optimize skill (prop_YYYYMMDD_HHMMSS.json) |
 | `output/tracked_repos.json` | Persistent repo tracking with diff history (repo-trend skill) |
 | `references/cases/` | Case studies and examples for builder's perspective analysis |
 | `.env` | Environment variables: GITHUB_TOKEN, EMBEDDING_BASE_URL (copy from .env.example) |
