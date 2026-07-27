@@ -11,6 +11,7 @@ description: >
   The skill wraps 7 composable CLI commands (collect → trend → pain → opportunity → report → config → observability)
   so the user never needs to remember flags — you translate intent into the right command chain.
   Reads state/hypotheses.json to track exploration across conversations.
+  Uses GOAP A* planning (dynamic replanning) to select the optimal execution path.
   After every run, present findings clearly and ask if they want to refine.
   Important: if the user is asking about GitHub developer analysis or tech trends,
   use this skill — don't try to analyze repos or trends without it.
@@ -20,12 +21,12 @@ description: >
 
 You operate BuilderDNA — a composable toolkit that analyzes GitHub developer activity.
 Each command is an independent sandbox: structured JSON input → deterministic compute → structured JSON output.
-Claude Code handles all semantic reasoning and orchestration.
+Claude Code handles all semantic reasoning and orchestration, including GOAP A* planning.
 
 ## Architecture
 
 ```
-Claude Code (you) — reads hypotheses.json, decides what to run, interprets results
+Claude Code (you) — reads hypotheses.json + plan_state.json, runs GOAP A* loop
       │
       ▼
 7 sandbox CLI commands (each independent, JSON-in, JSON-out)
@@ -35,9 +36,113 @@ Claude Code (you) — reads hypotheses.json, decides what to run, interprets res
 Global memory — SQLite + output/*.json + state/*.json + claude-mem
 ```
 
+Two key state files drive the planning loop:
+
+- **`state/hypotheses.json`** — cross-session exploration tree + goal + planning config (ADR-004)
+- **`state/plan_state.json`** — current-session planning state (path taken, cost, data readiness)
+- **`state/run_stats.json`** — historical command durations for cost estimates
+
 All commands run from the project root with `PYTHONPATH=.` prefix.
 
-## Command Map
+## GOAP A* Planning Loop (ADR-004)
+
+Before running any command, you must run the planning loop. This replaces the old "read hypotheses → pick commands from a fixed map" approach with dynamic, cost-aware path selection.
+
+### Step 0: Session Initialization
+
+On first invocation in a session:
+
+1. Read `state/hypotheses.json` — determine the goal (user's intent or default `opportunity_discovery`)
+2. Read `state/plan_state.json` — load the action catalog and cost estimates
+3. Read `state/run_stats.json` (if empty, use conservative defaults from plan_state.json's `action_catalog`)
+4. Set `session_id`:
+   - Use format `"YYYY-MM-DD-NNN"` where NNN is a daily increment (001, 002, ...)
+   - Check if `plan_state.json` already has a session from today — if so, increment the suffix
+   - If this is the first session today, use `-001`
+   - Example: first session → `"2026-07-27-001"`, second → `"2026-07-27-002"`
+   - Also set `goal` and `target_domain`
+5. Initialize `current_state`:
+   - `data_ready`: check which output files exist (`output/signals.json`, `output/trends.json`, etc.)
+   - `data_missing`: all output files NOT in data_ready
+   - `hypotheses_validated` / `hypotheses_exploring`: from hypotheses.json
+   - `user_dna_loaded`: check `state/user_dna.json` exists and has values
+   - `actions_executed`: []
+6. Write initialized `plan_state.json`
+
+### Step 1: Determine Goal
+
+Infer the goal from the user's request using these patterns:
+
+| User says | Goal |
+|-----------|------|
+| "what's trending in X" / "show me trends" / "trend radar" | `trend_radar` |
+| "find opportunities in X" / "what can I build" / "analyze X" | `opportunity_discovery` |
+| "check my hypothesis" / "validate X" / "is Y true" | `hypothesis_validation` |
+| Anything with a specific hypothesis ID or node name | `hypothesis_validation` |
+| Default (unclear intent) | `opportunity_discovery` |
+
+Write the goal to `plan_state.json`.
+
+If `hypothesis_validation`: identify which hypothesis node(s) are the target. If none specified, use the highest-confidence `exploring` node.
+
+### Step 2: The Planning Loop (Dynamic Replanning)
+
+Execute this loop, one action at a time, until the goal's stop condition is met:
+
+```
+WHILE goal not reached:
+  1. Read current state from plan_state.json
+  2. Identify EXECUTABLE actions:
+     - Check each action in the action_catalog
+     - An action is executable if ALL its preconditions are in data_ready
+     - (preconditions can also be empty, meaning always executable)
+  3. For each executable action, compute f(n) = g(n) + h(n):
+     - g(n): cost_so_far_s + this action's avg_cost_s (from run_stats or action_catalog)
+     - h(n): estimate of remaining cost to goal
+       * Count how many REQUIRED actions (from goal_conditions) are still unexecuted
+       * Sum their avg_cost_s
+     - SEMANTIC ADJUSTMENT: if the last executed action produced output that changes
+       the picture, adjust h(n) for affected actions:
+       * If trend output shows low gap_score (< 1.0) across all topics → inflate h(n)
+         for pain and opportunity (the planner should consider early termination)
+       * If a hypothesis was just validated → reduce h(n) (we're closer to goal)
+       * If a command errored → increase that action's g(n) for this session
+  4. SELECT the action with lowest f(n)
+  5. EXECUTE the action using its command template from action_catalog
+     - Replace {domain} with target_domain
+     - Replace {window} with appropriate value (default 365, or user-specified)
+     - Replace {data_file} with the appropriate JSON path
+     - ALWAYS prefix with PYTHONPATH=.
+  6. READ the command's output from the output/ directory
+  7. UPDATE plan_state.json:
+     - Move produced data from data_missing to data_ready
+     - Append action name to actions_executed and path_taken
+     - Update cost_so_far_s (add actual elapsed seconds from the command output's stats)
+     - If the output revealed useful info, update hypothesis confidence in hypotheses.json
+     - CALL persist_run_stats (via Python: `PYTHONPATH=. uv run python -c "from observability.telemetry import persist_run_stats; persist_run_stats('{command}', {elapsed})"`)
+  8. CHECK stop condition from goal_conditions:
+     - If met → break out of loop, proceed to report
+     - If not met → loop back to step 1 (re-search with updated state)
+```
+
+### Step 3: Early Termination Check
+
+After each action, evaluate whether continuing is worth the cost:
+
+- **Low opportunity signal**: if `trend` output shows all topics with gap_score < 1.0 and no topics with rising velocity, the planner should ask the user: "Trend data shows low opportunity signals in this domain. Skip pain/opportunity analysis and just report trends?"
+- **Cost budget exceeded**: if `cost_so_far_s` exceeds 300s (5 min), ask the user whether to continue or stop
+- **Hypothesis resolved**: if `hypothesis_validation` goal and target hypothesis reached `validated` or `pruned`, stop immediately
+
+### Step 4: After Goal Reached
+
+Once the stop condition is met:
+
+1. Run `report` action to generate the final output
+2. Present findings clearly, referencing hypothesis state
+3. Ask: "Want to refine with observability diagnostics?" → if yes, run `observability`
+4. Ask what to explore next
+
+## Command Map (Fallback — when planning state is unavailable)
 
 | User says | You run |
 |-----------|---------|
@@ -58,19 +163,23 @@ Run `builderdna --help` to see all 7 commands.
 The file `state/hypotheses.json` tracks exploration state across conversations. Each node has `status: exploring | validated | pruned`.
 
 **On every analysis session:**
-1. **Read** `state/hypotheses.json` — see what's being explored
-2. **Run** relevant sandbox commands to gather evidence
-3. **Update** node confidence and status based on results
-4. **Present** findings with hypothesis state context
-5. **Ask** what to explore next — add new nodes or prune dead ends
+1. **Read** `state/hypotheses.json` — see what's being explored and what the goal is
+2. **Initialize** `state/plan_state.json` with the current goal and state
+3. **Run** the GOAP A* planning loop to select and execute actions
+4. **Update** node confidence and status based on results
+5. **Present** findings with hypothesis state context
+6. **Ask** what to explore next — add new nodes or prune dead ends
 
 Example:
 ```
 Read: hyp_001 "Agent Memory needs unified State Engine" is EXPLORING, confidence=0.6
-  → Run collect → trend → opportunity for agent domain
-  → OpenViking 27k stars, UMP protocol emerging, gap_score=2.3
-  → Update hyp_001 confidence 0.6 → 0.85, status → VALIDATED
-  → Add hyp_002 "MCP Observability gap" EXPLORING
+  → Goal: opportunity_discovery, domain: agent
+  → A* selects: collect (only executable action, preconditions satisfied)
+  → collect done (45s), signals.json ready
+  → A* selects: trend (f=45+8+remaining=61) over pain (f=45+92+remaining=149)
+  → trend reveals: "Agent State Engine" gap_score=2.3, velocity=rising
+  → Update hyp_001 confidence 0.6 → 0.7
+  → A* selects: pain (now worth it — trend showed signal) → opportunity → report
   → Present: "Agent State Engine validated (gap=2.3). New lead: MCP Observability."
   → Ask: "Deep dive on either?"
 ```
@@ -112,7 +221,7 @@ The `--user-dna` flag is optional on both `collect` and `opportunity` — omitti
 
 ## Observability — Self-Iteration Check
 
-After running a full analysis pipeline (collect → trend → pain → opportunity), optionally run diagnostics. **For interactive observability sessions, invoke the `observability` skill** — it handles result interpretation and user interaction.
+After running a full analysis pipeline, optionally run diagnostics. **For interactive observability sessions, invoke the `observability` skill** — it handles result interpretation and user interaction.
 
 ```bash
 # Run all observability checks for the domain
@@ -146,7 +255,11 @@ Read these when needed:
 |------|-------------|---------|
 | `references/builder-lens.md` | Before builder's perspective analysis | 10-dimension methodology for analyzing project success patterns |
 | `schema.md` | Before reading command outputs | JSON schemas for all 7 commands |
-| `state/hypotheses.json` | Session start | Exploration state tree |
+| `state/hypotheses.json` | Session start | Exploration state tree + goal + planning config |
+| `state/plan_state.json` | Every planning cycle | Current session state, action catalog, cost estimates |
+| `state/run_stats.json` | Cost estimation | Historical command duration averages |
+| `docs/adr/` | Architecture understanding | All architecture decision records |
+| `docs/adr/ADR-004-goap-astar-planner.md` | Understanding the planner | GOAP A* design rationale |
 
 ## Config Management
 
@@ -167,3 +280,6 @@ Edit `config.yaml` to change accounts or topics. Confirm with user before editin
 | No pain clusters | Verify embedding endpoint (`EMBEDDING_BASE_URL`) |
 | Rate limited | Wait or reduce window size |
 | Import from deleted module | Old code path — verify you're in the refactored worktree |
+| plan_state.json missing | Run session init (Step 0) from the planning loop |
+| A* planner stuck | Check action preconditions in plan_state.json — may need to force a collect |
+| run_stats.json empty | Normal on first run — planner uses conservative defaults from action_catalog |
