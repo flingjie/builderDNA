@@ -10,6 +10,7 @@ from signals.models import Signal
 from intelligence.trend.velocity import compute_acceleration
 from models.payload import (
     SandboxResult, TrendPayload, TopicTrend, RepoSummary,
+    Diagnostics, DataQualityDiag, ConfidenceDiag,
 )
 from observability import RunTelemetry, OutputLevel, vprint, record_command, record_output_retention
 from observability.snapshot import save_trend_snapshot
@@ -124,11 +125,50 @@ def trend(
 
     trends.sort(key=lambda x: x.growth_velocity, reverse=True)
 
+    # ── Build diagnostics ──────────────────────────────────────────
+    diag = Diagnostics()
+
+    # data_quality: topics with zero matching repos
+    topic_with_signals: set[str] = set()
+    for s in repo_signals:
+        for t in s.payload.get("topics", []):
+            topic_with_signals.add(t)
+
+    # Get all topic names from trend rows
+    all_trend_topics = {t.topic for t in trends}
+    for topic in all_trend_topics:
+        if topic not in topic_with_signals:
+            diag.data_quality.coverage_gaps.append(
+                f"topic '{topic}' has no matching repos in signals — may be from stored data or empty"
+            )
+
+    if len(repo_signals) < 10:
+        diag.data_quality.sample_size_warning = (
+            f"Only {len(repo_signals)} signals available — trend confidence will be low. "
+            f"Consider re-running collect with more topics or a longer window."
+        )
+
+    # confidence: low-evidence trends
+    for t in trends:
+        if t.evidence_count < 3:
+            diag.confidence.low_confidence_items.append({
+                "item": t.topic,
+                "confidence": round(t.confidence, 2),
+                "reason": f"only {t.evidence_count} repo(s) support this trend — need ≥3 for reliable signal",
+            })
+        if t.confidence < 0.2:
+            diag.confidence.low_confidence_items.append({
+                "item": t.topic,
+                "confidence": round(t.confidence, 2),
+                "reason": "confidence below 0.2 — this trend may be noise; consider adjusting topic scope or window",
+            })
+
     result = SandboxResult(
         command="trend",
         domain=domain,
         payload=TrendPayload(trends=trends, domain=domain, window_days=window).model_dump(),
         stats={"total_trends": len(trends), **tel.to_stats()},
+        diagnostics=diag,
     )
 
     output_path = Path(output)

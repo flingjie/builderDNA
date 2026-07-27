@@ -6,6 +6,7 @@ Supports User DNA personalization: reads state/user_dna.json and applies
 import asyncio
 import json
 import math
+from datetime import datetime, timezone
 from pathlib import Path
 
 import typer
@@ -15,7 +16,10 @@ from collector.github.client import GitHubClient
 from collector.github.repo import fetch_top_repos
 from collector.github.issue import fetch_issues, DEMAND_LABELS
 from collector.normalizer import normalize_all
-from models.payload import SandboxResult, CollectPayload, RepoSignal, IssueSignal
+from models.payload import (
+    SandboxResult, CollectPayload, RepoSignal, IssueSignal,
+    Diagnostics, DataQualityDiag, ConfidenceDiag,
+)
 from observability import RunTelemetry, OutputLevel, vprint, record_command, record_output_retention
 from models.user_dna_schema import (
     load_user_dna, UserDNA,
@@ -306,6 +310,58 @@ async def _run_collect(
         "personalized": user_dna is not None,
     }
 
+    # ── Build diagnostics ──────────────────────────────────────────
+    diag = Diagnostics()
+
+    # data_quality: coverage gaps and noise
+    for topic in topics:
+        topic_repo_count = sum(1 for r in all_repos if topic.lower() in " ".join(r.get("topics", [])).lower())
+        if topic_repo_count < 3:
+            diag.data_quality.coverage_gaps.append(
+                f"topic '{topic}' matched only {topic_repo_count} repo(s) — insufficient for reliable trend signals"
+            )
+        if topic_repo_count > 50:
+            diag.data_quality.noise_sources.append(
+                f"topic '{topic}' matched {topic_repo_count} repos — too broad, consider narrowing"
+            )
+
+    # API issues from telemetry and client
+    if tel.errors:
+        for err in tel.errors:
+            diag.data_quality.api_issues.append(
+                f"{err.get('url', 'unknown')}: {err.get('reason', 'error')}"
+            )
+    if tel.retry_exhausted:
+        for retry in tel.retry_exhausted:
+            diag.data_quality.api_issues.append(
+                f"retry exhausted: {retry.get('url', 'unknown')} after {retry.get('attempts', 0)} attempts"
+            )
+    if client.rate_limiter._waited_calls > 0:
+        diag.data_quality.api_issues.append(
+            f"rate-limited {client.rate_limiter._waited_calls} time(s) — consider reducing concurrency or increasing margin"
+        )
+
+    # Sample size warning
+    if len(repo_signals) < 20:
+        diag.data_quality.sample_size_warning = (
+            f"Only {len(repo_signals)} repos collected — "
+            f"downstream trend and pain analysis may produce low-confidence results. "
+            f"Consider adding more topics or accounts, or widening the time window."
+        )
+
+    # confidence: low-confidence repos (velocity based on insufficient data)
+    for s in signals:
+        if s.type in ("repo_created", "star_growth") and s.velocity > 0:
+            age_days = max(1, (datetime.now(timezone.utc) - datetime.fromisoformat(
+                str(s.payload.get("created_at", "")) if s.payload.get("created_at") else "2020-01-01T00:00:00"
+            ).replace(tzinfo=timezone.utc)).days)
+            if age_days < 30:
+                diag.confidence.low_confidence_items.append({
+                    "item": s.target_repo,
+                    "confidence": round(min(1.0, age_days / 90), 2),
+                    "reason": f"repo is only {age_days} days old — velocity estimate based on limited history",
+                })
+
     result = SandboxResult(
         command="collect",
         domain=final_domain,
@@ -315,6 +371,7 @@ async def _run_collect(
             signals=signal_dicts,
         ).model_dump(),
         stats={**cmd_stats, **tel.to_stats()},
+        diagnostics=diag,
     )
 
     output_path = Path(output)

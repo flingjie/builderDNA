@@ -14,6 +14,7 @@ import typer
 
 from models.payload import (
     SandboxResult, OpportunityPayload, OpportunityCard,
+    Diagnostics, ConfidenceDiag,
 )
 from models.user_dna_schema import load_user_dna
 from intelligence.opportunity.scoring import (
@@ -134,6 +135,34 @@ def opportunity(
 
     cards = _generate_cards(trend_list, pain_list, dna)
 
+    # ── Build diagnostics ──────────────────────────────────────────
+    diag = Diagnostics()
+
+    # data_quality: input availability
+    if not pain_list:
+        diag.data_quality.coverage_gaps.append(
+            "No pain clusters available — opportunity scoring is trend-only (demand may be underestimated)"
+        )
+    if not trend_list:
+        diag.data_quality.sample_size_warning = (
+            "No trend data available — cannot generate opportunities. Re-run trend command first."
+        )
+    if len(trend_list) < 3:
+        diag.data_quality.sample_size_warning = (
+            f"Only {len(trend_list)} trends available — opportunity space is narrow. "
+            f"Consider collecting more signals or broadening the topic scope."
+        )
+
+    # confidence: suspiciously high-gap cards from weak demand
+    for c in cards:
+        if c.gap_score > 5.0 and c.demand_score < 2.0:
+            diag.confidence.low_confidence_items.append({
+                "item": c.title,
+                "confidence": round(min(c.demand_score / 5.0, 0.5), 2),
+                "reason": f"gap_score={c.gap_score:.1f} but demand_score={c.demand_score:.1f} — "
+                          f"high gap may be from low competition (<1 repo), not real opportunity",
+            })
+
     result = SandboxResult(
         command="opportunity",
         domain=t_payload.get("domain", ""),
@@ -144,6 +173,7 @@ def opportunity(
             "personalized": dna is not None,
             **tel.to_stats(),
         },
+        diagnostics=diag,
     )
 
     output_path = Path(output)

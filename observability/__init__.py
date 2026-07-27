@@ -36,6 +36,13 @@ from observability.snapshot import (
 from observability.hypothesis import (
     HypothesisManager,
 )
+from observability.diagnostics import (
+    generate_parameter_sensitivity,
+    record_bootstrap,
+    get_bootstrap_hints,
+    compare_diagnostics,
+    BOOTSTRAP_PATH,
+)
 
 __all__ = [
     # telemetry
@@ -62,4 +69,10 @@ __all__ = [
     "PREDICTIONS_DIR",
     # hypothesis
     "HypothesisManager",
+    # diagnostics
+    "generate_parameter_sensitivity",
+    "record_bootstrap",
+    "get_bootstrap_hints",
+    "compare_diagnostics",
+    "BOOTSTRAP_PATH",
 ]

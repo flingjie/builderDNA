@@ -1,0 +1,10 @@
+{
+  "version": 3,
+  "last_updated": "",
+  "domain": "agent",
+  "goal_config": {
+    "available_goals": ["trend_radar", "opportunity_discovery", "hypothesis_validation"],
+    "default_goal": "opportunity_discovery"
+  },
+  "nodes": []
+}

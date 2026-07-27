@@ -11,6 +11,7 @@ description: >
   The skill wraps 7 composable CLI commands (collect → trend → pain → opportunity → report → config → observability)
   so the user never needs to remember flags — you translate intent into the right command chain.
   Reads state/hypotheses.json to track exploration across conversations.
+  Uses goal-driven short-circuit pipeline to select the optimal execution path.
   After every run, present findings clearly and ask if they want to refine.
   Important: if the user is asking about GitHub developer analysis or tech trends,
   use this skill — don't try to analyze repos or trends without it.
@@ -25,7 +26,7 @@ Claude Code handles all semantic reasoning and orchestration.
 ## Architecture
 
 ```
-Claude Code (you) — reads hypotheses.json, decides what to run, interprets results
+Claude Code (you) — reads hypotheses.json, maps intent → commands via short-circuit pipeline
       │
       ▼
 7 sandbox CLI commands (each independent, JSON-in, JSON-out)
@@ -35,23 +36,78 @@ Claude Code (you) — reads hypotheses.json, decides what to run, interprets res
 Global memory — SQLite + output/*.json + state/*.json + claude-mem
 ```
 
+The pipeline is driven by a single state file and one principle:
+
+- **`state/hypotheses.json`** — cross-session exploration tree. Tracked hypotheses influence domain and topic choices across sessions.
+- **Principle**: the command dependency graph is almost linear (branch factor 1-2). A full search algorithm (A*) adds complexity without improving decisions over a simple goal → commands mapping with short-circuit rules. See ADR-006 for the rationale.
+
 All commands run from the project root with `PYTHONPATH=.` prefix.
 
-## Command Map
+## Goal-Driven Short-Circuit Pipeline (ADR-006)
 
-| User says | You run |
-|-----------|---------|
-| "collect signals for X" / "pull GitHub data for Y" | `PYTHONPATH=. uv run builderdna collect <domain> --window N` |
-| "what's trending in X" / "show me trends" | `PYTHONPATH=. uv run builderdna trend <domain> --data output/signals.json` |
-| "what problems are developers having" / "find pain points" | `PYTHONPATH=. uv run builderdna pain <domain> --data output/signals.json` |
-| "find opportunities" / "what can I build" | `PYTHONPATH=. uv run builderdna opportunity --trends output/trends.json --pains output/pain_clusters.json` |
-| "generate a report" / "format the results" | `PYTHONPATH=. uv run builderdna report --data output/opportunities.json --format md` |
-| "show config" / "what's my setup" | `PYTHONPATH=. uv run builderdna config --show` |
-| "check my predictions" / "validate assumptions" / "run diagnostics" | `PYTHONPATH=. uv run builderdna observability --all --domain <domain>` |
+### Step 1: Determine Goal
 
-**Command chaining**: commands pass data via JSON files. `collect` produces `signals.json` → `trend` and `pain` consume it → `opportunity` consumes both → `report` consumes any result.
+Infer the goal from the user's request:
 
-Run `builderdna --help` to see all 7 commands.
+| User says | Goal |
+|-----------|------|
+| "what's trending in X" / "show me trends" / "trend radar" | `trend_radar` |
+| "find opportunities in X" / "what can I build" / "analyze X" | `opportunity_discovery` |
+| "check my hypothesis" / "validate X" / "is Y true" | `hypothesis_validation` |
+| Anything with a specific hypothesis ID or node name | `hypothesis_validation` |
+| Default (unclear intent) | `opportunity_discovery` |
+
+If `hypothesis_validation`: identify which hypothesis node(s) are the target. If none specified, use the highest-confidence `exploring` node.
+
+### Step 2: Goal → Commands
+
+Each goal maps to a fixed ordered command sequence, respecting the dependency graph. Always execute `trend` before `pain` (8s vs 92s — cheap data informs the expensive decision).
+
+| Goal | Required | Optional (after short-circuit check) |
+|------|----------|--------------------------------------|
+| `trend_radar` | collect → trend → report | — |
+| `opportunity_discovery` | collect → trend → report | pain → opportunity (both, or neither) |
+| `hypothesis_validation` | collect → observability | trend (if you want supporting evidence) |
+
+**Command templates** (always prefix with `PYTHONPATH=.`):
+
+| Command | Template |
+|---------|----------|
+| collect | `PYTHONPATH=. uv run builderdna collect {domain} --window {window} --output output/signals.json` |
+| trend | `PYTHONPATH=. uv run builderdna trend {domain} --data output/signals.json --output output/trends.json` |
+| pain | `PYTHONPATH=. uv run builderdna pain {domain} --data output/signals.json --output output/pain_clusters.json` |
+| opportunity | `PYTHONPATH=. uv run builderdna opportunity --trends output/trends.json --pains output/pain_clusters.json --output output/opportunities.json` |
+| report | `PYTHONPATH=. uv run builderdna report --data {data_file} --format md` |
+| config | `PYTHONPATH=. uv run builderdna config --show` |
+| observability | `PYTHONPATH=. uv run builderdna observability --all --domain {domain}` |
+
+Substitute `{domain}` with the target domain, `{window}` with 365 (default) or user-specified value.
+
+### Step 3: Short-Circuit Check (the only decision point)
+
+After required commands complete, check whether to run optional ones:
+
+**Trend signal check** (for `opportunity_discovery`):
+- Read `output/trends.json`
+- If ALL topics have `gap_score < 1.0` AND no topics have rising velocity:
+  → Ask: "Trend data shows low opportunity signals in this domain. Skip pain + opportunity analysis and just report trends?"
+- If user agrees → skip pain + opportunity, go to report
+- If ANY topic has `gap_score >= 1.0` or rising velocity → proceed with optional commands
+
+**Cost budget check** (all goals):
+- Track wall-clock time across all commands
+- If cumulative time exceeds 5 minutes → ask whether to continue or stop
+
+**Hypothesis check** (for `hypothesis_validation`):
+- If target hypothesis reached `validated` or `pruned` → stop immediately
+
+### Step 4: After Commands Complete
+
+1. Run `report` to generate the final output (if not already done)
+2. Read command outputs, update hypothesis confidence in `state/hypotheses.json`
+3. Present findings clearly, referencing hypothesis state
+4. Ask: "Want to refine with observability diagnostics?" → if yes, run `observability`
+5. Ask what to explore next
 
 ## Hypothesis Tree Workflow
 
@@ -59,18 +115,22 @@ The file `state/hypotheses.json` tracks exploration state across conversations. 
 
 **On every analysis session:**
 1. **Read** `state/hypotheses.json` — see what's being explored
-2. **Run** relevant sandbox commands to gather evidence
-3. **Update** node confidence and status based on results
-4. **Present** findings with hypothesis state context
-5. **Ask** what to explore next — add new nodes or prune dead ends
+2. **Parse** user intent → goal (Step 1 above)
+3. **Execute** goal's command sequence (Step 2-3 above)
+4. **Update** node confidence and status based on results
+5. **Present** findings with hypothesis state context
+6. **Ask** what to explore next — add new nodes or prune dead ends
 
 Example:
 ```
 Read: hyp_001 "Agent Memory needs unified State Engine" is EXPLORING, confidence=0.6
-  → Run collect → trend → opportunity for agent domain
-  → OpenViking 27k stars, UMP protocol emerging, gap_score=2.3
-  → Update hyp_001 confidence 0.6 → 0.85, status → VALIDATED
-  → Add hyp_002 "MCP Observability gap" EXPLORING
+  → Goal: opportunity_discovery, domain: agent
+  → Required: collect → trend
+  → collect done (45s), signals.json ready
+  → trend reveals: "Agent State Engine" gap_score=2.3, velocity=rising
+  → Short-circuit check: gap >= 1.0 → proceed with optional
+  → Update hyp_001 confidence 0.6 → 0.7
+  → pain → opportunity → report
   → Present: "Agent State Engine validated (gap=2.3). New lead: MCP Observability."
   → Ask: "Deep dive on either?"
 ```
@@ -112,7 +172,7 @@ The `--user-dna` flag is optional on both `collect` and `opportunity` — omitti
 
 ## Observability — Self-Iteration Check
 
-After running a full analysis pipeline (collect → trend → pain → opportunity), optionally run diagnostics. **For interactive observability sessions, invoke the `observability` skill** — it handles result interpretation and user interaction.
+After running a full analysis pipeline, optionally run diagnostics. **For interactive observability sessions, invoke the `observability` skill** — it handles result interpretation and user interaction.
 
 ```bash
 # Run all observability checks for the domain
@@ -147,6 +207,8 @@ Read these when needed:
 | `references/builder-lens.md` | Before builder's perspective analysis | 10-dimension methodology for analyzing project success patterns |
 | `schema.md` | Before reading command outputs | JSON schemas for all 7 commands |
 | `state/hypotheses.json` | Session start | Exploration state tree |
+| `docs/adr/` | Architecture understanding | All architecture decision records |
+| `docs/adr/ADR-006-short-circuit-pipeline.md` | Understanding the pipeline | Goal-driven short-circuit design rationale |
 
 ## Config Management
 
@@ -167,3 +229,4 @@ Edit `config.yaml` to change accounts or topics. Confirm with user before editin
 | No pain clusters | Verify embedding endpoint (`EMBEDDING_BASE_URL`) |
 | Rate limited | Wait or reduce window size |
 | Import from deleted module | Old code path — verify you're in the refactored worktree |
+| Pain keeps getting skipped | Trend gap_scores are low — try broadening domain topics in config.yaml first |

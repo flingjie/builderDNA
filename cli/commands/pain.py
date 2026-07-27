@@ -10,6 +10,7 @@ from intelligence.pain.cluster import PainClusterer
 from intelligence.pain.severity import compute_severity
 from models.payload import (
     SandboxResult, PainPayload, PainCluster, IssueSummary,
+    Diagnostics, DataQualityDiag, ConfidenceDiag,
 )
 from observability import RunTelemetry, OutputLevel, vprint, record_command, record_output_retention
 from observability.snapshot import save_pain_snapshot
@@ -63,11 +64,14 @@ def pain(
     issues = payload.get("issues", [])
 
     if not issues:
+        diag = Diagnostics()
+        diag.data_quality.sample_size_warning = "No issues found in input data — cannot cluster. Consider re-running collect with different repos or a broader topic scope."
         result = SandboxResult(
             command="pain",
             domain=domain,
             payload=PainPayload().model_dump(),
             stats={"issue_count": 0, "repos_analyzed": [], "noise_count": 0, **tel.to_stats()},
+            diagnostics=diag,
         )
         output_path = Path(output)
         output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -132,6 +136,36 @@ def pain(
                 ],
             ))
 
+    # ── Build diagnostics ──────────────────────────────────────────
+    diag = Diagnostics()
+
+    # data_quality: sample size
+    if len(issues) < 10:
+        diag.data_quality.sample_size_warning = (
+            f"Only {len(issues)} issues analyzed — clustering results may be unstable. "
+            f"Consider collecting issues from more repos."
+        )
+    if noise_count > len(issues) * 0.5:
+        diag.data_quality.noise_sources.append(
+            f"{noise_count}/{len(issues)} issues classified as noise — "
+            f"topics may be too diverse for meaningful clustering"
+        )
+
+    # confidence: weak clusters
+    for c in pain_clusters_list:
+        if c.frequency == 1:
+            diag.confidence.low_confidence_items.append({
+                "item": f"Cluster {c.cluster_id}: {c.title}",
+                "confidence": 0.1,
+                "reason": "single-issue cluster — not a real pain pattern; noise that barely exceeded threshold",
+            })
+        if c.severity < 0.3:
+            diag.confidence.low_confidence_items.append({
+                "item": f"Cluster {c.cluster_id}: {c.title}",
+                "confidence": round(c.severity, 2),
+                "reason": f"severity={c.severity:.2f} — issues in this cluster have low engagement, may not represent real pain",
+            })
+
     result = SandboxResult(
         command="pain",
         domain=domain,
@@ -142,6 +176,7 @@ def pain(
         ).model_dump(),
         stats={"clusters": len(pain_clusters_list), "issues_analyzed": len(issues),
                "noise_count": noise_count, **tel.to_stats()},
+        diagnostics=diag,
     )
 
     output_path = Path(output)
