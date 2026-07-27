@@ -55,7 +55,12 @@ On first invocation in a session:
 1. Read `state/hypotheses.json` — determine the goal (user's intent or default `opportunity_discovery`)
 2. Read `state/plan_state.json` — load the action catalog and cost estimates
 3. Read `state/run_stats.json` (if empty, use conservative defaults from plan_state.json's `action_catalog`)
-4. Set `session_id` to today's date (e.g., `"2026-07-27-001"`), `goal`, and `target_domain`
+4. Set `session_id`:
+   - Use format `"YYYY-MM-DD-NNN"` where NNN is a daily increment (001, 002, ...)
+   - Check if `plan_state.json` already has a session from today — if so, increment the suffix
+   - If this is the first session today, use `-001`
+   - Example: first session → `"2026-07-27-001"`, second → `"2026-07-27-002"`
+   - Also set `goal` and `target_domain`
 5. Initialize `current_state`:
    - `data_ready`: check which output files exist (`output/signals.json`, `output/trends.json`, etc.)
    - `data_missing`: all output files NOT in data_ready

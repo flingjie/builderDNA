@@ -18,19 +18,19 @@
       "description": "Know what's trending and rising in a domain",
       "required_data": ["signals.json", "trends.json"],
       "required_actions": ["collect", "trend", "report"],
-      "stop_condition": "trends.json ready + report rendered"
+      "stop_condition": "trends.json ready"
     },
     "opportunity_discovery": {
       "description": "Find viable product/tool opportunities from developer activity",
       "required_data": ["signals.json", "trends.json", "pain_clusters.json", "opportunities.json"],
       "required_actions": ["collect", "trend", "pain", "opportunity", "report"],
       "min_hypothesis_confidence": 0.7,
-      "stop_condition": "opportunities.json ready + report rendered + min hypothesis confidence >= 0.7"
+      "stop_condition": "opportunities.json ready AND min hypothesis confidence >= 0.7 (report is run AFTER stop, in Step 4)"
     },
     "hypothesis_validation": {
       "description": "Confirm or refute a specific hypothesis",
-      "required_data": [],
-      "required_actions": [],
+      "required_data": ["signals.json"],
+      "required_actions": ["collect", "observability"],
       "stop_condition": "target hypothesis status in {validated, pruned}"
     }
   },
@@ -43,14 +43,14 @@
       "description": "Collect GitHub signals (repos + issues) for a domain"
     },
     "trend": {
-      "command": "PYTHONPATH=. uv run builderdna trend agent --data output/signals.json --output output/trends.json",
+      "command": "PYTHONPATH=. uv run builderdna trend {domain} --data output/signals.json --output output/trends.json",
       "preconditions": ["signals.json"],
       "effects": ["trends.json"],
       "avg_cost_s": 8,
       "description": "Compute topic trends from collected signals"
     },
     "pain": {
-      "command": "PYTHONPATH=. uv run builderdna pain agent --data output/signals.json --output output/pain_clusters.json",
+      "command": "PYTHONPATH=. uv run builderdna pain {domain} --data output/signals.json --output output/pain_clusters.json",
       "preconditions": ["signals.json"],
       "effects": ["pain_clusters.json"],
       "avg_cost_s": 92,

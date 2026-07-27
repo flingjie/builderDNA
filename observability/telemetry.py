@@ -16,14 +16,36 @@ from pathlib import Path
 RUN_STATS_PATH = "state/run_stats.json"
 
 
+def _resolve_run_stats_path() -> Path:
+    """Resolve run_stats.json relative to the project root.
+
+    When running from any subdirectory, locate the project root by walking
+    up until we find a config.yaml (BuilderDNA's project marker).
+    Falls back to the original relative path if config.yaml is not found.
+    """
+    current = Path.cwd()
+    for parent in [current, *current.parents]:
+        if (parent / "config.yaml").exists():
+            return parent / RUN_STATS_PATH
+    return Path(RUN_STATS_PATH)
+
+
 def _load_run_stats() -> dict:
     """Load run_stats.json, returning skeleton if missing or corrupt."""
-    path = Path(RUN_STATS_PATH)
+    path = _resolve_run_stats_path()
     if not path.exists():
         return {"command_stats": {}}
     try:
         return json.loads(path.read_text())
-    except (json.JSONDecodeError, OSError):
+    except json.JSONDecodeError:
+        # Corrupt file — back up and start fresh so data isn't silently lost
+        backup = path.with_suffix(".json.bak")
+        try:
+            path.rename(backup)
+        except OSError:
+            pass
+        return {"command_stats": {}}
+    except OSError:
         return {"command_stats": {}}
 
 
@@ -51,7 +73,7 @@ def persist_run_stats(command: str, elapsed_s: float) -> None:
     else:
         stats[command] = {"avg_s": round(elapsed_s, 2), "n": 1}
 
-    path = Path(RUN_STATS_PATH)
+    path = _resolve_run_stats_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, indent=2, ensure_ascii=False))
 
@@ -62,15 +84,15 @@ def get_command_cost(command: str) -> float:
     Returns the historical average if available, otherwise a conservative default.
     Used by the GOAP A* planner's g(n) and h(n) computation.
     """
-    # Conservative defaults for cold starts
+    # Conservative defaults for cold starts — must match plan_state.json action_catalog avg_cost_s
     FALLBACKS = {
-        "collect": 120.0,
-        "trend": 15.0,
-        "pain": 180.0,
-        "opportunity": 5.0,
-        "report": 2.0,
-        "config": 2.0,
-        "observability": 20.0,
+        "collect": 45.0,
+        "trend": 8.0,
+        "pain": 92.0,
+        "opportunity": 3.0,
+        "report": 1.0,
+        "config": 1.0,
+        "observability": 12.0,
     }
     data = _load_run_stats()
     entry = data.get("command_stats", {}).get(command)

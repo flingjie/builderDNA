@@ -65,8 +65,8 @@ What other options did we evaluate? Why were they rejected? (One paragraph per a
 
 | ADR | Title | Status | Date |
 |-----|-------|--------|------|
-| [ADR-001](ADR-001-dual-loop-architecture.md) | Dual-Loop Architecture (Claude Code + Python Sandbox) | Implemented | 2026-07-27 |
-| [ADR-002](ADR-002-python-typer-uv-stack.md) | Python + Typer + uv Technology Stack | Implemented | 2026-07-27 |
-| [ADR-003](ADR-003-local-ollama-embeddings.md) | Local Ollama Embeddings for Pain Analysis | Implemented | 2026-07-27 |
+| ADR-001 | Dual-Loop Architecture (Claude Code + Python Sandbox) | Planned | — |
+| ADR-002 | Python + Typer + uv Technology Stack | Planned | — |
+| ADR-003 | Local Ollama Embeddings for Pain Analysis | Planned | — |
 | [ADR-004](ADR-004-goap-astar-planner.md) | GOAP A* Planner in Skill Layer | Accepted | 2026-07-27 |
 | [ADR-005](ADR-005-adr-system-introduction.md) | ADR System Introduction | Implemented | 2026-07-27 |
