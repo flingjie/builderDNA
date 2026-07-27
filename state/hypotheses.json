@@ -1,0 +1,17 @@
+{
+  "version": 2,
+  "last_updated": "",
+  "domain": "agent",
+  "goal": null,
+  "goal_config": {
+    "available_goals": ["trend_radar", "opportunity_discovery", "hypothesis_validation"],
+    "default_goal": "opportunity_discovery"
+  },
+  "planning": {
+    "mode": "goap_astar",
+    "dynamic_replan": true,
+    "cost_source": "state/run_stats.json",
+    "semantic_adjustment": true
+  },
+  "nodes": []
+}
