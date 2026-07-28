@@ -297,7 +297,7 @@ async def _run_collect(
             ))
 
     # Serialize normalized signals for downstream consumption
-    signal_dicts = [s.model_dump() for s in signals]
+    signal_dicts = [s.model_dump(mode='json') for s in signals]
 
     # Build stats with telemetry
     cmd_stats = {
@@ -376,7 +376,7 @@ async def _run_collect(
 
     output_path = Path(output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(json.dumps(result.model_dump(), indent=2, ensure_ascii=False))
+    output_path.write_text(json.dumps(result.model_dump(mode='json'), indent=2, ensure_ascii=False))
 
     # End-of-run summary
     cache_info = ""

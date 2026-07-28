@@ -101,15 +101,18 @@ class GitHubClient:
         return waited
 
     async def _paginate(
-        self, path: str, extra_params: dict[str, str] | None = None
+        self, path: str, extra_params: dict[str, str] | None = None,
+        max_pages: int | None = None,
     ) -> list[dict[str, Any]]:
-        """Fetch all pages for a paginated endpoint."""
+        """Fetch pages for a paginated endpoint, up to max_pages if given."""
         params: dict[str, str] = dict(extra_params) if extra_params else {}
         all_items: list[dict[str, Any]] = []
         url: str = path
         first_page: bool = True
 
         while url:
+            if max_pages is not None and len(all_items) >= max_pages * int(params.get("per_page", "30")):
+                break
             req_params = params if first_page else None
             response = await self._request("GET", url, params=req_params)
             if response is None:
