@@ -53,16 +53,16 @@ def _apply_user_dna_rules(
     # ── Rule 1: output → domain + topics ──
     final_domain = domain
     final_topics: list[str] = []
-    domain_config = cfg.get("domains", {}).get(domain, {})
+    domain_config = (cfg.domains or {}).get(domain, {})
 
     if output_ranking:
         top_output = output_ranking[0]
         mapping = OUTPUT_DOMAIN_MAP.get(top_output, {})
         new_domain = mapping.get("domain")
 
-        if new_domain and new_domain != domain and new_domain in cfg.get("domains", {}):
+        if new_domain and new_domain != domain and new_domain in (cfg.domains or {}):
             final_domain = new_domain
-            final_topics = cfg["domains"][final_domain].get("topics", [])
+            final_topics = (cfg.domains or {}).get(final_domain, {}).get("topics", [])
         elif "topics_filter" in mapping:
             # Filter current domain topics
             all_topics = domain_config.get("topics", [])
