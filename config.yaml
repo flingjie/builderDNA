@@ -8,7 +8,7 @@ github:
   rate_limit_margin: 50
 
 embedding:
-  model: bge-m3:latest
+  model: nomic-embed-text:latest
   base_url: ${EMBEDDING_BASE_URL:-http://localhost:11434/v1}
 
 domains:
