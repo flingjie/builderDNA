@@ -75,7 +75,7 @@ def pain(
         )
         output_path = Path(output)
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(json.dumps(result.model_dump(), indent=2, ensure_ascii=False))
+        output_path.write_text(result.model_dump_json(indent=2))
         vprint("[yellow]No issues to cluster[/yellow]", level=OutputLevel.NORMAL)
         return
 
@@ -181,7 +181,7 @@ def pain(
 
     output_path = Path(output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(json.dumps(result.model_dump(), indent=2, ensure_ascii=False))
+    output_path.write_text(result.model_dump_json(indent=2))
     vprint(f"[green]{len(pain_clusters_list)} pain clusters → {output}[/green]", level=OutputLevel.NORMAL)
     noise_info = f" ({noise_count} noise)" if noise_count else ""
     vprint(f"[dim]Done in {tel.elapsed_seconds}s, {len(issues)} issues analyzed{noise_info}[/dim]",
