@@ -178,7 +178,7 @@ def opportunity(
 
     output_path = Path(output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(json.dumps(result.model_dump(), indent=2, ensure_ascii=False))
+    output_path.write_text(result.model_dump_json(indent=2))
     vprint(f"[green]{len(cards)} opportunities → {output}[/green]", level=OutputLevel.NORMAL)
     vprint(f"[dim]Done in {tel.elapsed_seconds}s[/dim]", level=OutputLevel.NORMAL)
     for c in cards[:5]:

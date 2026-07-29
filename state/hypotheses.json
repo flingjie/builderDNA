@@ -1,10 +1,35 @@
 {
   "version": 3,
-  "last_updated": "",
+  "last_updated": "2026-07-29T10:10:00+00:00",
   "domain": "agent",
   "goal_config": {
     "available_goals": ["trend_radar", "opportunity_discovery", "hypothesis_validation"],
     "default_goal": "opportunity_discovery"
   },
-  "nodes": []
+  "nodes": [
+    {
+      "id": "hyp_001",
+      "statement": "loop engineering (agent-orchestration + multi-agent + self-improving agents) 在未来 12 个月内会从 mainstream 进入加速期，gap_score 有望增长到 2.0+",
+      "status": "exploring",
+      "confidence": 0.55,
+      "created_at": "2026-07-29T10:10:00+00:00",
+      "updated_at": "2026-07-29T10:10:00+00:00",
+      "evidence": {
+        "supporting": [
+          "ai-agents accelerating: vel=880.5, accel=27.6, confidence=1.0",
+          "developer-tools accelerating: vel=763.1, accel=3.7",
+          "agent-orchestration mainstream: vel=190.1",
+          "multi-agent mainstream: vel=152.6, confidence=1.0",
+          "agent-skills top-5 opportunity: gap=2.1, 206K+ stars across top repos"
+        ],
+        "against": [
+          "loop-specific topic tags (agentic-workflows, agent-harness) have very low velocity (<2.0)",
+          "agent-orchestration confidence is low (0.4) — not enough evidence yet",
+          "no direct 'loop' or 'self-improving' topic in config domains"
+        ]
+      },
+      "tags": ["loop-engineering", "agent-orchestration", "multi-agent", "self-improving", "ai-agents"],
+      "next_check": "2026-10-29"
+    }
+  ]
 }

@@ -11,7 +11,7 @@ from pathlib import Path
 
 import typer
 
-from config import load_config
+from config import load_config, Config
 from collector.github.client import GitHubClient
 from collector.github.repo import fetch_top_repos
 from collector.github.issue import fetch_issues, DEMAND_LABELS
@@ -32,7 +32,7 @@ DEMAND_SET = set(DEMAND_LABELS)
 
 def _apply_user_dna_rules(
     domain: str,
-    cfg: dict,
+    cfg: Config,
     user_dna: UserDNA,
 ) -> tuple[str, list[str], int, dict, dict]:
     """Apply 4 mapping rules from User DNA to collect parameters.
@@ -53,16 +53,16 @@ def _apply_user_dna_rules(
     # ── Rule 1: output → domain + topics ──
     final_domain = domain
     final_topics: list[str] = []
-    domain_config = cfg.get("domains", {}).get(domain, {})
+    domain_config = cfg.domains.get(domain, {})
 
     if output_ranking:
         top_output = output_ranking[0]
         mapping = OUTPUT_DOMAIN_MAP.get(top_output, {})
         new_domain = mapping.get("domain")
 
-        if new_domain and new_domain != domain and new_domain in cfg.get("domains", {}):
+        if new_domain and new_domain != domain and new_domain in cfg.domains:
             final_domain = new_domain
-            final_topics = cfg["domains"][final_domain].get("topics", [])
+            final_topics = cfg.domains[final_domain].get("topics", [])
         elif "topics_filter" in mapping:
             # Filter current domain topics
             all_topics = domain_config.get("topics", [])
@@ -376,7 +376,7 @@ async def _run_collect(
 
     output_path = Path(output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(json.dumps(result.model_dump(), indent=2, ensure_ascii=False))
+    output_path.write_text(result.model_dump_json(indent=2))
 
     # End-of-run summary
     cache_info = ""
