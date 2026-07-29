@@ -297,7 +297,7 @@ async def _run_collect(
             ))
 
     # Serialize normalized signals for downstream consumption
-    signal_dicts = [s.model_dump() for s in signals]
+    signal_dicts = [s.model_dump(mode='json') for s in signals]
 
     # Build stats with telemetry
     cmd_stats = {

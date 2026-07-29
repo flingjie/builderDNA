@@ -34,7 +34,7 @@ async def fetch_issues(
     }
 
     try:
-        issues_data = await client._paginate(f"/repos/{repo}/issues", extra_params=params)
+        issues_data = await client._paginate(f"/repos/{repo}/issues", extra_params=params, max_pages=3)
     except Exception as e:
         tel = client.telemetry
         if tel:
