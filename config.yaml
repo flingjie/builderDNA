@@ -45,6 +45,18 @@ domains:
       - compiler
       - orchestration
       - observability
+  bio-med-ai:
+    topics:
+      - bioinformatics
+      - genomics
+      - protein-structure
+      - drug-discovery
+      - medical-imaging
+      - clinical-ai
+      - synthetic-biology
+      - digital-health
+      - computational-biology
+      - ai-healthcare
 
 vendors:
   domestic:

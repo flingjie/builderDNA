@@ -138,7 +138,7 @@ def _score_repo(repo: dict, weights: dict) -> float:
 
 async def _run_collect(
     domain: str, output: str, config_path: str,
-    user_dna_path: str = "state/user_dna.json",
+    user_dna_path: str | None = None,
     window_days: int | None = None,
     no_cache: bool = False,
     clear_cache: bool = False,
@@ -153,8 +153,8 @@ async def _run_collect(
         count = store.clear()
         vprint(f"[dim]Cleared {count} cache entries[/dim]", level=OutputLevel.NORMAL)
 
-    # Load User DNA and apply mapping rules
-    user_dna = load_user_dna(user_dna_path)
+    # Load User DNA and apply mapping rules (only when explicitly requested)
+    user_dna = load_user_dna(user_dna_path) if user_dna_path else None
     if user_dna:
         final_domain, topics, w_days, sort_weights, source_mix = _apply_user_dna_rules(
             domain, cfg, user_dna
@@ -422,8 +422,8 @@ def collect(
     domain: str = typer.Argument(..., help="Domain to collect signals for"),
     output: str = typer.Option("output/signals.json", "--output", "-o", help="Output JSON file"),
     config: str = typer.Option("config.yaml", "--config", "-c", help="Config file path"),
-    user_dna: str = typer.Option("state/user_dna.json", "--user-dna", help="User DNA file for personalization"),
-    window: int = typer.Option(None, "--window", "-w", help="Analysis window in days (overrides DNA)"),
+    user_dna: str | None = typer.Option(None, "--user-dna", help="User DNA file for personalization (optional)"),
+    window: int = typer.Option(None, "--window", "-w", help="Analysis window in days (default: 365)"),
     no_cache: bool = typer.Option(False, "--no-cache", help="Disable HTTP cache (all requests go to API)"),
     clear_cache: bool = typer.Option(False, "--clear-cache", help="Clear cache before collecting"),
 ) -> None:

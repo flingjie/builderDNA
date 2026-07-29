@@ -102,7 +102,7 @@ def opportunity(
     trends: str = typer.Option(..., "--trends", "-t", help="Input trends JSON"),
     pains: str = typer.Option(..., "--pains", "-p", help="Input pain clusters JSON"),
     output: str = typer.Option("output/opportunities.json", "--output", "-o", help="Output JSON file"),
-    user_dna: str = typer.Option("state/user_dna.json", "--user-dna", help="User DNA file for personalization"),
+    user_dna: str | None = typer.Option(None, "--user-dna", help="User DNA file for personalization (optional)"),
 ) -> None:
     """Generate opportunity cards from trends and pain clusters (rule engine).
 
@@ -128,8 +128,8 @@ def opportunity(
     trend_list = t_payload.get("trends", [])
     pain_list = p_payload.get("clusters", [])
 
-    # Load User DNA if available
-    dna = load_user_dna(user_dna)
+    # Load User DNA if available (only when explicitly requested)
+    dna = load_user_dna(user_dna) if user_dna else None
     if dna:
         vprint(f"[dim]User DNA loaded — applying personalized alignment[/dim]", level=OutputLevel.VERBOSE)
 
