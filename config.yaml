@@ -21,6 +21,7 @@ domains:
       - rag
       - tool-calling
       - multi-agent
+      - agent-harness
   devtools:
     topics:
       - sdk
@@ -57,6 +58,22 @@ domains:
       - digital-health
       - computational-biology
       - ai-healthcare
+  pi:
+    topics:
+      - pi-agent
+      - decentralized-agent
+      - autonomous-agent
+      - web3-agent
+      - crypto-agent
+      - blockchain-agent
+      - agent-network
+      - parallel-infinity
+      - pi-network
+      - pi-protocol
+      - pi-token
+      - pi-consensus
+      - pi-blockchain
+      - pi-ecosystem
 
 vendors:
   domestic:

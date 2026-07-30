@@ -1,35 +1,68 @@
 {
-  "version": 3,
-  "last_updated": "2026-07-29T10:10:00+00:00",
-  "domain": "agent",
-  "goal_config": {
-    "available_goals": ["trend_radar", "opportunity_discovery", "hypothesis_validation"],
-    "default_goal": "opportunity_discovery"
-  },
+  "preferred_domains": [],
+  "avoid_tags": [],
+  "scoring_bias": {},
+  "feedback_log": [],
   "nodes": [
     {
       "id": "hyp_001",
       "statement": "loop engineering (agent-orchestration + multi-agent + self-improving agents) 在未来 12 个月内会从 mainstream 进入加速期，gap_score 有望增长到 2.0+",
       "status": "exploring",
-      "confidence": 0.55,
+      "confidence": 0.65,
       "created_at": "2026-07-29T10:10:00+00:00",
-      "updated_at": "2026-07-29T10:10:00+00:00",
+      "updated_at": "2026-07-30T05:30:00+00:00",
       "evidence": {
         "supporting": [
-          "ai-agents accelerating: vel=880.5, accel=27.6, confidence=1.0",
-          "developer-tools accelerating: vel=763.1, accel=3.7",
+          "ai-agents accelerating: vel=1151.2, accel=27.2, conf=1.0",
+          "agent-skills mainstream: vel=1856.1, conf=1.0 — highest velocity, agent toolchain is real",
+          "claude-code accelerating: vel=1534.0, accel=24.2, conf=1.0",
+          "claude accelerating: vel=1855.0, accel=22.9, conf=1.0",
+          "llm accelerating: vel=1047.3, accel=17.8, conf=1.0 — foundation layer accelerating",
           "agent-orchestration mainstream: vel=190.1",
-          "multi-agent mainstream: vel=152.6, confidence=1.0",
-          "agent-skills top-5 opportunity: gap=2.1, 206K+ stars across top repos"
+          "multi-agent mainstream: vel=152.6, conf=1.0",
+          "opportunity card: agent-skills gap=1.7, demand=9.7 — validated demand signal",
+          "Pi (earendil-works/pi): 80K stars, 308 releases in 11 months — harness pattern validated at massive scale",
+          "Pi harness design v2: durable runs + lanes(multi-agent) + checkpoint model + crash recovery — all first-class citizens, not afterthoughts",
+          "Pi team: Mario Zechner(LibGDX) + Armin Ronacher(Flask) — world-class systems+web founders betting on harness paradigm",
+          "Pi explicitly differentiates 'harness' vs 'framework' — harness=how agents run, framework=how agents are built — distinct categories"
         ],
         "against": [
-          "loop-specific topic tags (agentic-workflows, agent-harness) have very low velocity (<2.0)",
-          "agent-orchestration confidence is low (0.4) — not enough evidence yet",
-          "no direct 'loop' or 'self-improving' topic in config domains"
+          "agent-orchestration confidence remains low (0.4), velocity flat — NOT accelerating",
+          "agent-framework vel=190.1, conf=0.4 — moderate velocity but low confidence",
+          "coding-agents vel=190.1, conf=0.4 — exists but no acceleration",
+          "multi-agent vel=152.6, conf=1.0 but accel=0.0 — stable, not growing",
+          "agent-harness, agent-governance still not individually tracked",
+          "loop engineering specific tools (harness-sdk vel=15.3, agent-framework vel=27.3) still tiny",
+          "Pi bus factor only 2-3 people; extreme contributor concentration risk",
+          "Pi is TypeScript-only, leaving Python AI/ML ecosystem underserved"
         ]
       },
       "tags": ["loop-engineering", "agent-orchestration", "multi-agent", "self-improving", "ai-agents"],
       "next_check": "2026-10-29"
+    },
+    {
+      "id": "hyp_pi_001",
+      "statement": "PI (Parallel Infinity) 生态在未来 12 个月内会从 early adopter 阶段进入 mainstream，gap_score 有望增长到 2.0+",
+      "status": "pruned",
+      "confidence": 0.10,
+      "created_at": "2026-07-30T00:00:00+00:00",
+      "updated_at": "2026-07-30T05:00:00+00:00",
+      "evidence": {
+        "supporting": [],
+        "against": [
+          "pi-ecosystem vel=0.5, conf=0.1 — virtually zero signal",
+          "pi-protocol vel=0.15, conf=0.2 — 2 pieces of evidence total, no acceleration",
+          "pi-extensions vel=0.5, conf=0.1 — 1 piece of evidence",
+          "pi vel=0.21, conf=0.1 — 1 piece of evidence",
+          "all 7 pi-specific topics (parallel-infinity, pi-network, pi-protocol, pi-token, pi-consensus, pi-blockchain, pi-ecosystem) returned zero matching repos",
+          "7 additional agent-intersection topics (pi-agent, decentralized-agent, autonomous-agent, web3-agent, crypto-agent, blockchain-agent, agent-network) also returned zero matching repos",
+          "only 2 repos in 205 had any web3/crypto relevance: ccxt/ccxt (crypto trading) and mudler/LocalAI (decentralized AI)",
+          "PI ecosystem has essentially NO GitHub open-source activity — not a developer ecosystem"
+        ]
+      },
+      "tags": ["pi-network", "parallel-infinity", "depin", "web3", "blockchain"],
+      "next_check": null,
+      "prune_reason": "GitHub 上 Pi 生态几乎零开源活动。即使扩展了 7 个 agent 交叉 topic，205 个 repo 中只有 2 个有微弱相关。这不是数据收集不足的问题——Pi 生态在开发者社区没有实质存在。建议重新评估 Pi 的价值锚点是否依赖 GitHub 生态。"
     }
   ]
 }
