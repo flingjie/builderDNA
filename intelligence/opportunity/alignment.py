@@ -1,14 +1,21 @@
 """User DNA alignment engine — personalized opportunity scoring.
 
-Computes an alignment_multiplier (0.5-1.5) from 4 value dimensions:
+Computes an alignment_multiplier (0.7-1.3) from 4 value dimensions:
   - Output match: does this opportunity serve the user's preferred output type?
   - Activity match: does this stage match the user's preferred activity?
   - Environment match: do the repos match the user's preferred work environment?
   - Reward match: does the opportunity offer the user's preferred rewards?
 
-Each dimension contributes equally. The multiplier starts at 0.5 (neutral = 1.0).
+Dimension weights are derived from user_dna scores — users who strongly
+prefer one dimension get proportionally more weight there.
+
+The multiplier starts at 0.7 (neutral alignment, slight penalty for total
+mismatch). Perfect alignment produces 1.3, a modest boost that can lift
+a good opportunity above a slightly-higher-gap but misaligned one without
+drowning the gap signal entirely.
 """
 import math
+import re
 
 from models.user_dna_schema import (
     UserDNA, Values,
@@ -16,14 +23,57 @@ from models.user_dna_schema import (
 )
 
 
+def _derive_dimension_weights(values: Values) -> dict[str, float]:
+    """Derive per-dimension weights from user_dna value scores.
+
+    Sums scores within each dimension, then normalizes across the 4
+    dimensions so they sum to 1.0. Falls back to equal 0.25 weights
+    if no scores are available.
+
+    Example:
+        env scores  {8,8,6,3} → sum=25
+        activity   {9,7,7,4} → sum=27
+        output     {9,7,5,4} → sum=25
+        reward     {10,7,7,3} → sum=27
+        total=104 → weights ≈ {env:0.24, activity:0.26, output:0.24, reward:0.26}
+    """
+    dim_sums = {
+        "environment": sum(values.environment.scores.values()),
+        "activity": sum(values.activity.scores.values()),
+        "output": sum(values.output.scores.values()),
+        "reward": sum(values.reward.scores.values()),
+    }
+    total = sum(dim_sums.values())
+    if total <= 0:
+        return {"environment": 0.25, "activity": 0.25, "output": 0.25, "reward": 0.25}
+    return {k: round(v / total, 4) for k, v in dim_sums.items()}
+
+
+def _tokenize(topic: str) -> set[str]:
+    """Split a topic string into tokens for robust matching.
+
+    'agent-framework' → {'agent', 'framework'}
+    'tool_calling' → {'tool', 'calling'}
+    'mcp' → {'mcp'}
+    """
+    return set(re.split(r"[-_]", topic.lower()))
+
+
 def _compute_output_match(
     opportunity_topic: str,
     values: Values,
 ) -> float:
-    """Match output preference vs opportunity domain/topics."""
+    """Match output preference vs opportunity domain/topics.
+
+    Uses token-based matching: splits both the opportunity topic and
+    the mapped topics by hyphens/underscores, then checks for any
+    token overlap. This is more robust than substring matching.
+    """
     ranking = values.output.ranking
     if not ranking:
         return 0.5  # Neutral
+
+    opp_tokens = _tokenize(opportunity_topic)
 
     for i, output_val in enumerate(ranking):
         mapping = OUTPUT_DOMAIN_MAP.get(output_val, {})
@@ -32,9 +82,9 @@ def _compute_output_match(
             or mapping.get("topics_filter", [])
             or mapping.get("topics_append", [])
         )
+        # Token-based matching: any overlap between opp_tokens and match topic tokens
         if any(
-            t.lower() in opportunity_topic.lower()
-            or opportunity_topic.lower() in t.lower()
+            bool(opp_tokens & _tokenize(t))
             for t in match_topics
         ):
             rank_score = {0: 1.0, 1: 0.7, 2: 0.4, 3: 0.2}.get(i, 0.1)
@@ -70,30 +120,48 @@ def _compute_activity_match(trend: dict, values: Values) -> float:
     return total / max(0.1, total_weight)
 
 
-def _compute_env_match(repos: list[dict], values: Values) -> float:
-    """Match environment preference vs repo characteristics."""
+def _parse_owner(full_name: str) -> str:
+    """Extract owner name from 'owner/repo' format."""
+    return full_name.split("/")[0] if "/" in full_name else ""
+
+
+def _compute_env_match(
+    repos: list[dict],
+    values: Values,
+    known_orgs: set[str] | None = None,
+) -> float:
+    """Match environment preference vs repo characteristics.
+
+    Parses owner from full_name (e.g. 'langchain-ai/langchain' → 'langchain-ai').
+    Checks against known_orgs (from config accounts+vendors) to distinguish
+    org-owned repos from personal projects.
+
+    Uses forks as a proxy for collaboration (since contributors is always 0
+    due to GitHub Search API limitations).
+    """
     ranking = values.environment.ranking
     scores = values.environment.scores
     if not ranking or not repos:
         return 0.5
 
+    known = known_orgs or set()
+
     personal_count = 0
     for r in repos:
-        owner_info = r.get("owner", {})
-        if isinstance(owner_info, dict) and owner_info.get("type") == "User":
+        full_name = r.get("full_name", "")
+        owner = _parse_owner(full_name)
+        if owner and owner not in known:
             personal_count += 1
-        elif not isinstance(owner_info, dict):
-            if r.get("stars", 0) < 1000:
-                personal_count += 1
+
     org_count = len(repos) - personal_count
     avg_stars = sum(r.get("stars", 0) for r in repos) / max(1, len(repos))
-    avg_contributors = sum(r.get("contributors", 0) for r in repos) / max(1, len(repos))
+    avg_forks = sum(r.get("forks", 0) for r in repos) / max(1, len(repos))
     num_repos = len(repos)
 
     env_scores = {
         "autonomy": personal_count / max(1, len(repos)),
         "stability": min(1.0, avg_stars / 5000) * (org_count / max(1, len(repos))),
-        "collaboration": min(1.0, avg_contributors / 50),
+        "collaboration": min(1.0, avg_forks / 100),      # forks as proxy for collaboration
         "competition": min(1.0, num_repos / 10),
     }
 
@@ -107,7 +175,14 @@ def _compute_env_match(repos: list[dict], values: Values) -> float:
 
 
 def _compute_reward_match(repos: list[dict], trend: dict, values: Values) -> float:
-    """Match reward preference vs opportunity rewards."""
+    """Match reward preference vs opportunity rewards.
+
+    Uses stars (>5000) as a proxy for wealth/commercialization potential
+    (replaces the non-existent has_sponsors field).
+
+    Uses velocity as a proxy for mastery depth (replaces contributors,
+    which is always 0 due to GitHub Search API limitations).
+    """
     ranking = values.reward.ranking
     scores = values.reward.scores
     if not ranking:
@@ -115,14 +190,15 @@ def _compute_reward_match(repos: list[dict], trend: dict, values: Values) -> flo
 
     avg_stars = sum(r.get("stars", 0) for r in repos) / max(1, len(repos))
     avg_velocity = trend.get("growth_velocity", 0)
-    avg_contributors = sum(r.get("contributors", 0) for r in repos) / max(1, len(repos))
-    has_sponsors = any(r.get("has_sponsors", False) for r in repos)
+    avg_forks = sum(r.get("forks", 0) for r in repos) / max(1, len(repos))
+    # Stars > 5000 as commercialization proxy (replaces has_sponsors)
+    has_high_stars = any(r.get("stars", 0) > 5000 for r in repos)
 
     reward_scores = {
         "growth": min(1.0, avg_velocity / 100),
         "recognition": min(1.0, math.log(avg_stars + 1) / math.log(100001)),
-        "wealth": 0.8 if has_sponsors else 0.2,
-        "mastery": min(1.0, avg_contributors / 200) + (0.2 if avg_stars < 1000 else 0),
+        "wealth": 0.8 if has_high_stars else 0.2,
+        "mastery": min(1.0, avg_forks / 200) + (0.2 if avg_stars < 1000 else 0),  # forks + small-project bonus as mastery proxy
     }
 
     total = 0.0
@@ -138,21 +214,43 @@ def compute_alignment(
     trend: dict,
     repos: list[dict],
     user_dna: UserDNA,
+    known_orgs: set[str] | None = None,
 ) -> tuple[float, str]:
-    """Compute alignment_multiplier and generate reason string."""
+    """Compute alignment_multiplier and generate reason string.
+
+    Args:
+        trend: Topic trend dict with topic, stage, growth_velocity, evidence_count.
+        repos: List of repo dicts (RepoSummary) with full_name, stars, forks, velocity.
+        user_dna: User cognitive model from value-discovery skill.
+        known_orgs: Set of known organization names (from config accounts + vendors).
+                    Used to distinguish org-owned repos from personal projects.
+
+    Returns:
+        (multiplier, reason) tuple. Multiplier range is [0.7, 1.3]:
+          - 0.7: complete mismatch across all dimensions
+          - 1.0: neutral (default when no alignment data)
+          - 1.3: perfect alignment, modest boost over neutral
+    """
     values = user_dna.values
+
+    # Derive dimension weights from user_dna scores (Issue #6)
+    dim_weights = _derive_dimension_weights(values)
 
     output_match = _compute_output_match(trend.get("topic", ""), values)
     activity_match = _compute_activity_match(trend, values)
-    env_match = _compute_env_match(repos, values)
+    env_match = _compute_env_match(repos, values, known_orgs)
     reward_match = _compute_reward_match(repos, trend, values)
 
-    raw_multiplier = 0.5 + 0.5 * (
-        0.25 * output_match
-        + 0.25 * activity_match
-        + 0.25 * env_match
-        + 0.25 * reward_match
+    # Issue #1 fix: 0.7 + 0.6 * weighted_avg → range [0.7, 1.3]
+    # (was: 0.5 + 0.5 * weighted_avg → [0.5, 1.0] — acted as attenuator only)
+    weighted_avg = (
+        dim_weights["output"] * output_match
+        + dim_weights["activity"] * activity_match
+        + dim_weights["environment"] * env_match
+        + dim_weights["reward"] * reward_match
     )
+
+    raw_multiplier = 0.7 + 0.6 * weighted_avg
 
     # Build alignment reason from top 2 contributing dimensions
     dims = [
@@ -162,7 +260,7 @@ def compute_alignment(
         ("reward", reward_match, values.reward.ranking[0] if values.reward.ranking else ""),
     ]
     dims.sort(key=lambda d: d[1], reverse=True)
-    top_two = [d for d in dims[:2] if d[1] > 0.3]
+    top_two = [d for d in dims[:2] if d[1] > 0.3 and d[2]]
 
     reason_parts = []
     dim_labels = {

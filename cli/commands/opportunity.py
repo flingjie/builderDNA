@@ -39,6 +39,7 @@ def _generate_cards(
     weights: dict | None = None,
     gap_threshold: float = 1.5,
     market_threshold: float = 5.0,
+    known_orgs: set[str] | None = None,
 ) -> list[OpportunityCard]:
     """Generate opportunity cards from trend + pain intersections.
 
@@ -102,7 +103,7 @@ def _generate_cards(
         alignment_multiplier = 1.0
         if user_dna:
             alignment_multiplier, alignment_reason = compute_alignment(
-                trend, top_repos, user_dna
+                trend, top_repos, user_dna, known_orgs=known_orgs,
             )
             personalized_score = round(gap * alignment_multiplier, 1)
 
@@ -170,6 +171,11 @@ def opportunity(
     gap_threshold = opp_cfg.gap_threshold_high
     market_threshold = opp_cfg.market_size_threshold
 
+    # Build known orgs set from config accounts + vendors (for env_match owner detection)
+    known_orgs: set[str] = set(cfg.accounts)
+    for vendor_list in (cfg.vendors.domestic, cfg.vendors.overseas):
+        known_orgs.update(vendor_list)
+
     # Load User DNA if available (only when explicitly requested)
     dna = load_user_dna(user_dna) if user_dna else None
     if dna:
@@ -180,6 +186,7 @@ def opportunity(
         weights=weights,
         gap_threshold=gap_threshold,
         market_threshold=market_threshold,
+        known_orgs=known_orgs,
     )
 
     # ── Build diagnostics ──────────────────────────────────────────
