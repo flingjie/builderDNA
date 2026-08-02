@@ -1,6 +1,7 @@
 __pycache__/
 *.pyc
 .env
+config.yaml
 snapshots/*.db
 snapshots/cache/
 output/*

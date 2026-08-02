@@ -1,5 +1,16 @@
 accounts:
   - hwchase17
+  - anthropics
+  - langchain-ai
+  - browser-use
+  - crewAIInc
+  - modelcontextprotocol
+  - e2b-dev
+  - daytonaio
+  - openai
+  - trycua
+  - letta-ai
+  - agntcy
 
 github:
   token: ${GITHUB_TOKEN}
@@ -12,16 +23,21 @@ embedding:
   base_url: ${EMBEDDING_BASE_URL:-http://localhost:11434/v1}
 
 domains:
+  agent-os:
+    topics:
+      - agent-harness
+      - agent-runtime
+      - sandbox
   agent:
     topics:
       - mcp
       - langchain
       - agent-framework
-      - llm
-      - rag
       - tool-calling
       - multi-agent
       - agent-harness
+      - ai-agent
+      - llm-agent
   devtools:
     topics:
       - sdk
@@ -99,3 +115,11 @@ observability:
   expiry_days: 30              # days after last update before pruning
   min_comparison_age_days: 90  # days before a prediction snapshot is eligible for validation
   predictions_dir: predictions # directory for prediction snapshots
+
+opportunity:
+  weights:
+    velocity: 0.4              # demand weight for trend velocity
+    severity: 0.4              # demand weight for pain severity
+    frequency: 0.2             # demand weight for pain frequency
+  gap_threshold_high: 1.5      # gap > this → Build or Niche
+  market_size_threshold: 5.0   # market > this → Build or Monitor

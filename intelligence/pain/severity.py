@@ -35,11 +35,12 @@ def compute_sentiment_multiplier(text: str) -> float:
 def compute_severity(comments: int, participants: int, text: str, reactions: int = 0) -> float:
     """Compute a composite pain severity score.
 
-    Formula:
-        log(comments + 1) * log(participants + 1) * log(reactions/2 + 1) * sentiment_multiplier
+    Formula (additive):
+        (log(c+1) + log(p+1) + log(r/2+1)) * sentiment_multiplier
 
-    Reactions (👍❤️🎉) indicate broader demand alignment — an issue with 50 👍
-    but few comments is still a clear signal of widespread need.
+    Additive so each signal channel contributes independently. An issue
+    with 50 👍 but zero comments still gets a non-zero score from reactions
+    alone — a clear signal of widespread but silent demand.
 
     Args:
         comments: Number of comments on the issue.
@@ -48,18 +49,16 @@ def compute_severity(comments: int, participants: int, text: str, reactions: int
         reactions: Total reaction count (across all types).
 
     Returns:
-        Severity score rounded to 2 decimal places. Returns 0.0 when
-        both comments and participants are zero or negative.
+        Severity score rounded to 2 decimal places. Returns 0.0 only when
+        all three channels (comments, participants, reactions) are zero or negative.
     """
-    if comments <= 0 and participants <= 0:
-        # Reactions alone can be a signal even without comments
-        if reactions <= 0:
-            return 0.0
+    if comments <= 0 and participants <= 0 and reactions <= 0:
+        return 0.0
 
-    comment_factor = math.log(comments + 1)
-    participant_factor = math.log(participants + 1)
-    # reactions/2 dampens so 2 reactions ≈ 1 comment equivalent; floor at 1.0 when no reactions
-    reaction_factor = math.log(reactions / 2.0 + 1) if reactions > 0 else 1.0
+    comment_factor = math.log(max(comments, 0) + 1)
+    participant_factor = math.log(max(participants, 0) + 1)
+    # reactions/2 dampens so 2 reactions ≈ 1 comment equivalent
+    reaction_factor = math.log(reactions / 2.0 + 1) if reactions > 0 else 0.0
     sentiment_mult = compute_sentiment_multiplier(text)
 
-    return round(comment_factor * participant_factor * reaction_factor * sentiment_mult, 2)
+    return round((comment_factor + participant_factor + reaction_factor) * sentiment_mult, 2)

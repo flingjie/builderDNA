@@ -64,6 +64,28 @@ class CollectConfig(BaseModel):
     )
 
 
+class OpportunityWeights(BaseModel):
+    """Demand scoring weights for opportunity detection.
+
+    Configurable via config.yaml so weights can be tuned without code changes.
+    Bootstrap-driven weight optimization (L3) can read/write these values.
+    """
+    velocity: float = Field(default=0.4, ge=0.0, le=1.0, description="Weight for trend velocity in demand score")
+    severity: float = Field(default=0.4, ge=0.0, le=1.0, description="Weight for pain severity in demand score")
+    frequency: float = Field(default=0.2, ge=0.0, le=1.0, description="Weight for pain frequency in demand score")
+
+
+class OpportunityConfig(BaseModel):
+    """Opportunity scoring configuration."""
+    weights: OpportunityWeights = Field(default_factory=OpportunityWeights)
+    gap_threshold_high: float = Field(
+        default=1.5, description="Gap score above this threshold → Build or Niche quadrant"
+    )
+    market_size_threshold: float = Field(
+        default=5.0, description="Market size above this threshold → Build or Monitor quadrant"
+    )
+
+
 class VendorConfig(BaseModel):
     """Vendor tracking configuration."""
 
@@ -83,6 +105,7 @@ class Config(BaseModel):
     output: OutputConfig = Field(default_factory=OutputConfig)
     collect: CollectConfig = Field(default_factory=CollectConfig)
     vendors: VendorConfig = Field(default_factory=VendorConfig)
+    opportunity: OpportunityConfig = Field(default_factory=OpportunityConfig)
 
 
 _ENV_VAR_RE = re.compile(r"\$\{(\w+)(?::-([^}]*))?\}")

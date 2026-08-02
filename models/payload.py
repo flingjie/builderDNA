@@ -197,14 +197,23 @@ class OpportunityCard(BaseModel):
     competition_score: float = Field(description="Competition intensity from existing repo activity (0-10)")
     gap_score: float = Field(description="Opportunity gap = demand_score / max(0.1, competition_score). Higher = more underserved demand.")
     signals: list[str] = Field(default_factory=list, description="Supporting evidence: top repos and representative issues")
-    recommended_action: str = Field(default="", description="Suggested next action: 'Build', 'Monitor', 'Avoid', or 'Partner'")
+    recommended_action: str = Field(default="", description="Suggested next action: 'Build', 'Niche', 'Monitor', or 'Avoid'")
+    quadrant: Literal["Build", "Niche", "Monitor", "Avoid"] = Field(
+        default="Monitor", description="Quadrant classification from gap × market_size matrix"
+    )
+    market_size_score: float = Field(
+        default=0.0, description="Absolute market size (0-10), based on total star activity across trends"
+    )
+    confidence: float = Field(
+        default=0.5, ge=0.0, le=1.0, description="Confidence in this opportunity assessment. <0.5 means low evidence or signal conflict."
+    )
     # Personalized fields added by alignment engine (User DNA integration)
     personalized_score: float | None = Field(default=None, description="gap_score × alignment_multiplier. Null when User DNA is unavailable.")
     alignment_reason: str = Field(default="", description="Why this opportunity matches user values (empty when not personalized)")
     alignment_multiplier: float = Field(default=1.0, description="Raw multiplier from User DNA alignment. 1.0 = neutral, >1.0 = strong match, <1.0 = mismatch.")
     scoring_breakdown: dict = Field(
         default_factory=dict,
-        description="Decomposed scoring: velocity_contribution, severity_contribution, frequency_contribution, demand_score, competition_score, gap_formula",
+        description="Decomposed scoring: velocity_contribution, severity_contribution, frequency_contribution, demand_score, competition_score, gap_formula, market_size_score, quadrant, confidence",
     )
 
 
