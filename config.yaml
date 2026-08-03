@@ -74,6 +74,22 @@ domains:
       - digital-health
       - computational-biology
       - ai-healthcare
+  human-in-the-loop:
+    topics:
+      - human-in-the-loop
+      - rlhf
+      - human-feedback
+      - human-review
+      - human-annotation
+      - active-learning
+      - human-ai-collaboration
+      - human-alignment
+      - red-teaming
+      - constitutional-ai
+      - preference-learning
+      - labeling
+      - rlhf-framework
+      - ai-safety
   pi:
     topics:
       - pi-agent
