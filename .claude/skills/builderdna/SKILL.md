@@ -208,7 +208,7 @@ Read these when needed:
 | `schema.md` | Before reading command outputs | JSON schemas for all 7 commands |
 | `state/hypotheses.json` | Session start | Exploration state tree |
 | `docs/adr/` | Architecture understanding | All architecture decision records |
-| `docs/adr/ADR-006-short-circuit-pipeline.md` | Understanding the pipeline | Goal-driven short-circuit design rationale |
+| `docs/adr/ADR-006-simplify-goap-to-short-circuit.md` | Understanding the pipeline | Goal-driven short-circuit design rationale |
 
 ## Config Management
 

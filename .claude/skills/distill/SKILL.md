@@ -60,7 +60,7 @@ mcp__plugin_claude-mem_mcp-search__search({
 
 This pulls in historical reflections that are semantically related — even if they've already been distilled. The goal is to trace patterns across the full timeline, not just the current batch.
 
-If claude-mem is unavailable: fall back to keyword matching on JSONL fields (value keys, emotions, ability labels).
+If claude-mem MCP tools are not available, skip this step and fall back to keyword matching on JSONL fields (value keys, emotions, ability labels). Note: "claude-mem 不可用，使用关键词匹配。"
 
 ### Step 2: Analyze — Tension + Resolution Framework
 
@@ -265,7 +265,7 @@ After confirmation:
 1. **Apply accepted diffs to user_dna.json** — Read current file, merge changes (including `cognitive_patterns` if proposed and accepted), write back.
 2. **Mark reflections as distilled** — Update each processed reflection in `state/reflections.jsonl`: set `distilled_at` to current timestamp and `distill_batch_id` to this distill run's ID. (Digest records are NOT marked — they are read-only.)
 
-3. **Index distill report in claude-mem** (if available):
+3. **Index distill report in claude-mem** (if claude-mem MCP tools are available):
    ```json
    {
      "content": "Distill: [central tension summary] | [key shifts]",
@@ -296,7 +296,7 @@ After confirmation:
 | Only one unprocessed reflection | Still produce a full report. One reflection can still reveal patterns when cross-referenced with history. |
 | records.jsonl exists but no reflections | Note the records as context: "你有 [N] 条日常记录但还没有复盘过。建议先运行 `/reflect`。" |
 | reflections.jsonl corrupted | Report degraded data state. Process what's readable. |
-| claude-mem unavailable | Fall back to keyword matching on JSONL. Note degraded mode in report. |
+| claude-mem MCP tools unavailable | Fall back to keyword matching on JSONL. Note degraded mode in report. |
 | User rejects all proposed diffs | Still mark reflections as distilled. Rejection is data. The report is still valuable as a record. |
 | User wants to modify a diff | Apply the user's override. Record both the proposed value and the user's chosen value. |
 | Gap since last distill is very long (30+ reflections) | Suggest processing in chunks: "你有 [N] 条未处理的复盘记录，建议分批次合成。先处理最近 2 周的？" |

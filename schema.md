@@ -45,3 +45,41 @@ stats: { total, avg_gap, personalized }
 ## report -> output/report-*.md|json
 
 Renders any SandboxResult to Markdown tables or JSON.
+
+## config -> stdout (no JSON output)
+
+The `config --show` command prints resolved configuration to stdout. Not a SandboxResult — console output only:
+- GitHub: token (masked), cache dir, max concurrent, rate limit margin
+- Embedding: model, base URL
+- Output: dir, formats
+- Accounts: configured GitHub accounts
+- Domains: topic tags per domain
+- Vendors: domestic and overseas tracked orgs
+- Collect: time range in days
+
+## observability -> output/observability_check_<domain>.json
+
+```json
+{
+  "domain": "<domain>",
+  "checks": {
+    "mismatches": {
+      "count": <int>,
+      "mismatches": [{"pattern": "...", "severity": "...", "details": "..."}],
+      "report": "<path to mismatch report, if any>"
+    },
+    "snapshots": {
+      "count": <int>,
+      "comparisons": [{"snapshot_id": "...", "domain": "...", "status": "..."}]
+    },
+    "hypotheses": {
+      "checked": <int>,
+      "results": [{"hypothesis_id": "...", "status": "...", "action": "keep|prune", "reason": "..."}]
+    }
+  },
+  "elapsed_ms": <int>
+}
+```
+
+stats: not applicable (only elapsed_ms).
+diagnostics: not applicable — observability IS the diagnostics layer.

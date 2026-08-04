@@ -4,14 +4,14 @@
 
 ## 架构
 
-BuilderDNA 是 5 个独立沙盒 CLI 命令的组合工具箱。每个命令：**结构化 JSON 输入 → 确定性计算 → 结构化 JSON 输出**。Claude Code 负责语义推理和编排。
+BuilderDNA 是 7 个独立沙盒 CLI 命令的组合工具箱。每个命令：**结构化 JSON 输入 → 确定性计算 → 结构化 JSON 输出**。Claude Code 负责语义推理和编排。
 
 ```
 Claude Code（编排 + 解读）── 读取 state/hypotheses.json，决定跑什么
     │
     ▼
-5 个沙盒 CLI 命令（独立、JSON in/out）
-  collect → trend → pain → opportunity → report
+7 个沙盒 CLI 命令（独立、JSON in/out）
+  collect → trend → pain → opportunity → report → config → observability
     │
     ▼
 全局记忆 — SQLite + output/*.json + state/*.json
@@ -51,15 +51,15 @@ PYTHONPATH=. uv run builderdna opportunity --trends output/trends.json --pains o
 PYTHONPATH=. uv run builderdna report --data output/opportunities.json --format md
 
 # 运行测试
-uv run pytest tests/ -v   # 118 tests
+uv run pytest tests/ -v   # 268 tests
 ```
 
 ## 项目结构
 
 ```
 BuilderDNA/
-├── cli/main.py                # Typer 入口，5 个命令
-├── cli/commands/              # collect.py, trend.py, pain.py, opportunity.py, report_cmd.py
+├── cli/main.py                # Typer 入口，7 个命令
+├── cli/commands/              # collect.py, trend.py, pain.py, opportunity.py, report_cmd.py, observability_cmd.py, config_cmd.py
 ├── config.py                  # 配置系统（YAML + ${ENV} 变量替换）
 ├── config.yaml                # accounts, domains, vendors, embedding
 │
@@ -72,23 +72,26 @@ BuilderDNA/
 │
 ├── signals/
 │   ├── models.py              # Signal（统一事件模型）
-│   ├── store.py               # SQLite 持久化
-│   └── graph.py               # NetworkX 共现图
+│   └── store.py               # SQLite 持久化
 │
-├── models/payload.py          # 所有 5 个命令的输出 schema（Claude Code 读取的契约）
+├── models/payload.py          # 所有命令的输出 schema（Claude Code 读取的契约）
 ├── schema.md                  # 人类可读的 schema 参考
 │
 ├── state/
 │   ├── hypotheses.json        # 跨对话的探索状态追踪
 │   ├── user_weights.json      # 用户偏好权重
+│   ├── user_dna.json          # 用户认知模型
+│   ├── reflections.jsonl      # 复盘事件日志
 │   └── watches.json           # 已保存的 repo 搜索（repo-trend skill）
 │
 ├── output/                    # JSON + Markdown 结果
-├── .claude/skills/            # Claude Code 的 3 个 skill
-│   ├── builderdna/            #   5 命令编排 + 假设树管理
+├── .claude/skills/            # Claude Code 的 skills
+│   ├── builderdna/            #   7 命令编排 + 假设树管理
 │   ├── repo-trend/            #   趋势 repo 发现 + 3 阶评估
-│   └── repo-awesome/          #   Awesome List 挖掘 + 策展评分
-└── tests/                     # 118 个测试
+│   ├── repo-awesome/          #   Awesome List 挖掘 + 策展评分
+│   ├── reflect/               #   多轮对抗式复盘
+│   └── distill/               #   阶段性合成蒸馏
+└── tests/                     # 268 个测试
 ```
 
 ## 配置
