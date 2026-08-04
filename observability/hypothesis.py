@@ -21,10 +21,24 @@ from typing import Literal
 
 HYPOTHESES_PATH = "state/hypotheses.json"
 
-# Pruning thresholds
-EXPIRY_DAYS = 30  # days after last update before expiry check
+# Pruning thresholds — defaults, overridden by config.yaml if available
 CONTRADICT_WINDOW = 3  # look at last N evidence entries
 CONTRADICT_THRESHOLD = 2  # ≥ this many contradicting in window triggers pruning
+
+
+def _load_observability_config() -> dict:
+    """Load observability section from config.yaml. Returns {} on failure."""
+    try:
+        import yaml
+        with open("config.yaml") as f:
+            cfg = yaml.safe_load(f)
+            return cfg.get("observability", {})
+    except Exception:
+        return {}
+
+
+_obs_cfg = _load_observability_config()
+EXPIRY_DAYS = _obs_cfg.get("expiry_days", 30)  # days after last update before expiry check
 
 
 def _now_iso() -> str:
@@ -188,31 +202,31 @@ class HypothesisManager:
             if contradict_count >= CONTRADICT_THRESHOLD:
                 return {
                     "node_id": node_id,
-                    "title": node["title"],
+                    "title": node.get("statement", node.get("title", "")),
                     "reason": "evidence_contradiction",
                     "detail": f"{contradict_count}/{CONTRADICT_WINDOW} recent evidence entries contradict",
                     "severity": "high",
                 }
 
-        # Check 2: Expiry (never updated recently)
+        # Check 2: Stale validated (re-evaluate after shorter period)
         days_stale = _days_ago(updated)
-        if days_stale > EXPIRY_DAYS:
+        if node["status"] == "validated" and days_stale > EXPIRY_DAYS // 2:
             return {
                 "node_id": node_id,
-                "title": node["title"],
-                "reason": "expired",
-                "detail": f"Last updated {days_stale:.0f} days ago (threshold: {EXPIRY_DAYS})",
-                "severity": "medium",
-            }
-
-        # Check 3: Stale validated
-        if node["status"] == "validated" and days_stale > EXPIRY_DAYS:
-            return {
-                "node_id": node_id,
-                "title": node["title"],
+                "title": node.get("statement", node.get("title", "")),
                 "reason": "stale_validated",
                 "detail": f"Validated but untouched for {days_stale:.0f} days — re-evaluate?",
                 "severity": "low",
+            }
+
+        # Check 3: Expiry (all nodes)
+        if days_stale > EXPIRY_DAYS:
+            return {
+                "node_id": node_id,
+                "title": node.get("statement", node.get("title", "")),
+                "reason": "expired",
+                "detail": f"Last updated {days_stale:.0f} days ago (threshold: {EXPIRY_DAYS})",
+                "severity": "medium",
             }
 
         return None
@@ -255,7 +269,7 @@ class HypothesisManager:
 
         # Ready to validate: exploring with confidence >= 0.8
         ready = [
-            {"id": n["id"], "title": n["title"], "confidence": n["confidence"]}
+            {"id": n["id"], "title": n.get("statement", n.get("title", "")), "confidence": n["confidence"]}
             for n in nodes
             if n["status"] == "exploring" and n.get("confidence", 0) >= 0.8
         ]
