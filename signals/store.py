@@ -24,6 +24,7 @@ class SignalStore:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(str(self.db_path))
         self._conn.row_factory = sqlite3.Row
+        self._closed = False
         self._init_db()
 
     def __enter__(self) -> "SignalStore":
@@ -121,4 +122,6 @@ class SignalStore:
         return results
 
     def close(self) -> None:
-        self._conn.close()
+        if not self._closed:
+            self._conn.close()
+            self._closed = True

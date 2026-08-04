@@ -162,7 +162,7 @@ class GitHubClient:
                     if cached is not None:
                         if tel:
                             tel.record_cache(hit=True)
-                        return self._build_cached_response(cached[2], cached[1])
+                        return self._build_cached_response(cached[2], cached[1], url)
 
                 if resp.status_code == 401:
                     resp.raise_for_status()
@@ -266,12 +266,12 @@ class GitHubClient:
         return None
 
     @staticmethod
-    def _build_cached_response(body: str, headers: dict) -> httpx.Response:
+    def _build_cached_response(body: str, headers: dict, url: str) -> httpx.Response:
         """Build an httpx.Response from cached data.
 
         Drop Content-Encoding headers since the cached body is already decoded.
         """
-        request = httpx.Request("GET", "https://api.github.com/")
+        request = httpx.Request("GET", url)
         clean_headers = {k: v for k, v in headers.items()
                          if k.lower() not in ("content-encoding", "transfer-encoding")}
         return httpx.Response(
