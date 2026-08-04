@@ -19,7 +19,21 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 PREDICTIONS_DIR = "predictions"
-MIN_COMPARISON_AGE_DAYS = 90  # days before a snapshot is eligible for validation
+
+
+def _load_observability_config() -> dict:
+    """Load observability section from config.yaml. Returns {} on failure."""
+    try:
+        import yaml
+        with open("config.yaml") as f:
+            cfg = yaml.safe_load(f)
+            return cfg.get("observability", {})
+    except Exception:
+        return {}
+
+
+_obs_cfg = _load_observability_config()
+MIN_COMPARISON_AGE_DAYS = _obs_cfg.get("min_comparison_age_days", 90)  # days before a snapshot is eligible for validation
 
 
 def _now_iso() -> str:

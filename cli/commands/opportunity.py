@@ -131,6 +131,7 @@ def opportunity(
     trends: str = typer.Option(..., "--trends", "-t", help="Input trends JSON"),
     pains: str = typer.Option(..., "--pains", "-p", help="Input pain clusters JSON"),
     output: str = typer.Option("output/opportunities.json", "--output", "-o", help="Output JSON file"),
+    config: str = typer.Option("config.yaml", "--config", "-c", help="Config file path"),
     user_dna: str | None = typer.Option(None, "--user-dna", help="User DNA file for personalization (optional)"),
 ) -> None:
     """Generate opportunity cards from trends and pain clusters (rule engine).
@@ -161,7 +162,7 @@ def opportunity(
     pain_list = p_payload.get("clusters", [])
 
     # Load scoring config (with defaults if config.yaml is missing the section)
-    cfg = load_config("config.yaml")
+    cfg = load_config(config)
     opp_cfg = cfg.opportunity
     weights = {
         "velocity": opp_cfg.weights.velocity,

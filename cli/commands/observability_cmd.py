@@ -64,7 +64,7 @@ def observability(
             "checked": len(pruning_results),
             "results": pruning_results,
         }
-        prunable = [r for r in pruning_results if r.get("action") == "prune"]
+        prunable = [r for r in pruning_results if r.get("severity") == "high"]
         vprint(f"  {len(pruning_results)} checked, {len(prunable)} eligible for pruning.", level=OutputLevel.NORMAL)
 
     elapsed = _time.time() - t0
@@ -81,4 +81,4 @@ def observability(
         "mismatches": check_mismatches,
         "snapshots": check_snapshots,
         "prune": prune_hypotheses,
-    }, elapsed_seconds=elapsed / 1000)
+    }, elapsed_seconds=round(elapsed, 3))

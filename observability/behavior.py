@@ -30,16 +30,34 @@ BEHAVIOR_LOG_PATH = "state/behavior_log.jsonl"
 MISMATCH_REPORT_PATH = "state/mismatch_report.json"
 USER_DNA_PATH = "state/user_dna.json"
 CONFIG_PATH = "config.yaml"
-MISMATCH_THRESHOLD = 7  # events before auto-suggest
+
+
+def _load_observability_config() -> dict:
+    """Load observability section from config.yaml. Returns {} on failure."""
+    try:
+        import yaml
+        with open("config.yaml") as f:
+            cfg = yaml.safe_load(f)
+            return cfg.get("observability", {})
+    except Exception:
+        return {}
+
+
+_obs_cfg = _load_observability_config()
+MISMATCH_THRESHOLD = _obs_cfg.get("mismatch_threshold", 7)  # events before auto-suggest
 
 # Domain → output type mapping (reverse of OUTPUT_DOMAIN_MAP)
 DOMAIN_OUTPUT_MAP: dict[str, str] = {
     "agent": "devtools",
+    "agent-os": "devtools",
     "devtools": "devtools",
+    "pi": "devtools",
     "consumer": "end_user",
     "fintech": "end_user",
     "infrastructure": "infrastructure",
     "knowledge": "knowledge",
+    "bio-med-ai": "knowledge",
+    "human-in-the-loop": "knowledge",
 }
 
 # Commercial-leaning domain indicators (for reward/wealth detection)

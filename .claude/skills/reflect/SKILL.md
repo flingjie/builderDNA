@@ -245,7 +245,7 @@ After user confirms/rejects all diffs:
      }
    }
    ```
-   If claude-mem is unavailable: note the degraded mode. Reflection is still saved to JSONL.
+   If claude-mem MCP tools are not available, skip this step and note it in the output: "claude-mem 不可用，跳过语义索引——复盘已保存到 JSONL。"
 
 6. **Confirm to user**:
 
@@ -288,7 +288,7 @@ Follow the edge case table in `references/reflection-protocol.md`. Key reminders
 | All three lenses fail | Abort with minimal event. Report to user. |
 | All signals filtered | Honest output: no diffs proposed. Still save. |
 | User rejects all | No DNA update. Rejection IS signal — record it. |
-| claude-mem down | Save JSONL only. Report degraded mode. |
+| claude-mem MCP tools unavailable | Save JSONL only. Report degraded mode. |
 | JSONL file has corrupt lines | Skip unparseable lines. Report count. If >50% corrupt, recommend manual recovery. |
 | JSONL file missing | Create new file. Not an error. |
 | Short conversation | Full protocol. Confidence will naturally be lower. |
