@@ -86,7 +86,7 @@ def pain(
     try:
         embeddings = _get_embeddings(texts, model=embedding_model, base_url=embedding_base_url)
     except Exception as e:
-        vprint(f"[yellow]Embedding failed: {e}. Falling back to title-based grouping.[/yellow]",
+        vprint(f"[yellow]Embedding generation failed — no clustering could be performed. Output will be empty.[/yellow]",
                level=OutputLevel.NORMAL)
         embeddings = []
 

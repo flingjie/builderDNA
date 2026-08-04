@@ -125,7 +125,8 @@ def _score_repo(repo: dict, weights: dict) -> float:
     forks_log = math.log(forks + 1) / math.log(max_forks + 1)
     velocity_norm = min(1.0, velocity / 100)
     contribs_norm = min(1.0, open_issues / max_contribs)
-    commercial = 1.0 if repo.get("has_sponsors") or repo.get("topics") and "enterprise" in repo.get("topics", []) else 0.3
+    topics_list = repo.get("topics") or []
+    commercial = 1.0 if (repo.get("has_sponsors") or "enterprise" in topics_list) else 0.3
 
     score = (
         weights.get("velocity", 0.2) * velocity_norm
@@ -153,6 +154,12 @@ async def _run_collect(
         count = store.clear()
         vprint(f"[dim]Cleared {count} cache entries[/dim]", level=OutputLevel.NORMAL)
 
+    # Validate domain before any DNA processing
+    domain_config = cfg.domains.get(domain)
+    if not domain_config:
+        vprint(f"[red]Unknown domain: {domain}[/red]", level=OutputLevel.QUIET)
+        raise typer.Exit(1)
+
     # Load User DNA and apply mapping rules (only when explicitly requested)
     user_dna = load_user_dna(user_dna_path) if user_dna_path else None
     if user_dna:
@@ -162,10 +169,6 @@ async def _run_collect(
         vprint(f"[dim]User DNA loaded → domain={final_domain}, window={w_days}d, "
                f"topics={topics[:3]}...[/dim]", level=OutputLevel.VERBOSE)
     else:
-        domain_config = cfg.domains.get(domain)
-        if not domain_config:
-            vprint(f"[red]Unknown domain: {domain}[/red]", level=OutputLevel.QUIET)
-            raise typer.Exit(1)
         final_domain = domain
         topics = domain_config.get("topics", [])
         w_days = window_days or 365
