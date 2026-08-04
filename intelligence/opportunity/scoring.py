@@ -133,9 +133,9 @@ def compute_confidence(
 
     # Low-evidence penalty: < 3 evidence items is very thin
     if total_evidence < 3:
-        confidence *= 0.5 + 0.17 * total_evidence  # 0 evid → 0.5; 3 evid → 1.0
+        confidence *= 0.5 + (1/6) * total_evidence  # 0 evid → 0.5; 3 evid → 1.0
     elif total_evidence < 10:
-        confidence *= 0.8 + 0.03 * (total_evidence - 3)  # gentle ramp 3→10
+        confidence *= 0.8 + (1/35) * (total_evidence - 3)  # gentle ramp 3→10
 
     # No-pain-data penalty: demand may be underestimated
     if total_pain_issues == 0:

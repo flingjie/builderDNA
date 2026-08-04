@@ -9,6 +9,8 @@ embeddings for equivalent angular-distance behaviour, or pass
 ``algorithm="generic"`` for full metric support.
 """
 
+import warnings
+
 from hdbscan import HDBSCAN
 import numpy as np
 
@@ -48,6 +50,7 @@ class PainClusterer:
             Noise points (label == -1) are excluded.
         """
         if len(embeddings) < self.clusterer.min_cluster_size:
+            warnings.warn(f"Insufficient data for clustering: {len(embeddings)} < {self.clusterer.min_cluster_size}")
             return {}
 
         matrix = np.array(embeddings)

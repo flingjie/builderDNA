@@ -6,6 +6,7 @@ Auto-loads .env file if present.
 
 import os
 import re
+import warnings
 from pathlib import Path
 from typing import Literal
 
@@ -121,6 +122,8 @@ def _resolve_env(value: str) -> str:
         default = m.group(2)
         if default is not None:
             return os.environ.get(var, default)
+        if var not in os.environ:
+            warnings.warn(f"Unresolved config variable: ${{{var}}} has no environment value and no default")
         return os.environ.get(var, m.group(0))
 
     return _ENV_VAR_RE.sub(_replacer, value)
