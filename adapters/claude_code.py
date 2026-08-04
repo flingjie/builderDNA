@@ -9,10 +9,25 @@ a non-Python context.
 """
 
 import asyncio
+import concurrent.futures
 from pathlib import Path
 
 from adapters.interface import BuilderDNAAdapter
 from models.payload import SandboxResult, Diagnostics, TopicTrend
+
+
+def _run_async(coro):
+    """Run an async coroutine, handling the case where an event loop is already running."""
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        # No running loop — safe to use asyncio.run()
+        return asyncio.run(coro)
+    else:
+        # Already in an event loop — use a thread
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            future = pool.submit(asyncio.run, coro)
+            return future.result()
 
 
 class ClaudeCodeAdapter(BuilderDNAAdapter):
@@ -48,7 +63,7 @@ class ClaudeCodeAdapter(BuilderDNAAdapter):
         opps_path = kwargs.get("opps_path", f"{output_dir}/opportunities.json")
 
         # Step 1: Collect
-        asyncio.run(_run_collect(
+        _run_async(_run_collect(
             domain=domain,
             output=signals_path,
             config_path=config_path,
