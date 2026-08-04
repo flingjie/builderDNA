@@ -6,6 +6,8 @@ management, and semaphore-based concurrency control.
 """
 
 import asyncio
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from typing import Any, TYPE_CHECKING
 
 import httpx
@@ -16,6 +18,18 @@ from observability.output import OutputLevel, get_console, vprint
 
 if TYPE_CHECKING:
     from observability.telemetry import RunTelemetry
+
+
+def _parse_retry_after(raw: str, default: int = 60) -> int:
+    """Parse a Retry-After header value per RFC 7231.
+
+    The header can be either an integer number of seconds or an HTTP-date.
+    """
+    try:
+        return max(1, int(raw))
+    except ValueError:
+        retry_time = parsedate_to_datetime(raw)
+        return max(1, int((retry_time - datetime.now(timezone.utc)).total_seconds()))
 
 
 class GitHubClient:
@@ -203,7 +217,7 @@ class GitHubClient:
 
                     # 429: primary rate limit
                     if resp.status_code == 429:
-                        retry_after = int(resp.headers.get("Retry-After", "60"))
+                        retry_after = _parse_retry_after(resp.headers.get("Retry-After", "60"))
                         if attempt < self.max_retries:
                             vprint(f"[RateLimit] 429 hit — waiting {retry_after}s "
                                    f"(attempt {attempt + 1}/{self.max_retries})",
@@ -219,7 +233,7 @@ class GitHubClient:
                         remaining = resp.headers.get("X-RateLimit-Remaining")
                         retry_after = resp.headers.get("Retry-After")
                         if remaining == "0" and retry_after:
-                            wait = int(retry_after)
+                            wait = _parse_retry_after(retry_after)
                             if attempt < self.max_retries:
                                 vprint(f"[RateLimit] Secondary rate limit — "
                                        f"waiting {wait}s (attempt {attempt + 1}/{self.max_retries})",
