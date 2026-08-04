@@ -37,6 +37,7 @@ class CacheStore:
     def __init__(self, cache_dir: str | Path = "snapshots/cache"):
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
+        self.prune(max_age_days=30)
 
     def _cache_key(self, method: str, url: str, params: dict[str, str] | None = None) -> str:
         """Generate a deterministic cache key from method, url, and params."""
@@ -132,3 +133,19 @@ class CacheStore:
             f.unlink()
             count += 1
         return count // 2  # json+meta = 1 entry
+
+    def prune(self, max_age_days: int = 30) -> int:
+        """Remove cache entries with mtime older than max_age_days.
+
+        Returns count of pruned entries (1 entry = json + meta pair).
+        """
+        cutoff = time.time() - (max_age_days * 86400)
+        pruned = 0
+        for f in self.cache_dir.glob("*.json"):
+            if f.stat().st_mtime < cutoff:
+                f.unlink()
+                meta_f = f.with_suffix(".meta")
+                if meta_f.exists():
+                    meta_f.unlink()
+                pruned += 1
+        return pruned

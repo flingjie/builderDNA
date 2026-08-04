@@ -67,7 +67,7 @@ def _extract_issues(issues_data: list[dict], repo: str) -> list[dict]:
             "repo": repo,
             "issue_number": issue.get("number", 0),
             "title": issue.get("title", "") or "",
-            "body": (issue.get("body", "") or "")[:500],
+            "body": (issue.get("body", "") or "")[:2000],
             "comments": comments,
             "participants": participants,
             "reactions": total_reactions,

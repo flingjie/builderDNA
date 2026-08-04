@@ -34,7 +34,7 @@ def _resolve_stage(velocity: float, acceleration: float, confidence: float) -> t
 def trend(
     domain: str = typer.Argument(..., help="Domain name"),
     data: str = typer.Option("output/signals.json", "--data", "-d", help="Input signals JSON"),
-    window: int = typer.Option(60, "--window", "-w", help="Time window in days"),
+    window: int = typer.Option(365, "--window", "-w", help="Time window in days"),
     output: str = typer.Option("output/trends.json", "--output", "-o", help="Output JSON file"),
 ) -> None:
     """Compute topic trends from collected signals."""
