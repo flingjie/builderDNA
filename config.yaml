@@ -114,7 +114,6 @@ vendors:
     - THUDM
     - MoonshotAI
   overseas:
-    - anthropics
     - langchain-ai
     - browser-use
     - crewAIInc
