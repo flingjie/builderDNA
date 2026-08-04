@@ -29,12 +29,14 @@ async def fetch_top_repos(
         data = resp.json()
         if isinstance(data, dict) and "items" in data:
             repos = data["items"]
-            if len(repos) >= 1000:
+            total_count = data.get("total_count", 0)
+            if total_count > 100:
                 tel = client.telemetry
                 if tel:
                     tel.add_warning(
-                        f"Search results truncated at 1000 for topic '{topic}' "
-                        f"(GitHub Search API limit). Consider narrowing the query."
+                        f"Search result truncated for topic '{topic}' "
+                        f"(got {len(repos)}, total {total_count}). "
+                        f"GitHub Search API limits to 100 per page. Consider narrowing the query."
                     )
             return repos
         return data if isinstance(data, list) else []

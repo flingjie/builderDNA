@@ -24,7 +24,7 @@ from models.payload import (
     DataQualityDiag,
     ConfidenceDiag,
 )
-from intelligence.trend.velocity import compute_acceleration
+from intelligence.trend.velocity import compute_acceleration, _resolve_stage
 from intelligence.opportunity.scoring import (
     compute_demand,
     compute_competition,
@@ -37,23 +37,6 @@ from intelligence.opportunity.scoring import (
 
 
 # ── Helpers ───────────────────────────────────────────────────────────
-
-
-def _resolve_stage(velocity: float, acceleration: float, confidence: float) -> tuple[str, str]:
-    """Replicated from cli/commands/trend.py for isolated testing."""
-    if acceleration > 2.0 and confidence > 0.6:
-        return (
-            "accelerating",
-            f"acceleration={acceleration:.1f} (>2.0) + confidence={confidence:.2f} (>0.6) -> accelerating",
-        )
-    if acceleration > 0.5 and confidence > 0.3:
-        return (
-            "emerging",
-            f"acceleration={acceleration:.1f} (>0.5) + confidence={confidence:.2f} (>0.3) -> emerging",
-        )
-    if acceleration < -1.0:
-        return "declining", f"acceleration={acceleration:.1f} (<-1.0) -> declining"
-    return "mainstream", f"acceleration={acceleration:.1f}, confidence={confidence:.2f} -> mainstream (default)"
 
 
 def _run_trend_pipeline(
@@ -72,7 +55,7 @@ def _run_trend_pipeline(
     """
     import tempfile
     if db_path is None:
-        db_path = tempfile.mktemp(suffix=".db")
+        db_path = tempfile.mkstemp(suffix=".db")[1]
     with SignalStore(db_path) as store:
         store.insert(signals)
         trend_rows = store.get_topic_trends(days=window_days)
@@ -320,57 +303,9 @@ class TestTrendPipeline:
 
     def test_full_pipeline_produces_ranked_trends(self, tmp_path):
         """Signals of varying velocity produce properly ranked TopicTrend output."""
-        store = SignalStore(str(tmp_path / "trends.db"))
         signals = _make_sample_signals()
-        store.insert(signals)
-
-        with store:
-            trend_rows = store.get_topic_trends(days=365)
-        assert len(trend_rows) >= 1, "Expected at least one topic trend"
-
-        # Enrich trends (same logic as CLI)
-        topic_signals: dict[str, list[Signal]] = {}
-        for s in signals:
-            for topic in s.payload.get("topics", []):
-                topic_signals.setdefault(topic, []).append(s)
-
-        trends: list[TopicTrend] = []
-        for t in trend_rows:
-            sigs = topic_signals.get(t.topic, [])
-            accel = compute_acceleration(sigs, window_days=365)
-            t.acceleration = round(accel, 2)
-            stage, reason = _resolve_stage(t.growth_velocity, accel, t.confidence)
-            t.stage = stage
-            t.classification_reason = reason
-
-            topic_repos: dict[str, dict] = {}
-            for s in sigs:
-                name = s.target_repo
-                if name not in topic_repos:
-                    p = s.payload
-                    topic_repos[name] = {
-                        "full_name": name,
-                        "stars": p.get("stars", 0),
-                        "forks": p.get("forks", 0),
-                        "contributors": p.get("contributors", 0),
-                        "velocity": s.velocity,
-                    }
-            sorted_repos = sorted(
-                topic_repos.values(), key=lambda r: r["stars"], reverse=True
-            )[:5]
-            t.top_repos = [
-                RepoSummary(
-                    full_name=r["full_name"],
-                    stars=r["stars"],
-                    forks=r["forks"],
-                    contributors=r["contributors"],
-                    velocity=r["velocity"],
-                )
-                for r in sorted_repos
-            ]
-            trends.append(t)
-
-        trends.sort(key=lambda x: x.growth_velocity, reverse=True)
+        trends = _run_trend_pipeline(signals, window_days=365, db_path=str(tmp_path / "trends.db"))
+        assert len(trends) >= 1, "Expected at least one topic trend"
 
         # Verify structure of every trend
         for trend in trends:

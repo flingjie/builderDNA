@@ -285,7 +285,7 @@ class GitHubClient:
 
         Drop Content-Encoding headers since the cached body is already decoded.
         """
-        request = httpx.Request("GET", url)
+        request = httpx.Request("GET", url if url.startswith("http") else f"https://api.github.com{url}")
         clean_headers = {k: v for k, v in headers.items()
                          if k.lower() not in ("content-encoding", "transfer-encoding")}
         return httpx.Response(

@@ -7,28 +7,13 @@ import typer
 
 from signals.store import SignalStore
 from signals.models import Signal
-from intelligence.trend.velocity import compute_acceleration
+from intelligence.trend.velocity import compute_acceleration, _resolve_stage
 from models.payload import (
     SandboxResult, TrendPayload, TopicTrend, RepoSummary,
     Diagnostics, DataQualityDiag, ConfidenceDiag,
 )
 from observability import RunTelemetry, OutputLevel, vprint, record_command, record_output_retention
 from observability.snapshot import save_trend_snapshot
-
-
-def _resolve_stage(velocity: float, acceleration: float, confidence: float) -> tuple[str, str]:
-    """Assign lifecycle stage based on velocity + acceleration.
-
-    Returns:
-        (stage, reason) — stage string and human-readable justification.
-    """
-    if acceleration > 2.0 and confidence > 0.6:
-        return "accelerating", f"acceleration={acceleration:.1f} (>2.0) + confidence={confidence:.2f} (>0.6) → accelerating"
-    if acceleration > 0.5 and confidence > 0.3:
-        return "emerging", f"acceleration={acceleration:.1f} (>0.5) + confidence={confidence:.2f} (>0.3) → emerging"
-    if acceleration < -1.0:
-        return "declining", f"acceleration={acceleration:.1f} (<-1.0) → declining"
-    return "mainstream", f"acceleration={acceleration:.1f}, confidence={confidence:.2f} → mainstream (default)"
 
 
 def trend(
