@@ -9,6 +9,7 @@ output/*
 predictions/
 state/*
 !state/.gitkeep
+!state/traces/
 !state/distill_reports/.gitkeep
 .venv/
 builderdna.egg-info/
