@@ -163,10 +163,25 @@ For each recurring problem you find across posts, record:
 - **why they fail** — the gap those attempts leave
 - **willingness to pay** — explicit ("I'd pay for this"), implicit (frustration + no free fix), or none
 
+In preset mode, also record `source_subreddits` and `source_segments` for each problem. Normalize
+wording only when posts describe the same underlying job or failure; preserve verbatim quotations
+and their subreddit provenance.
+
+Use four evidence labels:
+
+- **Technical recurrence** — repeated in `agent-builders`.
+- **Commercial recurrence** — repeated in `founders`.
+- **Buyer recurrence** — repeated in `automation-buyers` or `chinese-market`.
+- **Cross-segment validation** — supported by at least two distinct segments.
+
+Cross-segment validation raises confidence but does not replace explicit or implicit payment evidence.
+
 ## 5. Rank and select
 
-Rank problems by `frequency × urgency × willingness_to_pay`. Pick the top one as the primary
-opportunity.
+Start with `frequency × urgency × willingness_to_pay`. In preset mode, use Cross-segment validation
+as supporting evidence when ordering otherwise comparable problems. Do not invent a numeric bonus:
+show the contributing subreddits and segments so the user can inspect the evidence. Pick the top
+problem as the primary opportunity.
 
 ## 6. Generate a product concept
 
@@ -180,7 +195,9 @@ positioning + guide content + copy that a human hands off to deployment.
 
 ## 7. Write output and present
 
-Write `output/reddit_opportunities.json`:
+Write `output/reddit_opportunities.json`.
+
+Single mode preserves the existing shape:
 
 ```json
 {
@@ -196,15 +213,65 @@ Write `output/reddit_opportunities.json`:
       "tried_solutions": ["Zapier", "manual SOP docs"],
       "why_they_fail": "brittle, not product-specific",
       "willingness_to_pay": "explicit",
-      "product_concept": "...",
-      "guide_outline": ["..."],
-      "landing_copy": "..."
+      "product_concept": "An onboarding automation assistant for small B2B SaaS teams.",
+      "guide_outline": ["Map the current onboarding workflow", "Identify safe automation boundaries"],
+      "landing_copy": "Stop copy-pasting every customer onboarding step."
     }
   ]
 }
 ```
 
-Present a ranked table, then ask: "Deep dive on any of these? Say a number."
+Preset mode uses:
+
+```json
+{
+  "preset": "agent-startup",
+  "subreddits": ["AI_Agents", "LangChain", "SaaS", "China_irl"],
+  "generated_at": "2026-08-20T10:05:00Z",
+  "scan_summary": [
+    {
+      "subreddit": "AI_Agents",
+      "segment": "agent-builders",
+      "language": "en",
+      "status": "scanned",
+      "fetched_count": 25,
+      "new_count": 8,
+      "eligible_count": 8
+    },
+    {
+      "subreddit": "China_irl",
+      "segment": "chinese-market",
+      "language": "zh",
+      "status": "filtered-empty",
+      "fetched_count": 25,
+      "new_count": 5,
+      "eligible_count": 0
+    }
+  ],
+  "opportunities": [
+    {
+      "rank": 1,
+      "problem": "keeping multi-agent workflows reliable in production",
+      "frequency": 9,
+      "pain_level": "high",
+      "verbatim_language": ["our agents keep losing state between retries"],
+      "source_subreddits": ["AI_Agents", "LangChain", "SaaS"],
+      "source_segments": ["agent-builders", "founders"],
+      "cross_segment_validation": true,
+      "tried_solutions": ["custom retry loops", "manual runbooks"],
+      "why_they_fail": "recovery logic is duplicated and incomplete",
+      "willingness_to_pay": "implicit",
+      "product_concept": "A recovery and observability layer for multi-agent workflows.",
+      "guide_outline": ["Model workflow state explicitly", "Design idempotent retries"],
+      "landing_copy": "Recover failed agent workflows without rebuilding your orchestration stack."
+    }
+  ]
+}
+```
+
+The full preset output lists all configured subreddits and one scan-summary row per feed; the shortened
+example above demonstrates the shape. Present the scan summary first, then the ranked opportunity
+table, then ask: "Deep dive on any of these? Say a number."
 
 ## 8. State files
 
@@ -213,6 +280,7 @@ Present a ranked table, then ask: "Deep dive on any of these? Say a number."
 | `state/subreddit_profiles/{sub}.md` | 7-section markdown profile |
 | `state/reddit/{sub}.jsonl` | one JSON object per line: `{id, title, author, permalink, published, selftext, category, first_seen}` |
 | `state/reddit/last_scan.json` | `{ "r/SaaS": {"last_scan": "ISO8601", "newest_post_id": "...", "post_count": 25} }` |
+| `config/reddit_feeds/{preset}.yaml` | versioned feed inventory + scan policy; read-only at runtime |
 | `output/reddit_opportunities.json` | shape above |
 
 Timestamps are ISO 8601 UTC. Create directories (`state/reddit`, `state/subreddit_profiles`) if missing.
@@ -224,14 +292,24 @@ Timestamps are ISO 8601 UTC. Create directories (`state/reddit`, `state/subreddi
 
 ## 10. Error handling
 
-| Symptom | Fix |
-|---------|-----|
-| `rate_limited` (exit 2) | Wait ~60s, retry once; then stop and tell the user |
-| `not_found` (exit 3) | Tell the user the subreddit doesn't exist or is private; stop |
-| `network_error` / `parse_error` | Tell the user the error; stop |
-| No new posts since last scan | Report "no new posts since {last_scan}" and stop |
-| Profile section 5 requested | Explain RSS has no upvote/removal data; mark section "requires .json API" |
+| Symptom | Single mode | Preset mode |
+|---------|-------------|-------------|
+| `rate_limited` (exit 2) | Wait about 60s, retry once, then report and stop | Wait configured delay, retry configured count, record `rate-limited`, continue |
+| `not_found` (exit 3) | Report missing/private and stop | Record `missing/private`, continue |
+| network / parse / HTTP error | Report and stop | Record `failed`; do not append or advance that feed; continue |
+| no new posts | Report and stop | Record `no-new-posts`, continue |
+| all new posts filtered | Not applicable | Advance the raw cursor, record `filtered-empty`, continue |
+| profile section 5 requested | Explain RSS lacks score/removal data | Same |
+
+A preset run is successful when its configuration is valid and at least one feed completes acquisition,
+even if no eligible new posts remain. Report partial failures explicitly; never describe an unscanned
+feed as successful.
 
 ## 11. Conversational flow
 
-1. Determine subreddit → 2. Fetch + diff → 3. Update profile → 4. Analyze pain → 5. Rank → 6. Generate concept → 7. Write `output/reddit_opportunities.json` → 8. Present ranked table → 9. Ask to deep-dive.
+**Single mode:** determine subreddit → fetch + diff → update profile → analyze pain → rank → generate
+concept → write output → present → ask to deep-dive.
+
+**Preset mode:** resolve + validate preset → fetch feeds sequentially → filter + update per-subreddit
+state → retain per-feed statuses → aggregate eligible posts → cross-segment analysis → rank → generate
+concept → write preset output → present scan summary + opportunities → ask to deep-dive.

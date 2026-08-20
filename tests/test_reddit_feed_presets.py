@@ -146,3 +146,26 @@ def test_skill_documents_every_feed_status():
         "failed",
     ):
         assert f"`{status}`" in skill
+
+
+def test_skill_documents_cross_segment_ranking():
+    skill = SKILL_PATH.read_text(encoding="utf-8")
+
+    for phrase in (
+        "Technical recurrence",
+        "Commercial recurrence",
+        "Buyer recurrence",
+        "Cross-segment validation",
+        "source_subreddits",
+        "source_segments",
+    ):
+        assert phrase in skill
+
+
+def test_skill_preserves_single_output_and_adds_preset_output():
+    skill = SKILL_PATH.read_text(encoding="utf-8")
+
+    assert '"subreddit": "SaaS"' in skill
+    assert '"preset": "agent-startup"' in skill
+    assert '"scan_summary"' in skill
+    assert '"subreddits"' in skill
