@@ -77,7 +77,9 @@ Before network access in preset mode, validate:
 
 If validation fails, report the exact file and field and stop before the first RSS request.
 
-## 2. Fetch posts and diff
+## 2A. Single-subreddit fetch
+
+Run:
 
 ```bash
 python3 scripts/reddit_rss.py SUBREDDIT --sort new --limit 25
@@ -85,21 +87,60 @@ python3 scripts/reddit_rss.py SUBREDDIT --sort new --limit 25
 
 The helper routes through `http://127.0.0.1:7890` by default; use `--proxy ""` for a direct connection.
 
-- If exit 0: parse the JSON array of posts.
-- If exit 2 (`rate_limited`): wait ~60s, retry once; if still rate-limited, tell the user and stop.
-- If exit 3 (`not_found`): tell the user "r/SUBREDDIT does not exist or is private" and stop.
-- If exit 1 (`network_error` / `parse_error` / `http_error`): tell the user the error and stop.
+- Exit 0: parse the JSON array.
+- Exit 2 (`rate_limited`): wait about 60 seconds and retry once; on repeat failure, report and stop.
+- Exit 3 (`not_found`): report that the subreddit is missing/private and stop.
+- Exit 1: report the helper's network, parse, or HTTP error and stop.
 
-Read `state/reddit/last_scan.json`. Compare each post's `id` against the stored `newest_post_id`
-for this subreddit: posts **newer** than it are new. On first scan (no entry), all posts are new.
-Append every fetched post to `state/reddit/{sub}.jsonl` (dedupe by `id` — skip if already present),
-then update `last_scan.json`.
+Read `state/reddit/last_scan.json`. Posts newer than this subreddit's `newest_post_id` are new;
+on first scan all fetched posts are new. Append fetched posts to `state/reddit/{sub}.jsonl`, deduped
+by `id`, then update the cursor. Continue with the existing profile and pain-analysis flow.
+
+## 2B. Preset fetch loop
+
+Process feeds sequentially in YAML order. Do not launch parallel helper invocations.
+For each feed:
+
+1. Invoke:
+
+   ```bash
+   python3 scripts/reddit_rss.py SUBREDDIT --sort SCAN_SORT --limit SCAN_LIMIT
+   ```
+
+2. Handle the result without discarding state already written for earlier feeds:
+   - Exit 0: parse and diff the feed, then continue below.
+   - Exit 2: wait `retry_after_rate_limit_seconds`, retry up to `retry_limit`, then record
+     `rate-limited` and continue to the next feed.
+   - Exit 3: record `missing/private` and continue.
+   - Exit 1 or malformed stdout: record `failed` and continue. Do not append or advance that feed.
+3. Read that subreddit's cursor and identify new posts from the raw feed.
+4. If there are no new posts, record `no-new-posts`.
+5. Apply Keyword filtering when `include_keywords` exists:
+   - combine each post's `title + selftext`;
+   - compare case-insensitively;
+   - retain the post when any keyword is a substring;
+   - do not append, profile, or analyze filtered-out posts.
+6. Advance `state/reddit/last_scan.json` from the raw feed's newest post, including when all new
+   posts were filtered out. This prevents the same irrelevant posts from reappearing.
+7. Append eligible posts to `state/reddit/{sub}.jsonl`, deduped by `id`, and update that subreddit's
+   profile. Record `filtered-empty` when filtering removes every new post; otherwise record `scanned`.
+8. Wait `request_interval_seconds` before the next helper invocation. Do not wait after the final feed.
+
+Keep a run-local scan summary with `subreddit`, `segment`, `language`, `status`, `fetched_count`,
+`new_count`, `eligible_count`, and optional `error`. Exactly one terminal status is recorded per feed:
+`scanned`, `no-new-posts`, `filtered-empty`, `missing/private`, `rate-limited`, or `failed`.
 
 ## 3. Build / update the Subreddit Profile
 
 Read `state/subreddit_profiles/{sub}.md` (create if missing). Merge new signals into the 7 sections.
 This profile is the shared asset both reddit skills maintain — update it, don't overwrite unrelated
-sections. The 7 sections and how to derive them from RSS post bodies:
+sections.
+
+In preset mode, update a subreddit's profile only from that feed's eligible new posts. Never merge
+filtered-out posts or posts from a failed fetch. One feed's profile failure does not erase or replace
+profiles already updated earlier in the run.
+
+The 7 sections and how to derive them from RSS post bodies:
 
 | # | Section | How to derive (RSS-only) |
 |---|---------|---------------------------|

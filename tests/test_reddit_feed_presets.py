@@ -116,3 +116,33 @@ def test_skill_frontmatter_mentions_feed_presets():
 
     assert "feed preset" in frontmatter
     assert "Agent startup" in frontmatter
+
+
+def test_skill_documents_multi_feed_acquisition_contract():
+    skill = SKILL_PATH.read_text(encoding="utf-8")
+
+    for phrase in (
+        "## 2A. Single-subreddit fetch",
+        "## 2B. Preset fetch loop",
+        "Keyword filtering",
+        "title + selftext",
+        "raw feed's newest post",
+        "request_interval_seconds",
+        "retry_after_rate_limit_seconds",
+        "retry_limit",
+    ):
+        assert phrase in skill
+
+
+def test_skill_documents_every_feed_status():
+    skill = SKILL_PATH.read_text(encoding="utf-8")
+
+    for status in (
+        "scanned",
+        "no-new-posts",
+        "filtered-empty",
+        "missing/private",
+        "rate-limited",
+        "failed",
+    ):
+        assert f"`{status}`" in skill
