@@ -101,13 +101,15 @@ Schema contract: schema.md and models/payload.py — Claude Code reads these.
 
 ## Skills (`.claude/skills/`)
 
-Ten skills are deployed (13 directories — 3 `*-workspace/` dirs are skill-creator eval artifacts, not skills):
+Thirteen skills are deployed (16 directories — 3 `*-workspace/` dirs are skill-creator eval artifacts, not skills):
 
 | Skill | Purpose | Trigger |
 |-------|---------|---------|
 | `builderdna` | Run the 7-command analysis pipeline, manage hypotheses | "analyze X's GitHub", "tech DNA", "find opportunities in Z" |
 | `repo-trend` | Discover trending repos via GitHub API search, 3-tier eval | "find trending X repos", "evaluate this repo", "check my watches" |
 | `repo-awesome` | Mine awesome-* lists for curated repo discovery | "mine awesome lists for X", "what do awesome lists recommend" |
+| `reddit-opportunity` | Discover product opportunities + pain points from a Reddit community (no product yet): RSS → Subreddit Profile → recurring problems → product concept | "find problems people will pay to solve", "what should I build from r/...", "从 Reddit 找商机" |
+| `reddit-outreach` | Find customers + draft replies for an existing product on Reddit (human posts, no spam) | "find customers on reddit", "draft a reply", "红迪获客" |
 | `value-discovery` | Extract user's cognitive decision model via Meta Model interview | "value discovery", "what do I value", "help me understand my preferences" |
 | `observability` | Run self-iteration diagnostics (mismatch, snapshot, hypothesis pruning) | "check my predictions", "validate assumptions", "任何东西变了吗" |
 | `optimize` | Diagnose→Propose→Apply→Verify loop — read diagnostics, generate improvement proposals, apply and re-run | "/optimize", "improve the analysis", "fix low confidence", "优化分析" |
@@ -115,6 +117,7 @@ Ten skills are deployed (13 directories — 3 `*-workspace/` dirs are skill-crea
 | `distill` | Synthesize accumulated reflections + digest gap reports into growth reports, propose self-model updates (including cognitive_patterns) | "/distill", "synthesize my reflections", "growth report", "蒸馏" |
 | `note` | RAL recording layer — capture daily moments, amplify meaning, weekly connection review | "/note", "记一下", "take a note", "weekly review", "日复盘" |
 | `digest` | 5-layer Feynman adversarial interview — verify true understanding of a book/principle/repo by exposing blind spots | "/digest", "校验我对...的掌握", "verify my grasp of", "费曼校验" |
+| `trace-classify` | Classify raw tool-call traces into step-level trace files + periodic review for optimization insights | "classify the last trace", "trace this session", "review this week's traces" |
 
 Evals exist for builderdna (`.claude/skills/builderdna/evals/`) via the skill-creator workflow. Shared evaluation rubrics: `references/repo-scout/`. Most skills are pure Claude-orchestrated — they use `gh` CLI, not the Python codebase. The `builderdna` skill orchestrates the 7 Python CLI sandbox commands.
 
