@@ -1,0 +1,74 @@
+name: agent-startup
+description: Balanced Agent entrepreneurship opportunity radar
+
+scan:
+  sort: new
+  limit: 25
+  request_interval_seconds: 60
+  retry_after_rate_limit_seconds: 60
+  retry_limit: 1
+
+feeds:
+  - subreddit: AI_Agents
+    segment: agent-builders
+    language: en
+
+  - subreddit: LangChain
+    segment: agent-builders
+    language: en
+
+  - subreddit: LocalLLaMA
+    segment: agent-builders
+    language: en
+
+  - subreddit: LLMDevs
+    segment: agent-builders
+    language: en
+
+  - subreddit: SaaS
+    segment: founders
+    language: en
+
+  - subreddit: startups
+    segment: founders
+    language: en
+
+  - subreddit: SideProject
+    segment: founders
+    language: en
+
+  - subreddit: indiehackers
+    segment: founders
+    language: en
+
+  - subreddit: microSaaS
+    segment: founders
+    language: en
+
+  - subreddit: automation
+    segment: automation-buyers
+    language: en
+
+  - subreddit: n8n
+    segment: automation-buyers
+    language: en
+
+  - subreddit: smallbusiness
+    segment: automation-buyers
+    language: en
+
+  - subreddit: China_irl
+    segment: chinese-market
+    language: zh
+    include_keywords:
+      - AI Agent
+      - 智能体
+      - AI 代理
+      - 大模型
+      - 自动化
+      - 工作流
+      - SaaS
+      - 创业
+      - 独立开发
+      - 获客
+      - 降本增效
