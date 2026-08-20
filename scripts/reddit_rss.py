@@ -16,6 +16,7 @@ import xml.etree.ElementTree as ET
 DEFAULT_USER_AGENT = "BuilderDNA/0.1 (reddit RSS research; local use)"
 ATOM_NS = {"atom": "http://www.w3.org/2005/Atom"}
 TIMEOUT = 15
+DEFAULT_PROXY = "http://127.0.0.1:7890"
 
 
 def build_url(subreddit: str, sort: str, limit: int) -> str:
@@ -54,10 +55,16 @@ def parse_atom(xml_text: str) -> list[dict]:
     return posts
 
 
-def fetch(url: str, timeout: int = TIMEOUT) -> str:
-    """Fetch a URL and return the response body as decoded text."""
+def fetch(url: str, timeout: int = TIMEOUT, proxy: str | None = None) -> str:
+    """Fetch a URL and return the response body as decoded text.
+
+    When `proxy` is set, route the request through it; otherwise use the
+    default opener (which respects HTTP(S)_PROXY environment variables).
+    """
     req = urllib.request.Request(url, headers={"User-Agent": DEFAULT_USER_AGENT})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
+    handlers = [urllib.request.ProxyHandler({"http": proxy, "https": proxy})] if proxy else []
+    opener = urllib.request.build_opener(*handlers)
+    with opener.open(req, timeout=timeout) as resp:
         return resp.read().decode("utf-8", errors="replace")
 
 
@@ -66,11 +73,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("subreddit", help="subreddit name without r/ (e.g. 'SaaS')")
     parser.add_argument("--sort", choices=["hot", "new", "top"], default="new")
     parser.add_argument("--limit", type=int, default=25)
+    parser.add_argument(
+        "--proxy", default=DEFAULT_PROXY,
+        help="HTTP(S) proxy for fetching (default http://127.0.0.1:7890; empty string = direct)",
+    )
     args = parser.parse_args(argv)
 
     url = build_url(args.subreddit, args.sort, args.limit)
     try:
-        xml_text = fetch(url)
+        xml_text = fetch(url, timeout=TIMEOUT, proxy=args.proxy or None)
     except urllib.error.HTTPError as exc:
         if exc.code in (403, 429):
             print(json.dumps({

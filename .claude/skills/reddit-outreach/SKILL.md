@@ -71,6 +71,8 @@ If the user didn't name one, ask at most one question. Otherwise proceed.
 python3 scripts/reddit_rss.py SUBREDDIT --sort new --limit 25
 ```
 
+The helper routes through `http://127.0.0.1:7890` by default; use `--proxy ""` for a direct connection.
+
 Handle exit codes exactly as `reddit-opportunity` does (rate-limit wait/retry, not-found, network error).
 
 Score each post:

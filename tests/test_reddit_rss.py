@@ -44,7 +44,7 @@ def test_parse_atom_missing_fields_become_empty():
 
 
 def test_main_success(monkeypatch, capsys):
-    monkeypatch.setattr("scripts.reddit_rss.fetch", lambda url, timeout=15: FIXTURE_ATOM)
+    monkeypatch.setattr("scripts.reddit_rss.fetch", lambda url, timeout=15, proxy=None: FIXTURE_ATOM)
     code = main(["SaaS"])
     out = json.loads(capsys.readouterr().out)
     assert code == 0
@@ -53,7 +53,7 @@ def test_main_success(monkeypatch, capsys):
 
 
 def test_main_rate_limited(monkeypatch, capsys):
-    def raise_429(url, timeout=15):
+    def raise_429(url, timeout=15, proxy=None):
         raise urllib.error.HTTPError(url, 429, "Too Many Requests", {}, None)
     monkeypatch.setattr("scripts.reddit_rss.fetch", raise_429)
     code = main(["SaaS"])
@@ -64,10 +64,30 @@ def test_main_rate_limited(monkeypatch, capsys):
 
 
 def test_main_not_found(monkeypatch, capsys):
-    def raise_404(url, timeout=15):
+    def raise_404(url, timeout=15, proxy=None):
         raise urllib.error.HTTPError(url, 404, "Not Found", {}, None)
     monkeypatch.setattr("scripts.reddit_rss.fetch", raise_404)
     code = main(["SaaS"])
     out = json.loads(capsys.readouterr().out)
     assert code == 3
     assert out["error"] == "not_found"
+
+
+def test_main_passes_proxy_default(monkeypatch):
+    captured = {}
+    def fake_fetch(url, timeout=15, proxy=None):
+        captured["proxy"] = proxy
+        return FIXTURE_ATOM
+    monkeypatch.setattr("scripts.reddit_rss.fetch", fake_fetch)
+    main(["SaaS"])
+    assert captured["proxy"] == "http://127.0.0.1:7890"
+
+
+def test_main_empty_proxy_disables(monkeypatch):
+    captured = {}
+    def fake_fetch(url, timeout=15, proxy=None):
+        captured["proxy"] = proxy
+        return FIXTURE_ATOM
+    monkeypatch.setattr("scripts.reddit_rss.fetch", fake_fetch)
+    main(["SaaS", "--proxy", ""])
+    assert captured["proxy"] is None

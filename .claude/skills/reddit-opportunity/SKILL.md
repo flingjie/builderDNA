@@ -61,6 +61,8 @@ If the user didn't name one, ask at most one question: "Which subreddit?" (e.g. 
 python3 scripts/reddit_rss.py SUBREDDIT --sort new --limit 25
 ```
 
+The helper routes through `http://127.0.0.1:7890` by default; use `--proxy ""` for a direct connection.
+
 - If exit 0: parse the JSON array of posts.
 - If exit 2 (`rate_limited`): wait ~60s, retry once; if still rate-limited, tell the user and stop.
 - If exit 3 (`not_found`): tell the user "r/SUBREDDIT does not exist or is private" and stop.
