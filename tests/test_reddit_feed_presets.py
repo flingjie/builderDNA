@@ -94,3 +94,25 @@ def test_feed_fields_use_supported_values():
             "chinese-market",
         }
         assert feed["language"] in {"en", "zh"}
+
+
+SKILL_PATH = Path(".claude/skills/reddit-opportunity/SKILL.md")
+
+
+def test_skill_documents_agent_startup_preset_resolution():
+    skill = SKILL_PATH.read_text(encoding="utf-8")
+
+    assert "config/reddit_feeds/{preset}.yaml" in skill
+    assert "/reddit-opportunity agent-startup" in skill
+    assert "Explicit subreddit wins" in skill
+    assert "Do not silently default to a preset" in skill
+    assert "single mode" in skill
+    assert "preset mode" in skill
+
+
+def test_skill_frontmatter_mentions_feed_presets():
+    skill = SKILL_PATH.read_text(encoding="utf-8")
+    frontmatter = skill.split("---", 2)[1]
+
+    assert "feed preset" in frontmatter
+    assert "Agent startup" in frontmatter

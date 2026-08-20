@@ -9,9 +9,10 @@ description: >
   Monitors a subreddit's public RSS feed (no API key, no scraper), builds and updates a
   7-section Subreddit Profile (the shared community profile both reddit skills maintain),
   finds recurring problems, judges willingness to pay, and generates a product concept.
-  Shares state with reddit-outreach. RSS returns posts only — no comments, no scores;
-  analysis works on post bodies. After every run, present a ranked list of problems and
-  ask whether to deep-dive.
+  Supports a single subreddit or a versioned feed preset, including the Agent startup
+  opportunity radar. Shares state with reddit-outreach. RSS returns posts only — no
+  comments, no scores; analysis works on post bodies. After every run, present a ranked
+  list of problems and ask whether to deep-dive.
 ---
 
 # reddit-opportunity Skill
@@ -23,37 +24,58 @@ You are the orchestrator — the only Python you run is the shared `scripts/redd
 
 ## Architecture
 
+```text
+User target
+   ├─► explicit subreddit ───────────────────────────────► single mode
+   └─► config/reddit_feeds/{preset}.yaml ───────────────► preset mode
+                                                               │
+Claude orchestrator                                             │
+   ├─► python3 scripts/reddit_rss.py SUBREDDIT ... ◄───────────┘
+   ├─► state/reddit/last_scan.json        ⟷ per-subreddit cursors
+   ├─► state/subreddit_profiles/{sub}.md  ⟷ per-subreddit profiles
+   ├─► state/reddit/{sub}.jsonl           ⟷ eligible post history
+   ├─► per-feed filtering + status
+   ├─► cross-segment pain analysis
+   └─► output/reddit_opportunities.json
 ```
-User: "what should I build from r/SaaS?"
-       │
-       ▼
-You (Claude) — fetch RSS, diff new posts, update profile, analyze pain, rank, generate concept
-       │
-       ├─► python3 scripts/reddit_rss.py SaaS --sort new      → JSON posts
-       │
-       ├─► state/reddit/last_scan.json        ⟷  last scan + newest post id (diff)
-       ├─► state/subreddit_profiles/SaaS.md   ⟷  7-section community profile
-       ├─► state/reddit/SaaS.jsonl            ⟷  append-only post history
-       │
-       ├─► Pain analysis (frequency, verbatim language, urgency, tried, why-fail, willingness)
-       ├─► Rank problems → pick top 1
-       └─► output/reddit_opportunities.json   → ranked problems + product concepts
-```
+
+The helper remains single-request and single-subreddit. Preset iteration, request spacing,
+filtering, state updates, and aggregation happen in this skill.
 
 ## Quick Reference
 
 | User says | You do |
 |-----------|--------|
-| "find problems in r/X" / "what should I build from r/X" | Fetch → update profile → rank pain → present |
+| "find problems in r/X" / "what should I build from r/X" | Run single mode for X |
+| "/reddit-opportunity agent-startup" / "scan my Agent startup feeds" | Load `config/reddit_feeds/agent-startup.yaml` and run preset mode |
 | "deep dive on #1" | Expand one problem into a full product concept + guide outline + landing copy |
-| "scan r/X again" / "what changed" | Diff vs `last_scan.json`, process only new posts |
+| "scan r/X again" / "what changed" | Diff that subreddit vs `last_scan.json`, process only new posts |
 
 ---
 
-## 1. Determine the subreddit
+## 1. Determine the target mode
 
-If the user didn't name one, ask at most one question: "Which subreddit?" (e.g. `SaaS`, `sideproject`,
-`EntrepreneurRideAlong`). If given, proceed immediately.
+Resolve the target in this order:
+
+1. **Explicit subreddit wins.** A user-provided `r/X` or subreddit name selects **single mode**,
+   even if a preset also exists.
+2. A known preset name such as `agent-startup`, or a request to scan "my Agent startup feeds",
+   selects **preset mode** and loads `config/reddit_feeds/{preset}.yaml`.
+3. If neither target is identifiable, ask at most one question: "Which subreddit or feed preset?"
+   Give `SaaS` and `agent-startup` as examples.
+4. Do not silently default to a preset.
+
+Before network access in preset mode, validate:
+
+- top-level `name`, `description`, `scan`, and non-empty `feeds` exist;
+- `scan.sort` is `new`, `hot`, or `top`;
+- `scan.limit` is an integer from 1 through 25;
+- interval and retry values are non-negative integers;
+- subreddit names are unique;
+- every feed has `subreddit`, `segment`, and `language`;
+- every `language: zh` feed has a non-empty `include_keywords` list.
+
+If validation fails, report the exact file and field and stop before the first RSS request.
 
 ## 2. Fetch posts and diff
 
