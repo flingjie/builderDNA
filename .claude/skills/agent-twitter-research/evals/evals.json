@@ -1,0 +1,23 @@
+{
+  "skill_name": "agent-twitter-research",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "做今天的 agent 情报，帮我看看 Twitter 上 agent engineering / AI engineering 今天有什么值得学习和互动的内容。",
+      "expected_output": "一份含 Top 10 学习 + Top 5 交流 + 今日 Pattern/观点/实验 的日报，写入 state/reports/ 并打印到终端。",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "帮我搜一下最近 agent evaluation 和 context engineering 有没有什么一手生产经验，我想学点能落地的。",
+      "expected_output": "针对两个主题的定向搜索 + 筛选评分后的学习条目，含可迁移到 Agent 系统的启发。",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "把最近 3 天积累的 agent 知识沉淀一下，看看有没有反复出现的 pattern，以及有哪些可以写成我自己的内容。",
+      "expected_output": "更新 state/knowledge.json，晋升重复 pattern，输出可写短推文/长文/实验的清单。",
+      "files": []
+    }
+  ]
+}
