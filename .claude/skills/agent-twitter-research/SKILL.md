@@ -22,7 +22,7 @@ description: >
 | 做 | 不做 |
 |----|------|
 | 发现 → 筛选 → 评分 → 深度分析 → 设计互动 | 无脑抓取、堆数量 |
-| 产出 Top 10 学习 + Top 5 交流 + 每日报告 | 自动代发推文（每条回复必须经用户确认）|
+| 产出 Top 10 学习（七角分析）+ Top 5 交流（独立一类）+ 每日报告 | 自动代发推文（每条回复必须经用户确认）|
 | 沉淀个人知识资产（跨天累积）| 把「热门」当「高质量」|
 
 核心原则：**不追求「抓得多」，追求「值得学习、值得交流、值得沉淀」。**
@@ -33,11 +33,13 @@ description: >
 
 1. **搜索** — 读 `references/opencli-twitter.md`（命令）＋ `references/topics.md`（主题），用 `opencli` 拉候选推文。
 2. **筛选** — 去重（本次运行内 + 跨天 `state/seen_tweets.json`），按 `references/scoring-rubric.md` 的「直接丢弃 / 优先保留」清单过滤。
-3. **评分** — 按 `references/scoring-rubric.md` 的 100 分制（6 维加权）打分，取 Top 10。
-4. **分析** — 读 `references/analysis-guide.md`，对 Top 10 逐条做「如果我是 Agent Solution Expert 该学到什么」的深度分析；读 `references/reply-patterns.md` 选出 Top 5 交流对象。
+3. **评分** — 读 `references/scoring-rubric.md`，两条正交评分：Learning Score 取 Top 10，Discussion Worthiness 独立取 Top 5（不从 Top 10 派生）。
+4. **分析** — 读 `references/analysis-guide.md`，对 Top 10 用七角（要解决什么问题 / 读者是谁 / 读完该做什么 / 清晰度 / 具体性 / 可信度 / 可执行性）提炼「值得学习的点」；读 `references/reply-patterns.md` 为 Top 5 设计交流方向与建议回复。
 5. **沉淀** — 读 `references/report-template.md` 生成日报（写入 `state/reports/YYYY-MM-DD.md` 并打印到终端），读 `references/knowledge-base.md` 更新知识资产。
 
 ## 5 个必问问题
+
+这 5 问是进 Top 10 之前的**预筛硬门槛**；深度分析时再用 `analysis-guide.md` 的七角展开（见第 4 步）。
 
 每条候选进 Top 10 之前，先回答：
 

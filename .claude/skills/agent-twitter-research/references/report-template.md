@@ -25,7 +25,7 @@ Top 5 Discussion：XX 条
 # 📚 Top 10 Learning
 
 ## 1. xxx
-（作者 / 链接 / 核心观点 / 值得学习 / 对我的启发 —— 用 analysis-guide 里的条目格式）
+（作者 / 链接 / 要解决什么问题 / 读者是谁 / 读完该做什么 / 质量评估四维 / 值得学习的点 / 启发 / 验证 / 我的判断 —— 用 analysis-guide 里的七角条目格式）
 
 ## 2. xxx
 ...
@@ -34,8 +34,10 @@ Top 5 Discussion：XX 条
 
 # 💬 Top 5 Discussion
 
+> 与 Top 10 Learning 正交：本榜按「值得交流度」独立选出，不要求也在 Top 10 里。若某条同时进两榜，在此标注 `（也见 Top 10 #N）`。
+
 ## 1. xxx
-（作者 / 链接 / 为什么值得交流 / 建议回复 —— 用 reply-patterns 里的条目格式）
+（作者 / 链接 / 为什么值得交流 / 作者的核心观点 / 我可以贡献什么 / 建议回复 —— 用 reply-patterns 里的条目格式）
 
 ---
 
