@@ -11,6 +11,8 @@ state/*
 !state/.gitkeep
 !state/traces/
 !state/distill_reports/.gitkeep
+# agent-twitter-research runtime state (daily knowledge asset, dedup, reports — not versioned)
+.claude/skills/agent-twitter-research/state/
 .venv/
 builderdna.egg-info/
 *-workspace/
