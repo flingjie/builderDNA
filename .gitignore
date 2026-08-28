@@ -18,4 +18,6 @@ builderdna.egg-info/
 *-workspace/
 .claude/worktrees/
 .mcp.json
+# Codex CLI tooling state (skills symlink etc.)
+.codex/
 .venv/
