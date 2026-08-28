@@ -1,8 +1,10 @@
 # 个人知识资产
 
-Twitter Research 不该停在日报。把每天的信息沉淀成可复用的个人 Agent Engineering 知识库，存于 `state/knowledge.json`（已 gitignore，首次运行时若不存在则创建空结构 `{ "entries": [] }`）。
+Twitter Research 不该停在日报。把每天的信息沉淀成可复用的个人 {主题领域} 知识库（默认 agent），存于 `state/knowledge.json`（已 gitignore，首次运行时若不存在则创建空结构 `{ "entries": [] }`）。
 
 ## 分类 taxonomy
+
+下面是 `agent` 预设的 taxonomy。研究非 agent 主题时二选一：**派生主题专属 taxonomy**（按同样的三层结构拆分当前主题），或直接用**扁平的 `topic` 字段 + 自由 tags**（`topic` 本就是自由字符串，无 schema 限制）。
 
 ```text
 Agent Engineering
@@ -18,7 +20,7 @@ FDE
 ├── Deployment / Feedback
 ```
 
-每条沉淀给一个 `topic`（映射到上述叶子）＋ 1-3 个 `tags`（自由关键词）。
+每条沉淀给一个 `topic`（映射到上述叶子，或当前主题的对应叶子）＋ 1-3 个 `tags`（自由关键词）。
 
 ## 演化管线
 

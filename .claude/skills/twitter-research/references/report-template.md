@@ -5,7 +5,7 @@ Step 5 输出。写入 `state/reports/YYYY-MM-DD.md`（目录不存在则创建�
 ## 固定结构
 
 ```markdown
-# Agent Twitter Daily Research — YYYY-MM-DD
+# {主题领域} Twitter Daily Research — YYYY-MM-DD
 
 ## 今日摘要
 

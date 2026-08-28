@@ -16,7 +16,7 @@ Step 4 的下半场。
 | B 有观点缺证据 | 结论强、没给数据 | 提验证问题 |
 | C 有真实经验 | 一手生产经验 | 分享自己的类似经验 |
 | D 有开放问题 | 作者明确在找答案 | 直接给答案 / 资源 |
-| E 与自身实践高度相关 | Agent Loop / Evaluation / Harness / FDE | 带入自己的上下文 |
+| E 与自身实践高度相关 | 当前主题的核心子领域（`agent` 预设为 Agent Loop / Evaluation / Harness / FDE） | 带入自己的上下文 |
 
 ## Top 5 交流条目格式
 

@@ -101,7 +101,7 @@ Schema contract: schema.md and models/payload.py — Claude Code reads these.
 
 ## Skills (`.claude/skills/`)
 
-Thirteen skills are deployed (16 directories — 3 `*-workspace/` dirs are skill-creator eval artifacts, not skills):
+Fourteen skills are deployed (17 directories — 3 `*-workspace/` dirs are skill-creator eval artifacts, not skills):
 
 | Skill | Purpose | Trigger |
 |-------|---------|---------|
@@ -118,6 +118,7 @@ Thirteen skills are deployed (16 directories — 3 `*-workspace/` dirs are skill
 | `note` | RAL recording layer — capture daily moments, amplify meaning, weekly connection review | "/note", "记一下", "take a note", "weekly review", "日复盘" |
 | `digest` | 5-layer Feynman adversarial interview — verify true understanding of a book/principle/repo by exposing blind spots | "/digest", "校验我对...的掌握", "verify my grasp of", "费曼校验" |
 | `trace-classify` | Classify raw tool-call traces into step-level trace files + periodic review for optimization insights | "classify the last trace", "trace this session", "review this week's traces" |
+| `twitter-research` | Daily Twitter/X intelligence on a specified topic (default: agent): discover, filter, score, analyze high-signal posts → Top 10 learnings + Top 5 worth engaging + knowledge asset | "做今天的 X 情报", "帮我研究 Y 的推特", "run my twitter research", "今天有哪些值得学习的 X 推文" |
 
 Evals exist for builderdna (`.claude/skills/builderdna/evals/`) via the skill-creator workflow. Shared evaluation rubrics: `references/repo-scout/`. Most skills are pure Claude-orchestrated — they use `gh` CLI, not the Python codebase. The `builderdna` skill orchestrates the 7 Python CLI sandbox commands.
 

@@ -1,5 +1,5 @@
 {
-  "skill_name": "agent-twitter-research",
+  "skill_name": "twitter-research",
   "evals": [
     {
       "id": 1,
@@ -17,6 +17,12 @@
       "id": 3,
       "prompt": "把最近 3 天积累的 agent 知识沉淀一下，看看有没有反复出现的 pattern，以及有哪些可以写成我自己的内容。",
       "expected_output": "更新 state/knowledge.json，晋升重复 pattern，输出可写短推文/长文/实验的清单。",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "用 twitter-research 研究一下 MCP 生态最近有什么值得学习和互动的。",
+      "expected_output": "主题确定为 MCP（而非默认 agent），用 MCP 关键词构造搜索词，产出含 Top 10 学习 + Top 5 交流的日报，报告标题带 MCP，知识库条目 topic 归到 MCP 派生分类而非 Agent taxonomy。",
       "files": []
     }
   ]

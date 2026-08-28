@@ -20,7 +20,7 @@ Step 2 过滤 + Step 3 评分。目标是只留下「值得学习 / 值得交流
 - 有真实项目经验 / 有数据 / 有代码 / 有架构
 - 有失败案例 / 有具体方法 / 有实验 / 有 Benchmark
 - 有生产经验 / 有反直觉观点
-- 能迁移到其他 Agent 项目 / 能帮助理解 Agent Engineering
+- 能迁移到其他 {主题领域} 项目 / 能帮助理解 {主题领域}
 
 ## 100 分学习评分（Learning Score）
 
@@ -40,7 +40,7 @@ Learning Score =
 | Insight | 30% | 是否有新的认知？ |
 | Practicality | 25% | 是否可以实际应用？ |
 | Originality | 20% | 是否不是已被反复讨论的内容？ |
-| Transferability | 15% | 能否迁移到其他 Agent / AI 项目？ |
+| Transferability | 15% | 能否迁移到其他 {主题领域} / AI 项目？ |
 | Evidence | 10% | 是否有真实案例、数据、代码或实验？ |
 
 取加权和，降序取 Top 10。给每条留一个分数与一句话理由，便于报告里可追溯。
