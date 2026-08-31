@@ -1,18 +1,17 @@
-# 日报模板
+# 学习日报模板
 
 Step 5 输出。写入 `state/reports/YYYY-MM-DD.md`（目录不存在则创建），同时打印到终端。
 
 ## 固定结构
 
 ```markdown
-# {主题领域} Twitter Daily Research — YYYY-MM-DD
+# {主题领域} Twitter Learning — YYYY-MM-DD
 
 ## 今日摘要
 
 今日抓取：XX 条
 有效候选：XX 条
 Top 10：XX 条
-Top 5 Discussion：XX 条
 
 ---
 
@@ -29,15 +28,6 @@ Top 5 Discussion：XX 条
 
 ## 2. xxx
 ...
-
----
-
-# 💬 Top 5 Discussion
-
-> 与 Top 10 Learning 正交：本榜按「值得交流度」独立选出，不要求也在 Top 10 里。若某条同时进两榜，在此标注 `（也见 Top 10 #N）`。
-
-## 1. xxx
-（作者 / 链接 / 为什么值得交流 / 作者的核心观点 / 我可以贡献什么 / 建议回复 —— 用 reply-patterns 里的条目格式）
 
 ---
 

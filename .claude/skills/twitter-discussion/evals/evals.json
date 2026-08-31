@@ -1,0 +1,17 @@
+{
+  "skill_name": "twitter-discussion",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "帮我看看今天 Twitter 上 agent 领域有什么值得互动 / 回复的推文，我想参与讨论。",
+      "expected_output": "一份含 Top 15 值得交流（作者/链接/为什么值得交流/核心观点/我能贡献什么/建议回复草稿）的交流日报，写入 state/reports/ 并打印到终端，草稿进待确认清单，不自动发送。",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "用 twitter-discussion 看看 MCP 生态最近有什么值得交流讨论的，帮我起草几条回复。",
+      "expected_output": "主题确定为 MCP，产出 Top 15 值得交流 + 英文回复草稿，报告标题带 MCP，每条草稿等用户确认。",
+      "files": []
+    }
+  ]
+}

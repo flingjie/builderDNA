@@ -1,10 +1,10 @@
 {
-  "skill_name": "twitter-research",
+  "skill_name": "twitter-learning",
   "evals": [
     {
       "id": 1,
-      "prompt": "做今天的 agent 情报，帮我看看 Twitter 上 agent engineering / AI engineering 今天有什么值得学习和互动的内容。",
-      "expected_output": "一份含 Top 10 学习（七角分析）+ Top 5 交流（独立一类）+ 今日 Pattern/观点/实验 的日报，写入 state/reports/ 并打印到终端。",
+      "prompt": "做今天的 agent 情报，帮我看看 Twitter 上 agent engineering / AI engineering 今天有什么值得学习的内容。",
+      "expected_output": "一份含 Top 10 学习（七角分析）+ 今日 Pattern/观点/实验 的学习日报，写入 state/reports/ 并打印到终端，更新 state/knowledge.json。",
       "files": []
     },
     {
@@ -21,8 +21,8 @@
     },
     {
       "id": 4,
-      "prompt": "用 twitter-research 研究一下 MCP 生态最近有什么值得学习和互动的。",
-      "expected_output": "主题确定为 MCP（而非默认 agent），用 MCP 关键词构造搜索词，产出含 Top 10 学习 + Top 5 交流的日报，报告标题带 MCP，知识库条目 topic 归到 MCP 派生分类而非 Agent taxonomy。",
+      "prompt": "用 twitter-learning 研究一下 MCP 生态最近有什么值得学习的。",
+      "expected_output": "主题确定为 MCP（而非默认 agent），用 MCP 关键词构造搜索词，产出 Top 10 学习日报，报告标题带 MCP，知识库条目 topic 归到 MCP 派生分类而非 Agent taxonomy。",
       "files": []
     }
   ]
