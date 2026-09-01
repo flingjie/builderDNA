@@ -14,7 +14,9 @@ from datetime import datetime, timezone
 from concepts.scoring import (
     BuildGateResult,
     ScoredComponents,
+    ScoreResult,
     evaluate_build_gate,
+    score,
     score_components,
 )
 from models.concept import (
@@ -339,3 +341,165 @@ class TestBuildGate:
         assert "two source types" in joined
         assert "two independent supporting chains" in joined
         assert "smallest experiment" in joined
+
+
+# ── Unified score + six named gates ──
+
+
+ALL_SIX_GATES = {
+    "two_source_types",
+    "two_independent_chains",
+    "counterevidence_reviewed",
+    "smallest_experiment_present",
+    "experiment_thresholds_and_budget",
+    "weekly_builds_available",
+}
+
+
+class TestUnifiedScore:
+    def test_high_hype_lowers_priority(self):
+        card = make_card()
+        evidence = [
+            make_evidence(
+                id="e1",
+                role=EvidenceRole.PROBLEM,
+                strength=EvidenceStrength.STRONG,
+                independence_key="chain-a",
+            ),
+            make_evidence(
+                id="e2",
+                role=EvidenceRole.PROBLEM,
+                independence_key="chain-b",
+            ),
+        ]
+        low_hype = score(card, evidence, hype=0)
+        high_hype = score(card, evidence, hype=3)
+
+        assert high_hype.components.hype == 3
+        assert low_hype.components.hype == 0
+        assert high_hype.total < low_hype.total
+
+    def test_high_alignment_cannot_satisfy_truth_gates(self):
+        # A single source type + single chain is missing-evidence territory.
+        evidence = [
+            make_evidence(
+                id="e1",
+                source_type=SourceType.GITHUB,
+                role=EvidenceRole.PROBLEM,
+                independence_key="chain-a",
+            ),
+        ]
+        card = make_card(
+            smallest_experiment=make_experiment(), maturity=MaturityStage.VERIFIED
+        )
+
+        result = score(card, evidence, user_alignment=3)
+
+        assert result.components.user_alignment == 3
+        assert "two_source_types" in result.failed_gates
+        assert "two_independent_chains" in result.failed_gates
+
+    def test_high_total_cannot_override_failed_hard_gate(self):
+        evidence = [
+            make_evidence(
+                id="e1",
+                source_type=SourceType.GITHUB,
+                role=EvidenceRole.PROBLEM,
+                strength=EvidenceStrength.STRONG,
+                independence_key="a",
+            ),
+        ]
+        card = make_card(
+            maturity=MaturityStage.VERIFIED, smallest_experiment=make_experiment()
+        )
+        result = score(card, evidence, user_alignment=3, hype=0)
+
+        assert result.total >= 3  # numerically respectable...
+        assert result.failed_gates  # ...but gated out structurally
+
+    def test_weekly_builds_exhausted_blocks_build(self):
+        evidence = [
+            make_evidence(
+                id="e1",
+                source_type=SourceType.GITHUB,
+                role=EvidenceRole.IMPLEMENTATION,
+                independence_key="a",
+            ),
+            make_evidence(
+                id="e2",
+                source_type=SourceType.REDDIT,
+                role=EvidenceRole.PROBLEM,
+                independence_key="b",
+            ),
+        ]
+        card = make_card(
+            maturity=MaturityStage.VERIFIED, smallest_experiment=make_experiment()
+        )
+
+        available = score(card, evidence, weekly_builds_used=0, weekly_builds_cap=1)
+        assert "weekly_builds_available" in available.passed_gates
+        assert available.failed_gates == []
+
+        exhausted = score(card, evidence, weekly_builds_used=1, weekly_builds_cap=1)
+        assert "weekly_builds_available" in exhausted.failed_gates
+
+    def test_all_six_gates_pass_for_a_ready_card(self):
+        evidence = [
+            make_evidence(
+                id="e1",
+                source_type=SourceType.GITHUB,
+                role=EvidenceRole.IMPLEMENTATION,
+                independence_key="gh-repo-a",
+            ),
+            make_evidence(
+                id="e2",
+                source_type=SourceType.REDDIT,
+                role=EvidenceRole.PROBLEM,
+                independence_key="reddit-thread-1",
+            ),
+            make_evidence(
+                id="e3",
+                source_type=SourceType.GITHUB,
+                role=EvidenceRole.COUNTER,
+                independence_key="gh-counter-1",
+            ),
+        ]
+        card = make_card(
+            maturity=MaturityStage.VERIFIED,
+            stage=PortfolioStage.VERIFY,
+            smallest_experiment=make_experiment(),
+        )
+        result = score(card, evidence)
+
+        assert set(result.passed_gates) == ALL_SIX_GATES
+        assert result.failed_gates == []
+        assert isinstance(result, ScoreResult)
+        assert result.total == result.components.total
+
+    def test_experiment_bounded_gate_requires_thresholds_and_budget(self):
+        evidence = [
+            make_evidence(
+                id="e1",
+                source_type=SourceType.GITHUB,
+                role=EvidenceRole.IMPLEMENTATION,
+                independence_key="a",
+            ),
+            make_evidence(
+                id="e2",
+                source_type=SourceType.REDDIT,
+                role=EvidenceRole.PROBLEM,
+                independence_key="b",
+            ),
+        ]
+        # A blank stop_condition (the time/cost budget carrier on
+        # SmallestExperiment) fails the bounded-experiment gate even though
+        # every other gate passes.
+        blank_stop = make_experiment(stop_condition=" ")
+        card = make_card(
+            maturity=MaturityStage.VERIFIED, smallest_experiment=blank_stop
+        )
+        result = score(card, evidence)
+
+        assert "experiment_thresholds_and_budget" in result.failed_gates
+        assert "smallest_experiment_present" in result.passed_gates
+        assert "weekly_builds_available" in result.passed_gates

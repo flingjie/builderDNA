@@ -20,6 +20,18 @@ Design rules honoured here:
 - **Gates are separate from the total** — they check structural evidence
   requirements, never a numeric threshold.
 
+Component name mapping (concept-radar-loop plan ↔ ``ComponentScores``):
+
+- ``pain_recurrence``        ↔ ``ComponentScores.problem``
+- ``evidence_strength``      ↔ ``ComponentScores.evidence``
+- ``independent_recurrence`` ↔ ``ComponentScores.reach``
+- ``implementation_cost``    ↔ ``ComponentScores.competition``
+
+The plan's formula uses those names, but the model (``models/concept.py``)
+already owns the identical arithmetic ``2P + 2E + R + A - 2H - C``, so this
+module keeps the existing field names and reuses ``ComponentScores.total``
+unchanged.
+
 Component heuristics (all on a 0-3 integer scale):
 
 - ``problem``      — count/strength of ``problem``-role evidence and how many
@@ -366,3 +378,150 @@ def evaluate_build_gate(
         missing.append("a bounded smallest experiment")
 
     return BuildGateResult(passed=not missing, missing=tuple(missing))
+
+
+# ── Unified score + six named gates ──
+#
+# ``score()`` composes ``score_components()`` with an extended six-gate build
+# check. ``score_components()`` and ``evaluate_build_gate()`` remain intact for
+# backward compatibility; this section only *adds* a richer surface on top of
+# them, so the CLI's existing four-gate behaviour is unchanged.
+
+# Stable gate names — these are the public contract consumed by later waves
+# (the cycle engine, the report renderer, and the Skill evals).
+GATE_TWO_SOURCE_TYPES = "two_source_types"
+GATE_TWO_INDEPENDENT_CHAINS = "two_independent_chains"
+GATE_COUNTEREVIDENCE_REVIEWED = "counterevidence_reviewed"
+GATE_SMALLEST_EXPERIMENT_PRESENT = "smallest_experiment_present"
+GATE_EXPERIMENT_THRESHOLDS_AND_BUDGET = "experiment_thresholds_and_budget"
+GATE_WEEKLY_BUILDS_AVAILABLE = "weekly_builds_available"
+
+GATE_ORDER = (
+    GATE_TWO_SOURCE_TYPES,
+    GATE_TWO_INDEPENDENT_CHAINS,
+    GATE_COUNTEREVIDENCE_REVIEWED,
+    GATE_SMALLEST_EXPERIMENT_PRESENT,
+    GATE_EXPERIMENT_THRESHOLDS_AND_BUDGET,
+    GATE_WEEKLY_BUILDS_AVAILABLE,
+)
+
+# Human description per gate, so a caller can render a precise reason for any
+# failed gate without re-deriving the check.
+GATE_DESCRIPTIONS = {
+    GATE_TWO_SOURCE_TYPES: "at least two source types",
+    GATE_TWO_INDEPENDENT_CHAINS: "at least two independent evidence chains",
+    GATE_COUNTEREVIDENCE_REVIEWED: "counterevidence reviewed",
+    GATE_SMALLEST_EXPERIMENT_PRESENT: "smallest experiment present",
+    GATE_EXPERIMENT_THRESHOLDS_AND_BUDGET: (
+        "experiment contains success threshold, failure threshold, budget, "
+        "and stop condition"
+    ),
+    GATE_WEEKLY_BUILDS_AVAILABLE: "current run has not exhausted weekly_builds",
+}
+
+# ``SmallestExperiment`` has no separate ``budget`` field: its ``stop_condition``
+# is documented in ``models/concept.py`` as the "Bounded stop condition (time or
+# cost budget) that ends the experiment". That is where the budget lives on the
+# core a Build card must carry, so the budget sub-requirement is satisfied when
+# ``stop_condition`` is non-blank. The richer ``experiments.models.Experiment``
+# (which does carry a distinct ``budget`` field) is produced by the experiment
+# generator in a later phase and is not the input to this scoring gate.
+_EXPERIMENT_BUDGET_FIELDS = ("success_threshold", "failure_threshold", "stop_condition")
+
+
+@dataclass(frozen=True)
+class ScoreResult:
+    """Unified scoring outcome: components, reasons, and named gate results.
+
+    ``total`` mirrors ``components.total`` (the model-recomputed
+    ``2P + 2E + R + A - 2H - C``). ``passed_gates`` and ``failed_gates`` list
+    the names of the six hard build gates in the two partitions; a card must
+    satisfy *all six* — a high ``total`` or high ``user_alignment`` never
+    overrides a failed gate.
+    """
+
+    total: int
+    components: ComponentScores
+    reasons: dict[str, str]
+    passed_gates: list[str]
+    failed_gates: list[str]
+
+
+def _evaluate_named_gates(
+    card: ConceptCard,
+    evidence_records: Sequence[ConceptEvidence],
+    *,
+    weekly_builds_used: int,
+    weekly_builds_cap: int,
+) -> tuple[list[str], list[str]]:
+    """Evaluate the six hard build gates, returning (passed, failed) gate names.
+
+    Deterministic and side-effect free. Gate names are stable constants (see
+    ``GATE_ORDER``); the order of both lists follows ``GATE_ORDER``.
+    """
+    passed: list[str] = []
+    failed: list[str] = []
+
+    def check(name: str, ok: bool) -> None:
+        (passed if ok else failed).append(name)
+
+    source_types = {e.source_type for e in evidence_records}
+    check(GATE_TWO_SOURCE_TYPES, len(source_types) >= 2)
+
+    supporting = [e for e in evidence_records if e.role != EvidenceRole.COUNTER]
+    chains = {e.independence_key for e in supporting}
+    check(GATE_TWO_INDEPENDENT_CHAINS, len(chains) >= 2)
+
+    reviewed, _ = _counterevidence_reviewed(card, evidence_records)
+    check(GATE_COUNTEREVIDENCE_REVIEWED, reviewed)
+
+    experiment = card.smallest_experiment
+    check(GATE_SMALLEST_EXPERIMENT_PRESENT, experiment is not None)
+
+    # success/failure thresholds + stop condition (the budget carrier) must all
+    # be non-blank on the smallest experiment.
+    thresholds_present = experiment is not None and all(
+        bool(getattr(experiment, field, "").strip())
+        for field in _EXPERIMENT_BUDGET_FIELDS
+    )
+    check(GATE_EXPERIMENT_THRESHOLDS_AND_BUDGET, thresholds_present)
+
+    check(GATE_WEEKLY_BUILDS_AVAILABLE, weekly_builds_used < weekly_builds_cap)
+
+    return passed, failed
+
+
+def score(
+    card: ConceptCard,
+    evidence_records: Sequence[ConceptEvidence],
+    *,
+    user_alignment: int = 0,
+    hype: int | None = None,
+    weekly_builds_used: int = 0,
+    weekly_builds_cap: int = 1,
+) -> ScoreResult:
+    """Score a card and evaluate all six hard build gates in one call.
+
+    Composes :func:`score_components` (component integers + per-component
+    reasons) with :func:`_evaluate_named_gates` (the six named build gates).
+    ``total`` is ``components.total``, always recomputed by the model — it can
+    never override a failed gate, and ``user_alignment`` can never satisfy a
+    truth gate. ``weekly_builds_used < weekly_builds_cap`` is the last gate;
+    when they are equal the current run has exhausted its weekly build budget.
+    """
+    scored = score_components(
+        card, evidence_records, user_alignment=user_alignment, hype=hype
+    )
+    passed, failed = _evaluate_named_gates(
+        card,
+        evidence_records,
+        weekly_builds_used=weekly_builds_used,
+        weekly_builds_cap=weekly_builds_cap,
+    )
+    return ScoreResult(
+        total=scored.scores.total,
+        components=scored.scores,
+        reasons=scored.reasons,
+        passed_gates=passed,
+        failed_gates=failed,
+    )

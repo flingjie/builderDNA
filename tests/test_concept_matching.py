@@ -18,6 +18,7 @@ from concepts.matching import (
     NAME_EXACT_SCORE,
     PROBLEM_EXACT_SCORE,
     URL_SCORE,
+    classify_match,
     find_candidates,
     is_ambiguous,
     normalize_name,
@@ -223,3 +224,82 @@ class TestAmbiguity:
         matches = find_candidates(candidate, existing)
         assert len(matches) == 1
         assert is_ambiguous(matches) is False
+
+
+# ── Classification (exact / suggested / none) ──
+
+class TestClassifyMatch:
+    def test_renamed_idea_is_exact_alias_match(self):
+        # The old title lives in the new card's aliases -> unambiguous identity.
+        existing = [card(id="a", title="Hallucination Guard")]
+        candidate = card(id="b", title="Agent Reliability", aliases=["Hallucination Guard"])
+        result = classify_match(candidate, existing)
+        assert result.kind == "exact"
+        assert result.top is not None
+        assert result.top.concept_id == "a"
+
+    def test_no_candidate_is_none(self):
+        existing = [card(id="a", title="Alpha", problem="hallucination")]
+        candidate = card(id="b", title="Beta", problem="latency budgets")
+        result = classify_match(candidate, existing)
+        assert result.kind == "none"
+        assert result.candidates == ()
+        assert result.top is None
+
+    def test_shared_source_different_mechanism_is_suggested(self):
+        # Same source URL, but the mechanism (problem) differs -> never exact.
+        existing = [card(id="a", title="Alpha", problem="hallucinations in production")]
+        candidate = card(id="b", title="Beta", problem="exceeding latency budgets")
+        result = classify_match(
+            candidate,
+            existing,
+            candidate_urls=["https://github.com/x/y"],
+            existing_urls={"a": ["https://github.com/x/y"]},
+        )
+        assert result.kind == "suggested"
+
+    def test_homonym_different_target_users_is_not_exact(self):
+        # Same name, different target users -> ambiguous, never auto-merged.
+        existing = [card(id="a", title="Agent Reliability", problem="solo builders")]
+        candidate = card(id="b", title="Agent Reliability", problem="enterprise platform teams")
+        result = classify_match(candidate, existing)
+        assert result.kind in ("none", "suggested")
+        assert result.kind != "exact"
+
+    def test_exact_name_same_problem_is_exact(self):
+        existing = [card(id="a", title="Agent Reliability", problem="hallucinations in production")]
+        candidate = card(id="b", title="Agent Reliability", problem="hallucinations in production")
+        result = classify_match(candidate, existing)
+        assert result.kind == "exact"
+
+    def test_problem_fingerprint_without_identity_is_suggested(self):
+        # Deterministic problem fingerprint alone is a weak signal.
+        existing = [card(id="a", title="Alpha", problem="agents hallucinate in production")]
+        candidate = card(id="b", title="Beta", problem="agents hallucinate in production")
+        result = classify_match(candidate, existing)
+        assert result.kind == "suggested"
+        assert result.top is not None
+        assert result.top.concept_id == "a"
+
+    def test_shared_upstream_origin_is_exact(self):
+        existing = [card(id="a", title="Alpha")]
+        candidate = card(id="b", title="Beta")
+        result = classify_match(
+            candidate,
+            existing,
+            candidate_upstream_origins=["https://x.com/thread/1"],
+            existing_upstream_origins={"a": ["https://x.com/thread/1"]},
+        )
+        assert result.kind == "exact"
+        assert result.top is not None
+        assert result.top.concept_id == "a"
+        assert result.top.reasons[0].signal == "upstream"
+
+    def test_ranked_candidates_carry_per_signal_reasons(self):
+        existing = [card(id="a", title="Agent Reliability", problem="hallucinations in production")]
+        candidate = card(id="b", title="Agent Reliability", problem="hallucinations in production")
+        result = classify_match(candidate, existing)
+        assert result.kind == "exact"
+        signals = {r.signal for r in result.candidates[0].reasons}
+        assert "name" in signals
+        assert "problem" in signals

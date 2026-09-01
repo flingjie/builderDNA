@@ -10,12 +10,15 @@ Covers the hard requirements:
 - One current snapshot per concept ID.
 """
 
+import threading
 from datetime import datetime, timedelta, timezone
 
 import pytest
 
 from concepts.store import (
     ConceptStore,
+    ConceptStoreError,
+    ConflictError,
     CorruptionError,
     DuplicateRecordError,
 )
@@ -258,12 +261,12 @@ class TestEvidence:
 
     def test_duplicate_id_raises(self, store):
         store.add_evidence(make_evidence(id="ev1", note="original"))
-        with pytest.raises(DuplicateRecordError):
+        with pytest.raises(ConflictError):
             store.add_evidence(make_evidence(id="ev1", note="clobbered"))
 
     def test_duplicate_id_never_silently_clobbers(self, store):
         store.add_evidence(make_evidence(id="ev1", note="original"))
-        with pytest.raises(DuplicateRecordError):
+        with pytest.raises(ConflictError):
             store.add_evidence(make_evidence(id="ev1", note="clobbered"))
         assert store.get_evidence("ev1").note == "original"
         assert len(store.list_evidence()) == 1
@@ -291,7 +294,7 @@ class TestReviews:
 
     def test_duplicate_review_id_raises(self, store):
         store.add_review(make_review(id="rev1", reason="first"))
-        with pytest.raises(DuplicateRecordError):
+        with pytest.raises(ConflictError):
             store.add_review(make_review(id="rev1", reason="clobbered"))
         assert store.get_review("rev1").reason == "first"
 
@@ -309,3 +312,143 @@ class TestDedupAfterCorruption:
         cards = store.list_concepts()
         assert len(cards) == 1
         assert cards[0].title == "Last"
+
+
+# ── Idempotent replay: identical ID + identical payload is a no-op ──
+
+class TestIdempotentReplay:
+    def test_identical_evidence_replay_is_noop(self, store):
+        store.add_evidence(make_evidence(id="ev1", note="same note"))
+        replay = make_evidence(id="ev1", note="same note")
+        returned = store.add_evidence(replay)
+        assert returned.id == "ev1"
+        assert returned.note == "same note"
+        # no second record was created
+        assert len(store.list_evidence()) == 1
+
+    def test_identical_review_replay_is_noop(self, store):
+        review_date = datetime(2026, 9, 8, 0, 0, 0, tzinfo=timezone.utc)
+        store.add_review(make_review(id="rev1", reason="first", review_date=review_date))
+        replay = make_review(id="rev1", reason="first", review_date=review_date)
+        returned = store.add_review(replay)
+        assert returned.id == "rev1"
+        assert len(store.list_reviews()) == 1
+
+    def test_replay_ignores_evidence_write_timestamp(self, store):
+        # Same logical evidence but a different `captured_at` (the write
+        # timestamp) must still be an idempotent replay, not a conflict.
+        store.add_evidence(make_evidence(id="ev1", note="same", captured_at=utc_now()))
+        replay = make_evidence(
+            id="ev1", note="same", captured_at=datetime(2020, 1, 1, tzinfo=timezone.utc)
+        )
+        returned = store.add_evidence(replay)
+        assert returned.id == "ev1"
+        assert len(store.list_evidence()) == 1
+
+    def test_replay_ignores_review_write_timestamp_not_review_date(self, store):
+        review_date = datetime(2026, 9, 8, 0, 0, 0, tzinfo=timezone.utc)
+        store.add_review(make_review(id="rev1", reason="first", review_date=review_date))
+        # Different `recorded_at` (write timestamp) -> idempotent replay.
+        replay = make_review(
+            id="rev1",
+            reason="first",
+            review_date=review_date,
+            recorded_at=datetime(2020, 1, 1, tzinfo=timezone.utc),
+        )
+        returned = store.add_review(replay)
+        assert returned.id == "rev1"
+        assert len(store.list_reviews()) == 1
+        # Different `review_date` (semantic field, not a write timestamp) -> conflict.
+        with pytest.raises(ConflictError):
+            store.add_review(
+                make_review(
+                    id="rev1",
+                    reason="first",
+                    review_date=datetime(2026, 10, 1, 0, 0, 0, tzinfo=timezone.utc),
+                )
+            )
+
+    def test_idempotent_replay_returns_existing_record(self, store):
+        store.add_evidence(make_evidence(id="ev1", note="original"))
+        returned = store.add_evidence(make_evidence(id="ev1", note="original"))
+        assert returned.note == "original"
+
+
+# ── Conflict: identical ID + different payload raises ConflictError ──
+
+class TestConflict:
+    def test_conflict_error_is_distinct_and_catchable(self):
+        # Distinct from the old broad duplicate error, but still a
+        # DuplicateRecordError / ConceptStoreError so existing handlers keep working.
+        assert ConflictError is not DuplicateRecordError
+        assert issubclass(ConflictError, DuplicateRecordError)
+        assert issubclass(DuplicateRecordError, ConceptStoreError)
+
+    def test_different_evidence_payload_raises_conflict(self, store):
+        store.add_evidence(make_evidence(id="ev1", note="original"))
+        with pytest.raises(ConflictError):
+            store.add_evidence(make_evidence(id="ev1", note="different"))
+
+    def test_different_review_payload_raises_conflict(self, store):
+        store.add_review(make_review(id="rev1", reason="first"))
+        with pytest.raises(ConflictError):
+            store.add_review(make_review(id="rev1", reason="different"))
+
+    def test_conflict_does_not_append(self, store):
+        store.add_evidence(make_evidence(id="ev1", note="original"))
+        with pytest.raises(ConflictError):
+            store.add_evidence(
+                make_evidence(id="ev1", source_url="https://other.example/repo")
+            )
+        assert len(store.list_evidence()) == 1
+        assert store.get_evidence("ev1").source_url == "https://github.com/example/repo"
+
+
+# ── Process-local lock: concurrent calls cannot interleave ──
+
+class TestConcurrency:
+    def test_store_has_functional_process_local_lock(self, store):
+        lock = store._lock
+        assert lock.acquire(blocking=False)
+        lock.release()
+
+    def test_concurrent_identical_appends_are_idempotent(self, store):
+        n = 16
+        errors: list[Exception] = []
+        barrier = threading.Barrier(n)
+
+        def worker():
+            try:
+                barrier.wait()
+                store.add_evidence(make_evidence(id="ev1", note="same"))
+            except Exception as exc:  # noqa: BLE001
+                errors.append(exc)
+
+        threads = [threading.Thread(target=worker) for _ in range(n)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        assert errors == []
+        assert len(store.list_evidence()) == 1
+
+    def test_concurrent_distinct_appends_lose_nothing(self, store):
+        n = 24
+        errors: list[Exception] = []
+        barrier = threading.Barrier(n)
+
+        def worker(i: int):
+            try:
+                barrier.wait()
+                store.add_evidence(make_evidence(id=f"ev{i}", concept_id="c1"))
+            except Exception as exc:  # noqa: BLE001
+                errors.append(exc)
+
+        threads = [threading.Thread(target=worker, args=(i,)) for i in range(n)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        assert errors == []
+        assert len(store.list_evidence()) == n
+        assert {e.id for e in store.list_evidence()} == {f"ev{i}" for i in range(n)}

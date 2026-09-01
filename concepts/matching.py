@@ -16,13 +16,22 @@ distance — so superficially similar names with different users, failure modes,
 interventions do not merge. Each candidate is returned with a ranked score plus
 the reasons it matched, and ``is_ambiguous`` flags merges that require human
 confirmation (near-ties, or a strong name match whose problems actually differ).
+
+``classify_match`` layers a clean ``"exact"`` / ``"suggested"`` / ``"none"``
+decision over those signals, honouring the ordered-signal contract:
+
+1. normalized canonical URL / content fingerprint;
+2. exact normalized name or alias;
+3. explicit upstream origin (repost-chain independence key);
+4. deterministic problem fingerprint;
+5. ranked suggestions requiring semantic-agent confirmation.
 """
 
 from __future__ import annotations
 
 import re
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from models.concept import ConceptCard
 
@@ -68,6 +77,7 @@ def normalize_url(url: str) -> str:
 NAME_EXACT_SCORE = 1.0
 ALIAS_SCORE = 0.9
 URL_SCORE = 0.8
+UPSTREAM_SCORE = 0.75
 PROBLEM_EXACT_SCORE = 0.7
 PROBLEM_JACCARD_WEIGHT = 0.6
 
@@ -78,7 +88,7 @@ PROBLEM_JACCARD_WEIGHT = 0.6
 class MatchReason:
     """Why one candidate matched, with that signal's sub-score."""
 
-    signal: str  # "name" | "alias" | "url" | "problem"
+    signal: str  # "name" | "alias" | "url" | "upstream" | "problem"
     detail: str
     score: float
 
@@ -95,6 +105,7 @@ class CandidateMatch:
     problem_score: float
     both_have_problem: bool
     reasons: tuple[MatchReason, ...]
+    upstream_score: float = 0.0
 
 
 def _name_scores(
@@ -245,3 +256,167 @@ def is_ambiguous(
             return True
 
     return False
+
+
+# ── Classification (exact / suggested / none) ──
+
+@dataclass(frozen=True)
+class MatchClassification:
+    """The classification of a capture against existing concept cards.
+
+    ``kind`` is one of ``"exact"``, ``"suggested"``, or ``"none"``:
+
+    - ``"exact"`` — an unambiguous fingerprint (URL / upstream origin) or exact
+      name/alias match; safe to merge without human confirmation.
+    - ``"suggested"`` — ranked candidates exist but the match is ambiguous: a
+      strong identity signal whose mechanism differs, a near-tie, or
+      problem-origin overlap with no strong identity signal. Never auto-merge.
+    - ``"none"`` — no candidate matched.
+
+    ``candidates`` carries the ranked ``CandidateMatch`` list, each with its own
+    per-signal ``reasons``; ``top`` is the highest-ranked candidate (``None``
+    when ``kind == "none"``).
+    """
+
+    kind: str
+    candidates: tuple[CandidateMatch, ...]
+    top: CandidateMatch | None
+    reason: str
+
+
+def _problem_overlap(candidate: ConceptCard, card: ConceptCard) -> tuple[bool, float]:
+    """Return ``(both_have_problem, problem_score)`` for the ambiguity check."""
+    cand_norm = normalize_problem(candidate.problem)
+    card_norm = normalize_problem(card.problem)
+    both = bool(cand_norm) and bool(card_norm)
+    if not both:
+        return False, 0.0
+    if cand_norm == card_norm:
+        return True, PROBLEM_EXACT_SCORE
+    sim = jaccard(tokenize(candidate.problem), tokenize(card.problem))
+    return True, PROBLEM_JACCARD_WEIGHT * sim
+
+
+def _strong_identity(match: CandidateMatch) -> bool:
+    """True when a match carries a strong identity signal (not problem-only)."""
+    return (
+        match.name_score >= ALIAS_SCORE
+        or match.url_score > 0.0
+        or match.upstream_score > 0.0
+    )
+
+
+def _is_exact(
+    ranked: Sequence[CandidateMatch],
+    *,
+    problem_similarity_threshold: float = 0.5,
+) -> bool:
+    """True when the top candidate is an unambiguous strong-identity match."""
+    if not ranked:
+        return False
+    top = ranked[0]
+    if not _strong_identity(top):
+        return False
+    if is_ambiguous(ranked, problem_similarity_threshold=problem_similarity_threshold):
+        return False
+    # A fingerprint (URL/upstream) whose mechanism differs is still ambiguous:
+    # two cards can share a source yet describe different concepts.
+    if (
+        (top.url_score > 0.0 or top.upstream_score > 0.0)
+        and top.both_have_problem
+        and top.problem_score < problem_similarity_threshold
+    ):
+        return False
+    return True
+
+
+def classify_match(
+    candidate: ConceptCard,
+    existing: Sequence[ConceptCard],
+    candidate_urls: Sequence[str] = (),
+    existing_urls: Mapping[str, Sequence[str]] | None = None,
+    candidate_upstream_origins: Sequence[str] = (),
+    existing_upstream_origins: Mapping[str, Sequence[str]] | None = None,
+    min_score: float = 0.0,
+) -> MatchClassification:
+    """Classify ``candidate`` against ``existing`` using the ordered signals.
+
+    Signal order (strongest identity first):
+
+    1. normalized canonical URL / content fingerprint;
+    2. exact normalized name or alias;
+    3. explicit upstream origin (repost-chain independence key);
+    4. deterministic problem fingerprint;
+    5. ranked suggestions requiring semantic-agent confirmation.
+
+    ``"exact"`` requires an unambiguous fingerprint or exact name/alias match.
+    Anything ambiguous — a strong identity signal whose problem differs, a
+    near-tie, or problem-only overlap — is ``"suggested"`` and must never be
+    auto-merged. ``"none"`` means no candidate matched at all.
+    """
+    base = find_candidates(candidate, existing, candidate_urls, existing_urls, min_score)
+    by_id: dict[str, CandidateMatch] = {m.concept_id: m for m in base}
+
+    cand_upstream = {normalize_url(o) for o in candidate_upstream_origins}
+    cand_upstream.discard("")
+    if cand_upstream:
+        existing_upstream_origins = existing_upstream_origins or {}
+        for card in existing:
+            card_upstream = {
+                normalize_url(o) for o in existing_upstream_origins.get(card.id, ())
+            }
+            card_upstream.discard("")
+            shared = cand_upstream & card_upstream
+            if not shared:
+                continue
+            upstream_reason = MatchReason(
+                "upstream",
+                f"shared upstream origin: {sorted(shared)[0]}",
+                UPSTREAM_SCORE,
+            )
+            prev = by_id.get(card.id)
+            if prev is not None:
+                by_id[card.id] = replace(
+                    prev,
+                    upstream_score=UPSTREAM_SCORE,
+                    score=max(prev.score, UPSTREAM_SCORE),
+                    reasons=prev.reasons + (upstream_reason,),
+                )
+            elif UPSTREAM_SCORE >= min_score:
+                both, pscore = _problem_overlap(candidate, card)
+                by_id[card.id] = CandidateMatch(
+                    concept_id=card.id,
+                    title=card.title,
+                    score=UPSTREAM_SCORE,
+                    name_score=0.0,
+                    url_score=0.0,
+                    problem_score=pscore,
+                    both_have_problem=both,
+                    upstream_score=UPSTREAM_SCORE,
+                    reasons=(upstream_reason,),
+                )
+
+    ranked = sorted(by_id.values(), key=lambda m: (-m.score, m.concept_id))
+    if not ranked:
+        return MatchClassification(
+            kind="none", candidates=(), top=None, reason="no candidate matched"
+        )
+
+    top = ranked[0]
+    if _is_exact(ranked):
+        driver = top.reasons[0].signal if top.reasons else "identity"
+        return MatchClassification(
+            kind="exact",
+            candidates=tuple(ranked),
+            top=top,
+            reason=f"unambiguous {driver} match on {top.concept_id!r}",
+        )
+    return MatchClassification(
+        kind="suggested",
+        candidates=tuple(ranked),
+        top=top,
+        reason=(
+            f"ambiguous or weak match (top: {top.concept_id!r}); "
+            "requires human confirmation"
+        ),
+    )
