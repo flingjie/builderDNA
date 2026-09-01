@@ -1,0 +1,40 @@
+name: production-agent-failures
+description: >
+  Production agent failure radar: people complaining that deployed AI agents fail,
+  plus builders discussing reliability and attempted fixes.
+
+scan:
+  sort: new
+  limit: 25
+  request_interval_seconds: 60
+  retry_after_rate_limit_seconds: 60
+  retry_limit: 1
+
+feeds:
+  - subreddit: ChatGPT
+    segment: agent-users
+    language: en
+
+  - subreddit: OpenAI
+    segment: agent-users
+    language: en
+
+  - subreddit: ClaudeAI
+    segment: agent-users
+    language: en
+
+  - subreddit: AI_Agents
+    segment: agent-builders
+    language: en
+
+  - subreddit: LangChain
+    segment: agent-builders
+    language: en
+
+  - subreddit: LocalLLaMA
+    segment: agent-builders
+    language: en
+
+  - subreddit: LLMDevs
+    segment: agent-builders
+    language: en

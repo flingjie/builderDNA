@@ -290,6 +290,20 @@ Timestamps are ISO 8601 UTC. Create directories (`state/reddit`, `state/subreddi
 - This skill only READS public posts and writes local state. It never posts to Reddit.
 - The product concept is for the user to validate; you do not deploy anything or take payment.
 
+## 10. Import into the concept radar
+
+Reddit findings can be imported into the concept radar as primary ("L1") evidence via the
+`concepts.adapters.reddit` adapter (`post_to_evidence` / `from_signal`), which normalizes RSS
+title/body findings into `ConceptEvidence` (role=`problem`, directness=`direct` only for a
+first-hand report; `indirect` otherwise). Two coverage rules apply to every report:
+
+- RSS returns posts only — no comments, no scores. State explicitly "comments were not read"
+  (`comments_read: false`) whenever you have not imported comments through an authenticated
+  or publicly-supported path; never describe RSS-only findings as community consensus or
+  production validation.
+- Cross-community recurrence counts independent communities and upstream links (via
+  `independence_key`), not raw post count.
+
 ## 10. Error handling
 
 | Symptom | Single mode | Preset mode |

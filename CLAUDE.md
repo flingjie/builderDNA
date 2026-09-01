@@ -101,11 +101,12 @@ Schema contract: schema.md and models/payload.py — Claude Code reads these.
 
 ## Skills (`.claude/skills/`)
 
-Fifteen skills are deployed (18 directories — 3 `*-workspace/` dirs are skill-creator eval artifacts, not skills):
+Sixteen skills are deployed (19 directories — 3 `*-workspace/` dirs are skill-creator eval artifacts, not skills):
 
 | Skill | Purpose | Trigger |
 |-------|---------|---------|
 | `builderdna` | Run the 7-command analysis pipeline, manage hypotheses | "analyze X's GitHub", "tech DNA", "find opportunities in Z" |
+| `concept-radar` | Cross-source concept lifecycle radar: turn weak signals into validated, falsifiable builds (Inbox → Watch → Verify → Build/Drop) | "validate an idea", "weak signals to validated builds", "hypothesis and evidence", "should I build or drop this", "track this concept", "雷达" |
 | `repo-trend` | Discover trending repos via GitHub API search, 3-tier eval | "find trending X repos", "evaluate this repo", "check my watches" |
 | `repo-awesome` | Mine awesome-* lists for curated repo discovery | "mine awesome lists for X", "what do awesome lists recommend" |
 | `reddit-opportunity` | Discover product opportunities + pain points from a Reddit community (no product yet): RSS → Subreddit Profile → recurring problems → product concept | "find problems people will pay to solve", "what should I build from r/...", "从 Reddit 找商机" |
@@ -120,6 +121,8 @@ Fifteen skills are deployed (18 directories — 3 `*-workspace/` dirs are skill-
 | `trace-classify` | Classify raw tool-call traces into step-level trace files + periodic review for optimization insights | "classify the last trace", "trace this session", "review this week's traces" |
 | `twitter-learning` | Daily Twitter/X learning on a topic (default: agent): discover, filter, score by Learning Score → Top 10 learnings (7-angle analysis) + knowledge asset | "做今天的 X 情报", "帮我研究 Y 的推特", "今天 X 上有什么值得学的", "有哪些值得学习的高质量推文" |
 | `twitter-discussion` | Daily Twitter/X discussion targeting on a topic (default: agent): discover, filter, score by Discussion Worthiness → Top 5 worth engaging + reply drafts (human posts each) | "帮我找值得回复的推文", "有哪些值得交流讨论的推文", "今天 X 上有什么值得互动的" |
+
+**Cross-source routing (Phase 0):** `concept-radar` owns cross-source synthesis and the `Inbox → Watch → Verify → Build/Drop` lifecycle. Single-source requests stay with their specialists — X-only learning/knowledge-base → `twitter-learning`, reply/engagement → `twitter-discussion`, Reddit-only pain discovery → `reddit-opportunity`, GitHub-only discovery → `repo-trend`. Selected `twitter-learning` findings may feed into `concept-radar`; never the reverse.
 
 Evals exist for builderdna (`.claude/skills/builderdna/evals/`) via the skill-creator workflow. Shared evaluation rubrics: `references/repo-scout/`. Most skills are pure Claude-orchestrated — they use `gh` CLI, not the Python codebase. The `builderdna` skill orchestrates the 7 Python CLI sandbox commands.
 

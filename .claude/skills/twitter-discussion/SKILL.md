@@ -23,6 +23,7 @@ description: >
 | 找值得交流的推文 + 设计回复草稿 | 自动代发（每条回复必须经用户确认）|
 | Top 15 值得交流（按 Discussion Worthiness 独立选）| 找值得学习的推文（那是 twitter-learning 的事）|
 | 沉淀已互动记录，避免重复打扰 | 把「热门」当「值得交流」|
+| 只管对外互动（outward engagement） | 拥有概念卡片 / 跨源验证（那是 concept-radar 的事）|
 
 核心原则：**不追求「回复得多」，追求「每一次互动都值得」——让对方有理由回你。**
 
@@ -73,6 +74,8 @@ description: >
 > 发现值得交流的对象 → 设计有质量的回复 → 参与高质量讨论 → 验证自己的判断。
 
 （想找值得学习、沉淀知识的推文，用 `twitter-learning`。）
+
+（本 skill 只做对外互动，从不拥有概念卡片或跨源验证——那些归 `concept-radar`。）
 
 ## Reference Files
 

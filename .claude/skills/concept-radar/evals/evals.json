@@ -1,0 +1,90 @@
+{
+  "skill_name": "concept-radar",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "我捕获了两条 X 推文，它们都是转发同一条上游文章（同一个 quoted-source URL）。帮我把它们记进同一个概念，然后告诉我这个概念到底有几条独立证据链。",
+      "expected_output": "Claude captures each repost via builderdna concept capture (or the manual-X adapter) so both evidence records derive the SAME independence_key from the shared upstream/quoted URL; scoring via builderdna concept score ID counts independent chains (via independence_key), not raw post count, and builderdna radar verify ID reports supporting_chains collapsed to 1 for the repost pair. The recurrence is not inflated by the duplicate propagation chain.",
+      "files": [],
+      "assertions": [
+        "reposts-share-independence-key",
+        "recurrence-not-inflated",
+        "score-counts-chains-not-posts",
+        "verify-reports-supporting-chains"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "我从 Reddit RSS 抓到一个帖子（只有标题和正文，没有评论），用户问：这个社区是不是都认同这个痛点？",
+      "expected_output": "Claude captures the Reddit post via builderdna concept capture --source reddit, keeps its directness INDIRECT (RSS returns no comments, no scores) and its note carrying the coverage gap; builderdna radar source-audit agent-reliability (or radar scan) classifies the reddit source as partial with note comments not read; not community consensus unless a [comments read] marker is present. Claude describes the finding as one post, never as community consensus or production validation.",
+      "files": [],
+      "assertions": [
+        "reddit-source-partial",
+        "comments-not-read-surfaced",
+        "not-community-consensus",
+        "coverage-gap-explicit"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "用户捕获了一个正在爆火/病毒式传播的概念，但只有一条弱证据记录，然后要求把它直接推进到 Build。",
+      "expected_output": "Claude runs builderdna concept score ID and reports a hype component > 0 (penalty), with total = 2P+2E+R+A-2H-C reduced by the hype term; builderdna concept move ID build ... (or builderdna radar verify ID) fails the build gate via evaluate_build_gate, listing missing requirements (e.g. two source types, two independent supporting chains). Hype does not satisfy any evidence gate; the card stays out of Build.",
+      "files": [],
+      "assertions": [
+        "hype-penalty-lowers-total",
+        "build-gate-failed",
+        "hype-does-not-pass-gate",
+        "gate-missing-listed"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "用户用一个新名字捕获一个概念，但其实这个名字是已有卡片 x 的一个 alias（旧想法换了新名字）。",
+      "expected_output": "Claude runs builderdna concept capture --title <new-name> --alias <old-title>, matches the existing card via the alias signal (normalize_name equality, ALIAS_SCORE 0.9), returns action merged rather than created, and preserves the new name in the surviving card's aliases. is_ambiguous returns False (single unambiguous alias match), so no confirmation is required.",
+      "files": [],
+      "assertions": [
+        "alias-match",
+        "action-merged-not-created",
+        "alias-preserved",
+        "not-ambiguous"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "用户捕获一个概念，它的名字和一个已有卡片几乎一样，但描述的是完全不同的用户/问题；同时另一个卡片也以相近的分数进入候选。",
+      "expected_output": "Claude runs builderdna concept capture; find_candidates returns candidates and is_ambiguous returns True (name-similar but problems differ, or two candidates tie). The command exits non-zero with a capture is ambiguous ... never auto-merged error and lists the candidate concepts; Claude asks the user to disambiguate with --into <ID> and does not merge on its own.",
+      "files": [],
+      "assertions": [
+        "is-ambiguous-true",
+        "capture-fails-never-auto-merges",
+        "candidates-listed",
+        "human-confirmation-required"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "用户要求扫一遍 agent-reliability 雷达，但 store 里没有任何 github 证据（github 源拿不到）。",
+      "expected_output": "Claude runs builderdna radar scan agent-reliability; the run still completes and writes a usable RadarRunPayload JSON with per-source status. The github source is recorded as unavailable (and any reddit-only evidence as partial) with explicit gap notes in the gaps list; no other source is silently substituted for the missing one. Caps are enforced unless --override is given.",
+      "files": [],
+      "assertions": [
+        "partial-run-usable",
+        "unavailable-source-explicit",
+        "no-silent-substitution",
+        "gaps-listed"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "用户依次提出这些请求：(a) 只在 X 上学习 agent 相关的高质量推文；(b) 找今天值得回复/讨论的推文；(c) 只从 Reddit 挖一个产品的痛点；(d) 只在 GitHub 上发现/评估一个 repo；(e) 跨 X/Reddit/GitHub 验证一个想法、跑它的生命周期。",
+      "expected_output": "Claude routes each single-source request to its specialist skill before doing any work: (a) X-only learning to twitter-learning, (b) reply/engagement to twitter-discussion, (c) Reddit-only pain discovery to reddit-opportunity, (d) GitHub-only discovery to repo-trend, and only (e) cross-source synthesis/lifecycle to concept-radar (this skill). Single-source requests do not enter the concept-radar lifecycle.",
+      "files": [],
+      "assertions": [
+        "route-x-learning-to-twitter-learning",
+        "route-engagement-to-twitter-discussion",
+        "route-reddit-only-to-reddit-opportunity",
+        "route-github-only-to-repo-trend",
+        "route-cross-source-to-concept-radar"
+      ]
+    }
+  ]
+}

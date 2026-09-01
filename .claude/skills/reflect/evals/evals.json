@@ -1,0 +1,44 @@
+{
+  "skill_name": "reflect",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "复盘一下这次概念雷达的判断：我之前把一个只有一条弱信号的 AI 记忆压缩概念推进到了 Verify，结果后续 review 里 prediction 被 rejected。这是不是说明我有什么判断偏差？",
+      "expected_output": "Claude runs the reflect protocol (loads state/user_dna.json, state/reflections.jsonl, and optionally state/concepts.jsonl, state/concept_evidence.jsonl, state/radar_reviews.jsonl, output/radar/*.json), reads the rejected prediction vs. recorded outcome, explains the error through one or more calibration dimensions (novelty bias, authority bias, hype sensitivity, source precision, recurring over/underestimation), proposes user_dna.json diffs linked to that explanation, and asks for confirmation before writing any diff",
+      "files": [],
+      "assertions": [
+        "reads-radar-state",
+        "cites-outcome-as-evidence",
+        "maps-calibration-dimension",
+        "proposes-dna-diff",
+        "requires-confirmation"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "复盘这段对话：用户想把概念卡片 x 的证据强度调高，理由是它来自一个权威作者，但 concept-radar 里该证据的 strength 是 weak。帮我反映这个模式。",
+      "expected_output": "Claude reflects on the authority-bias pattern, proposes a user_dna.json diff (a criterion or belief about not over-weighting authority), but does NOT modify state/concept_evidence.jsonl, state/concepts.jsonl, or state/radar_reviews.jsonl — no change to evidence strength, maturity, or source records. It reads radar state read-only, states that corrections belong to concept-radar, and routes any evidence/maturity change through concept-radar, not reflect",
+      "files": [],
+      "assertions": [
+        "explains-authority-bias",
+        "proposes-dna-diff-only",
+        "does-not-mutate-evidence-strength",
+        "does-not-mutate-maturity",
+        "does-not-mutate-source-records",
+        "routes-evidence-corrections-to-concept-radar"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "复盘一下这次对话，帮我看看我学到了什么。",
+      "expected_output": "Claude runs the full 3-lens reflect protocol with no radar state present (no state/concepts.jsonl etc.), treats radar decision outcomes as optional evidence and skips them silently, and still proposes evidence-linked user_dna.json diffs gated by confirmation",
+      "files": [],
+      "assertions": [
+        "radar-evidence-optional",
+        "full-protocol-without-radar",
+        "proposes-dna-diff",
+        "requires-confirmation"
+      ]
+    }
+  ]
+}

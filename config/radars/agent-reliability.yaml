@@ -1,0 +1,84 @@
+# Agent Reliability radar — cross-source concept lifecycle config.
+# Loaded by the concept-radar skill's scan / source-audit modes.
+version: 1
+
+name: agent-reliability
+description: >
+  Cross-source radar for the reliability of production AI agents: how they fail,
+  how people supervise and guardrail them, how they are evaluated, and how memory
+  and hallucination erode trust.
+
+# Exploration neighborhoods — the failure/solution areas the radar watches.
+# Keep to 3–5; each neighborhood is a lens over the same sources.
+neighborhoods:
+  - id: failure-modes
+    label: Failure modes
+    focus: >
+      How production agents fail in the wild: state loss, non-idempotent retries,
+      tool misuse, silent wrong answers, and unrecoverable loops.
+
+  - id: supervision
+    label: Supervision and human-in-the-loop
+    focus: >
+      Escalation, human approval, review queues, and where human judgment is
+      inserted into an agent run.
+
+  - id: guardrails
+    label: Guardrails and safety
+    focus: >
+      Bounds on tool use, policy enforcement, sandboxing, stopping conditions,
+      and cost controls.
+
+  - id: evaluation
+    label: Evaluation and testing
+    focus: >
+      How agent reliability is measured: task success, trajectory scoring,
+      regression suites, and failure injection.
+
+  - id: memory-hallucination
+    label: Memory and hallucination
+    focus: >
+      Context and memory corruption and factual drift in long-running agents.
+
+# Exclusions — signals the radar explicitly ignores.
+exclusions:
+  - pure model-quality benchmarks unrelated to agent behavior
+  - non-agent LLM chat applications
+  - AI safety policy and alignment theory
+  - agent monetization and go-to-market content
+
+# Caps — hard limits per run/period.
+daily_card_cap: 3      # max new concept cards per day
+weekly_build_cap: 1    # max concepts promoted to Build per week
+
+# Reddit communities — both sides of the reliability problem.
+# role "problem": people complaining about agents failing in production.
+# role "solution": agent builders and practitioners discussing fixes.
+reddit_communities:
+  - subreddit: ChatGPT
+    role: problem
+    segment: agent-users
+
+  - subreddit: OpenAI
+    role: problem
+    segment: agent-users
+
+  - subreddit: ClaudeAI
+    role: problem
+    segment: agent-users
+
+  - subreddit: AI_Agents
+    role: solution
+    segment: agent-builders
+
+  - subreddit: LangChain
+    role: solution
+    segment: agent-builders
+
+  - subreddit: LocalLLaMA
+    role: solution
+    segment: agent-builders
+
+  - subreddit: LLMDevs
+    role: solution
+    segment: agent-builders

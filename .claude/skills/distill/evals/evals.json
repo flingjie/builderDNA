@@ -1,0 +1,44 @@
+{
+  "skill_name": "distill",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "蒸馏我最近的复盘，特别是这个模式：我反复高估那些爆火/病毒式传播的概念，它们后来大多被证伪了。",
+      "expected_output": "Claude gathers unprocessed reflections, reads radar decision outcomes (state/concepts.jsonl, state/concept_evidence.jsonl, state/radar_reviews.jsonl, output/radar/*.json) as optional calibration evidence, identifies hype sensitivity / recurring overestimation as a Tension+Resolution pattern, and proposes a user_dna.json diff (criterion, belief, or cognitive_patterns) that explains the pattern, then asks for confirmation before applying",
+      "files": [],
+      "assertions": [
+        "reads-radar-state",
+        "maps-hype-sensitivity",
+        "maps-recurring-overestimation",
+        "proposes-dna-diff",
+        "requires-confirmation"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "蒸馏最近复盘，其中一条反思说：concept-radar 里某个 Reddit 证据被当成了社区共识，但其实 comments 没读。",
+      "expected_output": "Claude explains the source-precision error (RSS-only evidence described as consensus) in the distill narrative and proposes a user_dna.json diff (e.g. a criterion: never describe RSS-only Reddit findings as consensus), but does NOT modify state/concept_evidence.jsonl, state/concepts.jsonl, or state/radar_reviews.jsonl — evidence strength, maturity, and source records stay unchanged; the correction is routed back to concept-radar",
+      "files": [],
+      "assertions": [
+        "explains-source-precision-error",
+        "proposes-dna-diff-only",
+        "does-not-mutate-evidence-strength",
+        "does-not-mutate-maturity",
+        "does-not-mutate-source-records"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "蒸馏最近的复盘。",
+      "expected_output": "Claude runs the distill protocol (reads state/reflections.jsonl, state/digest_gaps.jsonl, state/user_dna.json) with no radar state present, treats radar decision outcomes as optional and skips them, and still produces a Tension+Resolution growth report with proposed user_dna.json diffs gated by confirmation",
+      "files": [],
+      "assertions": [
+        "radar-evidence-optional",
+        "full-distill-without-radar",
+        "tension-resolution-report",
+        "proposes-dna-diff",
+        "requires-confirmation"
+      ]
+    }
+  ]
+}

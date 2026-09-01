@@ -87,12 +87,15 @@ BuilderDNA/
 ├── output/                    # JSON + Markdown 结果
 ├── .claude/skills/            # Claude Code 的 skills
 │   ├── builderdna/            #   7 命令编排 + 假设树管理
+│   ├── concept-radar/         #   跨源概念雷达：弱信号 → 验证 → 构建/否决
 │   ├── repo-trend/            #   趋势 repo 发现 + 3 阶评估
 │   ├── repo-awesome/          #   Awesome List 挖掘 + 策展评分
 │   ├── reflect/               #   多轮对抗式复盘
 │   └── distill/               #   阶段性合成蒸馏
 └── tests/                     # 268 个测试
 ```
+
+新增 `concept-radar` skill：跨源合成 + `Inbox → Watch → Verify → Build/Drop` 概念生命周期。单源请求仍走专家 skill（`twitter-learning` / `twitter-discussion` / `reddit-opportunity` / `repo-trend`）。
 
 ## 配置
 

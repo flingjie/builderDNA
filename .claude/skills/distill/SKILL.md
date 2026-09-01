@@ -38,6 +38,7 @@ Invoke this skill when:
 5. **Read `state/user_dna.json`** — current self-model for comparison.
 6. **Read `state/digest_gaps.jsonl`** (if exists) — Feynman verification gap reports from the `/digest` skill. Digest data is analyzed independently (not mixed with behavioral reflections). All records are read — no filtering or marking. Digest is read-only here.
 7. **Read `references/reflection-protocol.md`** — for the distill report template.
+8. **Read radar decision outcomes (optional)** — `state/concepts.jsonl`, `state/concept_evidence.jsonl`, and `state/radar_reviews.jsonl` (plus any `output/radar/*.json` run payloads), if present. Read-only calibration evidence from the `concept-radar` skill — see "Calibration Evidence" below. If absent, skip; radar evidence is optional.
 
 If there are ZERO unprocessed reflections:
 
@@ -46,6 +47,28 @@ If there are ZERO unprocessed reflections:
 If the file doesn't exist or is empty:
 
 > "还没有复盘记录。先运行 `/reflect` 对几次对话进行复盘，积累一些数据后再运行 `/distill`。"
+
+## Calibration Evidence (radar decisions)
+
+Radar state (concept cards, evidence records, radar reviews, radar run payloads)
+may be cited as **optional** calibration evidence alongside reflections and digest
+gaps. The five calibration dimensions and their radar signals:
+
+| Dimension | Radar signal to read |
+|-----------|----------------------|
+| Novelty bias | Cards advanced on `why_now` energy with thin evidence; predictions later rejected |
+| Authority bias | Evidence weighted by author/popularity rather than `directness`/`strength` |
+| Hype sensitivity | `hype` penalty (0-3) and hype keyword groups in `why_now`/notes |
+| Source precision | Source coverage gaps (`partial`/`unavailable`) vs. conclusions drawn as if complete |
+| Recurring over/underestimation | Prediction vs. recorded outcome across reviews |
+
+**Hard constraint.** Radar artifacts are **read-only** during distillation. A
+distill report may *explain* a recurring judgment error — e.g. "hype sensitivity:
+repeatedly over-ranked viral claims" — and fold that explanation into a proposed
+`user_dna.json` diff (including `cognitive_patterns`), but it must **never alter
+evidence strength, maturity, or source records**. Those corrections belong to the
+`concept-radar` skill. Proposed user-DNA changes still flow through the existing
+confirmation rules in Step 6 unchanged.
 
 ### Step 1: Semantic Search (via claude-mem)
 

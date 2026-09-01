@@ -60,6 +60,8 @@ Determine age in days since `activated_at`:
 >
 > Record outcomes. Update `outcome` and `status` fields. This feedback loop is how insights become behavioral change.
 
+6. **Radar decision outcomes (optional)** — `Read state/concepts.jsonl`, `state/concept_evidence.jsonl`, and `state/radar_reviews.jsonl` if present (plus any `output/radar/*.json` run payloads). These are read-only calibration evidence from the `concept-radar` skill — see "Calibration Evidence" below. If absent, skip silently; radar evidence is optional, never required.
+
 After agents complete, mark all loaded records with `processed_at: "<ISO>"`.
 
 ### Step 0.5: Conversation Preprocessing (long conversations)
@@ -82,6 +84,28 @@ For long conversations, spawn a single lightweight preprocessing agent (or do it
 2. The full transcript (reference — available for evidence-checking when a finding needs direct quote verification)
 
 This reduces per-agent context by 50-70% while preserving signal density. If the preprocessing agent fails, fall back to full transcript with a note: "预处理未完成，使用完整对话。"
+
+## Calibration Evidence (radar decisions)
+
+When radar state is present (concept cards, evidence records, radar reviews, or
+radar run payloads), it may be cited as **optional** calibration evidence for
+judgment-accuracy patterns. Five calibration dimensions map to radar artifacts:
+
+| Dimension | Radar signal to read |
+|-----------|----------------------|
+| **Novelty bias** | Cards advanced on `why_now` energy with thin evidence; predictions later rejected |
+| **Authority bias** | Evidence weighted by author/popularity rather than `directness`/`strength` |
+| **Hype sensitivity** | `hype` penalty (0-3) and hype keyword groups in `why_now`/notes |
+| **Source precision** | Source coverage gaps (`partial`/`unavailable`) vs. conclusions drawn as if complete |
+| **Recurring over/underestimation** | Prediction vs. recorded outcome (`confirmed`/`partially_confirmed`/`rejected`/`inconclusive`) across reviews |
+
+**Hard constraint.** Radar artifacts are **read-only** in reflection. A reflection
+may *explain* a judgment error — e.g. "I over-weighted one viral author (authority
+bias)" — and fold that explanation into a proposed `user_dna.json` diff, but it
+must **never alter evidence strength, maturity, or source records**. Corrections to
+evidence, cards, or reviews belong to the `concept-radar` skill, not here. Proposed
+user-DNA changes still flow through the existing confirmation rules in Step 3
+unchanged.
 
 ### Step 1: Pass 1 — Parallel 3-Lens Extraction
 
