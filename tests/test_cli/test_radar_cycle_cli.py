@@ -347,6 +347,31 @@ def seed_build_eligible_card(tmp_path):
     ))
 
 
+def seed_verify_card_without_experiment(tmp_path):
+    """Seed a VERIFY-stage card whose evidence passes the decision gates but
+    which has no smallest_experiment yet (the real-world decide input)."""
+    store = ConceptStore(state_dir=tmp_path)
+    store.upsert_concept(
+        ConceptCard(
+            id="agent-timeout-guard",
+            title="Agent timeout guard",
+            stage=PortfolioStage.VERIFY,
+        )
+    )
+    store.add_evidence(ConceptEvidence(
+        id="e1", concept_id="agent-timeout-guard",
+        source_type=SourceType.GITHUB, source_url="https://github.com/x/y",
+        role=EvidenceRole.IMPLEMENTATION, directness=Directness.DIRECT,
+        strength=EvidenceStrength.STRONG, independence_key="chain-a",
+    ))
+    store.add_evidence(ConceptEvidence(
+        id="e2", concept_id="agent-timeout-guard",
+        source_type=SourceType.REDDIT, source_url="https://reddit.com/r/x/1",
+        role=EvidenceRole.PROBLEM, directness=Directness.DIRECT,
+        strength=EvidenceStrength.MODERATE, independence_key="chain-b",
+    ))
+
+
 class TestDecide:
     def test_decide_records_build_count_and_gates_experiment(
         self, app, runner, tmp_path, config_dirs
@@ -368,6 +393,45 @@ class TestDecide:
         run = checkpoint.load(run_id, store_dir=checkpoint_dir(tmp_path))
         assert run.checkpoint.counts[PhaseName.DECIDE] == 1
         assert run.checkpoint.status_of(PhaseName.DECIDE).value == "completed"
+
+    def test_decide_promotes_card_without_experiment(self, app, runner, tmp_path, config_dirs):
+        """decide uses decision gates (evidence), not the experiment gates, and
+        promotes a build-worthy VERIFY card to BUILD even when it has no
+        smallest_experiment yet (attaching a draft)."""
+        payload = start_run(app, runner, tmp_path, config_dirs, mode="weekly")
+        run_id = payload["data"]["run_id"]
+        for phase in ("validate", "x-discovery", "reddit-scan", "reduce", "verify"):
+            complete_phase(tmp_path, run_id, phase)
+
+        seed_verify_card_without_experiment(tmp_path)
+
+        result = invoke(app, runner, tmp_path, config_dirs, "decide", run_id, "--json")
+        assert result.exit_code == 0, result.output
+        data = load(result)["data"]
+        assert data["build_decisions"] == 1
+        assert data["decisions"][0]["promoted"] is True
+        # the card was promoted to BUILD with a smallest_experiment attached
+        card = ConceptStore(state_dir=tmp_path).get_concept("agent-timeout-guard")
+        assert card.stage == PortfolioStage.BUILD
+        assert card.smallest_experiment is not None
+        assert data["next_action"]["phase"] == "experiment"
+
+    def test_decide_fails_on_changed_fingerprint(self, app, runner, tmp_path, config_dirs):
+        payload = start_run(app, runner, tmp_path, config_dirs, mode="weekly")
+        run_id = payload["data"]["run_id"]
+        for phase in ("validate", "x-discovery", "reddit-scan", "reduce", "verify"):
+            complete_phase(tmp_path, run_id, phase)
+        seed_verify_card_without_experiment(tmp_path)
+
+        radar_dir, _ = config_dirs
+        changed = {**VALID_RADAR, "description": "changed after start"}
+        (Path(radar_dir) / "agent-reliability.yaml").write_text(
+            yaml.safe_dump(changed, sort_keys=False), encoding="utf-8"
+        )
+
+        result = invoke(app, runner, tmp_path, config_dirs, "decide", run_id, "--json")
+        assert result.exit_code != 0
+        assert "fingerprint" in load(result)["error"].lower()
 
 
 # ── finalize ──

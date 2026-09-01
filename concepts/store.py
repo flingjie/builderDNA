@@ -170,6 +170,20 @@ def _atomic_write(path: Path, records: list) -> None:
         raise
 
 
+def _append_line(path: Path, record: T) -> None:
+    """Append one JSONL line without rewriting the file (O(1) per append).
+
+    Evidence/review files are append-only, so a full-file rewrite is unnecessary
+    work (O(n^2) across a batch). The caller holds the store lock and verifies the
+    tail afterward; a crash mid-line is handled by the corruption guard on read.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as fh:
+        fh.write(record.model_dump_json() + "\n")
+        fh.flush()
+        os.fsync(fh.fileno())
+
+
 # Write-only timestamp fields that do not change a record's logical identity.
 # A replayed record whose only difference is *when* it was captured/recorded is
 # the same logical record, so these are dropped before idempotency comparison.
@@ -316,7 +330,7 @@ class ConceptStore:
                 f"{kind} ID {record.id!r} already exists with a different payload; "
                 f"{hint}"
             )
-        _atomic_write(path, result.records + [record])
+        _append_line(path, record)
         _verify_tail_parses(path, model_cls)
         return record
 
@@ -346,6 +360,23 @@ class ConceptStore:
             if evidence.id == evidence_id:
                 return evidence
         return None
+
+    def evidence_conflicts(self, records: list[ConceptEvidence]) -> list[str]:
+        """Pre-check ``records`` for same-ID/different-payload conflicts (no writes).
+
+        Returns one message per record whose ID already exists with a different
+        payload. The handoff importer uses this to reject a whole handoff atomically
+        before writing any record.
+        """
+        existing = {e.id: e for e in self.list_evidence()}
+        conflicts = []
+        for record in records:
+            prev = existing.get(record.id)
+            if prev is not None and _record_view(prev) != _record_view(record):
+                conflicts.append(
+                    f"evidence ID {record.id!r} already exists with a different payload"
+                )
+        return conflicts
 
     # ── reviews (append-only) ──
 

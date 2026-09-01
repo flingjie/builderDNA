@@ -370,6 +370,10 @@ def score_cmd(
     _finalize("concept.score", output_format, run)
 
 
+def _outcome_run(store, concept_id, outcome, lesson) -> dict:
+    return record_outcome(store, concept_id, outcome, lesson)
+
+
 def outcome_cmd(
     concept_id: str = typer.Argument(..., help="Concept ID"),
     outcome: str = typer.Option(..., "--outcome", "-o", help="Outcome: confirmed, partially_confirmed, rejected, inconclusive"),
@@ -379,15 +383,29 @@ def outcome_cmd(
 ) -> None:
     """Record a Build outcome + lesson without rewriting the original prediction."""
     store = ConceptStore(state_dir=state_dir)
+    _finalize(
+        "concept.outcome", output_format,
+        lambda: _outcome_run(store, concept_id, outcome, lesson),
+    )
 
-    def run() -> dict:
-        return record_outcome(store, concept_id, outcome, lesson)
 
-    _finalize("concept.outcome", output_format, run)
+def review_cmd(
+    concept_id: str = typer.Argument(..., help="Concept ID"),
+    outcome: str = typer.Option(..., "--outcome", "-o", help="Outcome: confirmed, partially_confirmed, rejected, inconclusive"),
+    lesson: str = typer.Option(..., "--lesson", "-l", help="Lesson learned from the outcome"),
+    state_dir: str = typer.Option("state", "--state-dir", help="Concept store directory"),
+    output_format: str = typer.Option("json", "--format", "-f", help="Output format: json or md"),
+) -> None:
+    """Deprecated alias for ``outcome``; reports the ``concept.review`` command name."""
+    store = ConceptStore(state_dir=state_dir)
+    _finalize(
+        "concept.review", output_format,
+        lambda: _outcome_run(store, concept_id, outcome, lesson),
+    )
 
 
 concept.command("outcome")(outcome_cmd)
-concept.command("review", deprecated=True)(outcome_cmd)
+concept.command("review", deprecated=True)(review_cmd)
 
 
 # ── Markdown rendering ──

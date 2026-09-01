@@ -38,13 +38,15 @@ from uuid import uuid4
 import typer
 
 from concepts.handoffs import SourceHandoffEnvelope, import_handoff
-from concepts.scoring import score as score_concept
+from concepts.scoring import EXPERIMENT_GATES, score as score_concept
 from concepts.store import ConceptStore, ConceptStoreError, ConflictError
 from models.concept import (
+    ConceptCard,
     ConceptEvidence,
     EvidenceRole,
     EvidenceStrength,
     PortfolioStage,
+    SmallestExperiment,
 )
 from models.radar_payload import SourceStatus
 from observability import RunTelemetry
@@ -141,6 +143,40 @@ def _load_run(run_id: str, state_dir: str) -> RadarCycleRun:
         return checkpoint.load(run_id, store_dir=_run_store_dir(state_dir))
     except FileNotFoundError:
         raise RadarCycleValidationError(f"no checkpoint for run {run_id!r}")
+
+
+def _check_fingerprint(run_obj: RadarCycleRun, config: RadarConfig) -> None:
+    """Fail closed if the config fingerprint drifted from the one at ``start``.
+
+    Every state-advancing command checks this (not just ``resume``) so an edited
+    config can never silently alter an in-progress run.
+    """
+    if config.fingerprint != run_obj.checkpoint.config_fingerprint:
+        raise RadarCycleValidationError(
+            "config fingerprint changed since start; refusing to advance state "
+            f"(stored {run_obj.checkpoint.config_fingerprint[:12]}..., "
+            f"current {config.fingerprint[:12]}...) to avoid silently continuing "
+            "under different configuration"
+        )
+
+
+def _draft_experiment(card: ConceptCard) -> SmallestExperiment:
+    """Derive a minimal DRAFT smallest experiment for a build-worthy card.
+
+    A genuinely falsifiable threshold is a semantic judgment the orchestrating
+    skill must supply; these placeholders are marked ``[draft]`` so the fde-gym
+    export (which fails closed on non-falsifiable fields) surfaces the need to
+    refine them before running.
+    """
+    problem = (card.problem or card.title or "the problem").strip()
+    return SmallestExperiment(
+        hypothesis=f"{card.title}: {problem}",
+        target="[draft] the target user/system (refine)",
+        artifact=f"[draft] a minimal prototype for {card.title}",
+        success_threshold="[draft] observable success metric (refine)",
+        failure_threshold="[draft] observable failure metric, distinct from success (refine)",
+        stop_condition="[draft] bounded time/cost budget (refine)",
+    )
 
 
 def _status_snapshot(run: RadarCycleRun) -> dict:
@@ -351,6 +387,7 @@ def complete_cmd(
     def run() -> dict:
         run_obj = _load_run(run_id, state_dir)
         config = _load_config(run_obj.radar, config_dir, reddit_dir)
+        _check_fingerprint(run_obj, config)
 
         try:
             phase_enum = PhaseName(phase)
@@ -453,6 +490,7 @@ def import_cmd(
     def run() -> dict:
         run_obj = _load_run(run_id, state_dir)
         config = _load_config(run_obj.radar, config_dir, reddit_dir)
+        _check_fingerprint(run_obj, config)
 
         try:
             phase_enum = PhaseName(phase)
@@ -524,6 +562,12 @@ def import_cmd(
         store = ConceptStore(state_dir=state_dir)
         result = import_handoff(store, envelope)
 
+        if result.conflicts:
+            raise ConflictError(
+                f"handoff import had {len(result.conflicts)} conflict(s); refusing "
+                f"to complete phase {phase_enum.value!r}: " + "; ".join(result.conflicts[:5])
+            )
+
         # Complete the phase, then record counts + output + coverage.
         _complete_phase(run_id, phase_enum, state_dir)
         store_dir = _run_store_dir(state_dir)
@@ -578,6 +622,7 @@ def decide_cmd(
     def run() -> dict:
         run_obj = _load_run(run_id, state_dir)
         config = _load_config(run_obj.radar, config_dir, reddit_dir)
+        _check_fingerprint(run_obj, config)
         store = ConceptStore(state_dir=state_dir)
 
         status = run_obj.checkpoint.status_of(PhaseName.DECIDE)
@@ -609,6 +654,7 @@ def decide_cmd(
         cap = config.weekly_build_cap
         builds_used = 0
         decisions: list[dict] = []
+        experiment_failed = set(EXPERIMENT_GATES)
         for card in reviewed:
             evidence = store.list_evidence(card.id)
             result = score_concept(
@@ -617,18 +663,44 @@ def decide_cmd(
                 weekly_builds_used=builds_used,
                 weekly_builds_cap=cap,
             )
-            passed = not result.failed_gates
-            decisions.append(
-                {
-                    "concept_id": card.id,
-                    "total": result.total,
-                    "passed": passed,
-                    "passed_gates": result.passed_gates,
-                    "failed_gates": result.failed_gates,
-                }
-            )
-            if passed:
+            # Decide on the evidence gates alone: a VERIFY card has no
+            # smallest experiment yet, so the experiment gates are evaluated at
+            # promotion time, not here.
+            decision_failed = [g for g in result.failed_gates if g not in experiment_failed]
+            passed = not decision_failed
+            if passed and builds_used < cap:
+                # Promote to BUILD, attaching a (possibly draft) experiment so the
+                # decision is persisted on the card and the experiment phase can
+                # export/refine it.
+                experiment = card.smallest_experiment or _draft_experiment(card)
+                store.upsert_concept(
+                    card.model_copy(
+                        update={
+                            "stage": PortfolioStage.BUILD,
+                            "smallest_experiment": experiment,
+                        }
+                    )
+                )
                 builds_used += 1
+                decisions.append(
+                    {
+                        "concept_id": card.id,
+                        "total": result.total,
+                        "passed": True,
+                        "promoted": True,
+                        "deferred_experiment": True,
+                    }
+                )
+            else:
+                decisions.append(
+                    {
+                        "concept_id": card.id,
+                        "total": result.total,
+                        "passed": False,
+                        "promoted": False,
+                        "failed_gates": decision_failed,
+                    }
+                )
 
         store_dir = _run_store_dir(state_dir)
         run2 = checkpoint.load(run_id, store_dir=store_dir)
@@ -677,14 +749,7 @@ def resume_cmd(
         run_obj = _load_run(run_id, state_dir)
         config = _load_config(run_obj.radar, config_dir, reddit_dir)
 
-        stored_fp = run_obj.checkpoint.config_fingerprint
-        current_fp = config.fingerprint
-        if current_fp != stored_fp:
-            raise RadarCycleValidationError(
-                "config fingerprint changed since start; refusing to resume "
-                f"(stored {stored_fp[:12]}..., current {current_fp[:12]}...) "
-                "to avoid silently continuing under different configuration"
-            )
+        _check_fingerprint(run_obj, config)
 
         action = next_action(run_obj, config)
         _notice(f"radar-cycle resume: run {run_id} ({run_obj.mode.value})")
@@ -696,7 +761,7 @@ def resume_cmd(
                 "run_id": run_id,
                 "radar": run_obj.radar,
                 "mode": run_obj.mode.value,
-                "config_fingerprint": current_fp,
+                "config_fingerprint": config.fingerprint,
                 "phase_status": _status_snapshot(run_obj),
                 "next_action": _action_payload(action),
             },
@@ -843,6 +908,7 @@ def finalize_cmd(
     def run() -> dict:
         run_obj = _load_run(run_id, state_dir)
         config = _load_config(run_obj.radar, config_dir, reddit_dir)
+        _check_fingerprint(run_obj, config)
 
         refusal = _finalize_gate(run_obj, config)
         if refusal:

@@ -63,6 +63,8 @@ MINIMAL_RADAR = {
     "description": "test radar",
     "neighborhoods": [
         {"id": "failure-modes", "label": "Failure modes", "focus": "how agents fail"},
+        {"id": "supervision", "label": "Supervision", "focus": "human oversight"},
+        {"id": "guardrails", "label": "Guardrails", "focus": "safety constraints"},
     ],
     "exclusions": ["pure benchmarks"],
     "daily_card_cap": 3,
@@ -143,7 +145,7 @@ class TestRadarConfigLoading:
         assert cfg.version == 1
         assert cfg.daily_card_cap == 3
         assert cfg.weekly_build_cap == 1
-        assert len(cfg.neighborhoods) == 1
+        assert len(cfg.neighborhoods) == 3
         assert {c.role for c in cfg.reddit_communities} == {"problem", "solution"}
 
     def test_missing_file_raises(self, tmp_path):
@@ -167,9 +169,8 @@ class TestRadarConfigLoading:
         (radar_dir / "agent-reliability.yaml").write_text(
             yaml.safe_dump(cfg), encoding="utf-8"
         )
-        from pydantic import ValidationError
 
-        with pytest.raises(ValidationError):
+        with pytest.raises(RadarConfigError):
             load_radar_config("agent-reliability", radar_dir)
 
 

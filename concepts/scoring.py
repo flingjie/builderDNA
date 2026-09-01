@@ -428,6 +428,21 @@ GATE_DESCRIPTIONS = {
 # generator in a later phase and is not the input to this scoring gate.
 _EXPERIMENT_BUDGET_FIELDS = ("success_threshold", "failure_threshold", "stop_condition")
 
+# Gate partition: the *decision* gates are what ``decide``/``review`` evaluate to
+# decide Build-vs-Drop from evidence alone. The *experiment* gates require a
+# smallest experiment, which a VERIFY-stage card does not yet carry — they are
+# evaluated at promotion time (the experiment phase), not at decision time.
+DECISION_GATES = (
+    GATE_TWO_SOURCE_TYPES,
+    GATE_TWO_INDEPENDENT_CHAINS,
+    GATE_COUNTEREVIDENCE_REVIEWED,
+    GATE_WEEKLY_BUILDS_AVAILABLE,
+)
+EXPERIMENT_GATES = (
+    GATE_SMALLEST_EXPERIMENT_PRESENT,
+    GATE_EXPERIMENT_THRESHOLDS_AND_BUDGET,
+)
+
 
 @dataclass(frozen=True)
 class ScoreResult:

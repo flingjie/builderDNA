@@ -396,14 +396,28 @@ def import_handoff(
     """
     records = normalize_handoff(envelope)
 
+    # Atomicity: pre-check every record for a same-ID/different-payload conflict
+    # against the store BEFORE writing anything, so a conflicted handoff imports
+    # nothing (no partial write), per the plan's "import all valid records
+    # atomically per handoff".
+    conflicts = store.evidence_conflicts(records)
+    if conflicts:
+        return ImportResult(
+            imported=0,
+            skipped_idempotent=0,
+            conflicts=conflicts,
+            concept_ids_affected=sorted({r.concept_id for r in records}),
+        )
+
     imported = 0
     skipped = 0
-    conflicts: list[str] = []
 
     for record in records:
         try:
             stored = store.add_evidence(record)
         except ConflictError as exc:
+            # Intra-handoff duplicate ID (rare); the pre-check already covered
+            # conflicts against pre-existing store data.
             conflicts.append(str(exc))
             continue
         # ``add_evidence`` returns the input record on a fresh append and the

@@ -58,7 +58,7 @@ from concepts.scoring import (
     GATE_TWO_INDEPENDENT_CHAINS,
     GATE_TWO_SOURCE_TYPES,
     GATE_WEEKLY_BUILDS_AVAILABLE,
-    evaluate_build_gate,
+    EXPERIMENT_GATES,
     score,
 )
 from concepts.store import ConceptStore
@@ -68,6 +68,13 @@ from experiments.fde_gym import (
     export_fde_gym_scenario,
 )
 from experiments.generator import ExperimentGenerationError, generate_experiment
+from radar_cycles.config import (
+    Neighborhood,
+    RadarConfig,
+    RadarConfigError as RadarCyclesConfigError,
+    RedditCommunity,
+    load_radar_config as load_radar_config_cycles,
+)
 from models.concept import (
     ConceptEvidence,
     EvidenceRole,
@@ -82,35 +89,10 @@ from models.radar_payload import (
 from observability import OutputLevel, vprint
 
 
-# ── Radar config models (inline; the radar config lives in config/radars/) ──
-
-class Neighborhood(BaseModel):
-    """One exploration neighborhood / lens over the radar's sources."""
-
-    id: str
-    label: str
-    focus: str = ""
-
-
-class RedditCommunity(BaseModel):
-    """A Reddit community watched by the radar (problem or solution side)."""
-
-    subreddit: str
-    role: str = "problem"  # "problem" | "solution"
-    segment: str = ""
-
-
-class RadarConfig(BaseModel):
-    """Versioned radar configuration loaded from config/radars/<name>.yaml."""
-
-    version: int
-    name: str
-    description: str = ""
-    neighborhoods: list[Neighborhood] = []
-    exclusions: list[str] = []
-    daily_card_cap: int = 3
-    weekly_build_cap: int = 1
-    reddit_communities: list[RedditCommunity] = []
+# ── Radar config models ──
+#
+# Imported from ``radar_cycles.config`` (the single source of truth) so the
+# ``radar`` and ``radar-cycle`` commands validate the same YAML identically.
 
 
 # ── Verify payload (no canonical model exists for the build-gate report) ──
@@ -216,26 +198,14 @@ def _verify_requirements(
 def load_radar_config(name: str, config_dir: str | Path = "config/radars") -> RadarConfig:
     """Load and validate a versioned radar config from ``<config_dir>/<name>.yaml``.
 
-    Follows the ``config.load_config`` convention (YAML -> Pydantic validation).
-    Raises :class:`RadarConfigError` for a missing file, unparsable YAML, or a
-    ``name`` field that does not match the requested radar; raises Pydantic
-    ``ValidationError`` for a structurally invalid config.
+    Delegates to :func:`radar_cycles.config.load_radar_config` (the single source
+    of truth) so ``radar`` and ``radar-cycle`` validate identically. Raises the
+    local :class:`RadarConfigError` for a missing/unparsable/mismatched config.
     """
-    path = Path(config_dir) / f"{name}.yaml"
-    if not path.exists():
-        raise RadarConfigError(f"radar config not found: {path}")
     try:
-        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except yaml.YAMLError as exc:
-        raise RadarConfigError(f"invalid YAML in {path}: {exc}") from exc
-    if not isinstance(raw, dict):
-        raise RadarConfigError(f"radar config {path} must be a YAML mapping")
-    cfg = RadarConfig.model_validate(raw)
-    if cfg.name != name:
-        raise RadarConfigError(
-            f"radar config name {cfg.name!r} does not match requested radar {name!r}"
-        )
-    return cfg
+        return load_radar_config_cycles(name, config_dir)
+    except RadarCyclesConfigError as exc:
+        raise RadarConfigError(str(exc))
 
 
 def _load_radar_or_exit(name: str, config_dir: str) -> RadarConfig:
@@ -825,12 +795,15 @@ def review(
     for record in evidence:
         by_concept[record.concept_id].append(record)
 
-    eligible = [
-        card
-        for card in concepts
-        if card.stage == PortfolioStage.VERIFY
-        and evaluate_build_gate(card, by_concept.get(card.id, [])).passed
-    ]
+    experiment_failed = set(EXPERIMENT_GATES)
+    eligible = []
+    for card in concepts:
+        if card.stage != PortfolioStage.VERIFY:
+            continue
+        result = score(card, by_concept.get(card.id, []))
+        decision_failed = [g for g in result.failed_gates if g not in experiment_failed]
+        if not decision_failed:
+            eligible.append(card)
     eligible.sort(key=lambda c: c.id)
 
     gaps: list[str] = []
