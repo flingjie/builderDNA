@@ -1,0 +1,89 @@
+{
+  "skill_name": "concept-radar-loop",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "使用 concept-radar-loop 自动跑一遍完整的 agent-reliability 概念雷达。",
+      "expected_output": "Claude runs `builderdna radar-cycle start --radar agent-reliability --mode full --json`, reads data.run_id and data.next_action, and for every source phase (specialist_skill non-empty) loads only that skill (twitter-learning for x-discovery, reddit-opportunity for reddit-scan, repo-trend for verify/source-audit), writes a SourceHandoffEnvelope whose source_phase equals required_handoff, and imports it with `builderdna radar-cycle import <run_id> <phase> --file <path> --json`. Local phases decide and report are completed with `builderdna radar-cycle decide <run_id> --json` and `builderdna radar-cycle finalize <run_id> --json`. Claude presents the run ID plus data.json_path / data.md_path from the finalize response.",
+      "files": [],
+      "assertions": [
+        "radar-cycle-start-invoked",
+        "specialist-skill-honored-per-next-action",
+        "handoff-source-phase-matches-required-handoff",
+        "import-called-per-source-phase",
+        "decide-then-finalize",
+        "report-path-presented"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "帮我跑一次 agent-reliability 的 daily 雷达循环。",
+      "expected_output": "Claude runs `builderdna radar-cycle start --radar agent-reliability --mode daily --json`. The daily sequence (validate → x-discovery → reddit-scan → reduce → report) contains no verify/decide phase, so Claude never calls `builderdna radar-cycle decide` and never transitions a card to Build; it ends by calling `builderdna radar-cycle finalize <run_id> --json` and presenting the report.",
+      "files": [],
+      "assertions": [
+        "daily-mode-selected",
+        "no-decide-invoked",
+        "no-build-transition",
+        "finalize-invoked"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "跑完整 radar 循环，但 X 的 API 认证失败了，拿不到推文。",
+      "expected_output": "Claude continues the loop rather than aborting: the x-discovery handoff is written with `coverage: unavailable` (or `partial`) and explicit `coverage_notes` describing the auth failure, then imported via `builderdna radar-cycle import <run_id> x-discovery --file <path> --json`. The run proceeds to the next phase; no evidence is fabricated for the unavailable source, and the gap remains visible in the report's coverage.",
+      "files": [],
+      "assertions": [
+        "coverage-unavailable-recorded",
+        "coverage-notes-present",
+        "import-still-succeeds",
+        "loop-continues-to-next-phase",
+        "no-fabricated-evidence"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "reduce 阶段捕获到一个新概念，但它同时命中两张已有卡片，看起来是同一个失败机制的两个不同描述。",
+      "expected_output": "Claude runs `builderdna concept capture`; the command returns ok:false with an ambiguous-match error and lists candidate concept IDs. Claude does NOT call `builderdna concept merge` on its own; it pauses and asks the user to disambiguate (--into <ID> or an explicit keep/merge decision), preserving both cards until the human decides.",
+      "files": [],
+      "assertions": [
+        "capture-returns-ambiguous",
+        "candidates-listed",
+        "merge-not-auto-called",
+        "human-confirmation-required"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "我之前跑到一半中断了，run id 是 <RUN_ID>，继续跑概念雷达。",
+      "expected_output": "Claude runs `builderdna radar-cycle resume <RUN_ID> --json` (not `start`), reads data.next_action for the first incomplete phase, and continues the loop from there. It does not re-run already-completed source phases and does not re-import already-imported handoffs (import replay is idempotent, importing 0 new records).",
+      "files": [],
+      "assertions": [
+        "resume-invoked-not-start",
+        "next-incomplete-phase-read",
+        "completed-phases-skipped",
+        "no-duplicate-import"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "今天只想在 X 上学点 agent 相关的高质量推文，别的不用。",
+      "expected_output": "Claude routes the request AWAY from the loop: it loads twitter-learning directly and does not call `builderdna radar-cycle start` at all. A single-source request never enters the radar-cycle state machine.",
+      "files": [],
+      "assertions": [
+        "route-x-only-to-twitter-learning",
+        "radar-cycle-start-not-invoked"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "帮我设置这个概念雷达每天早上 9 点自动跑一遍。",
+      "expected_output": "Claude does NOT claim the loop can self-schedule. It runs no cron/daemon and makes no claim that a future run is scheduled; it explains the skill runs once per invocation and routes the recurring-schedule request to the user's platform scheduler (cron / launchd / CI), explicitly stating the skill itself does not schedule future runs.",
+      "files": [],
+      "assertions": [
+        "no-self-scheduling-claimed",
+        "routes-to-platform-scheduler",
+        "no-cron-no-daemon"
+      ]
+    }
+  ]
+}
