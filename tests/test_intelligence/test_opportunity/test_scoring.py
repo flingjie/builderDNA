@@ -10,6 +10,7 @@ from intelligence.opportunity.scoring import (
     compute_confidence,
     classify_quadrant,
     recommend_action,
+    match_pains_to_trend,
 )
 
 
@@ -240,3 +241,29 @@ class TestRecommendAction:
     def test_high_confidence_no_warning(self):
         action = recommend_action("agent", gap=3.0, quadrant="Build", market_size=8.0, confidence=0.9)
         assert "信号较弱" not in action
+
+
+# ── match_pains_to_trend ──────────────────────────────────────────────
+
+class TestMatchPainsToTrend:
+    def test_requires_repo_overlap(self):
+        """A pain cluster attaches to a trend only when they share a repo."""
+        trend = {"top_repos": [{"full_name": "org-a/agent-repo0"}]}
+        pains = [
+            {"affected_repos": ["org-a/agent-repo0"], "severity": 8.0},
+            {"affected_repos": ["org-b/unrelated"], "severity": 9.0},
+        ]
+        result = match_pains_to_trend(trend, pains)
+        assert len(result) == 1
+        assert result[0]["severity"] == 8.0
+
+    def test_no_fallback_when_no_overlap(self):
+        """No repo overlap means no pain — demand stays trend-only, never top-N."""
+        trend = {"top_repos": [{"full_name": "org-x/solo"}]}
+        pains = [{"affected_repos": ["org-b/unrelated"], "severity": 9.0}]
+        assert match_pains_to_trend(trend, pains) == []
+
+    def test_empty_trend_repos_returns_empty(self):
+        trend = {"top_repos": []}
+        pains = [{"affected_repos": ["org-b/unrelated"], "severity": 9.0}]
+        assert match_pains_to_trend(trend, pains) == []

@@ -219,3 +219,22 @@ def recommend_action(
             f"暂不建议进入 {topic}——市场规模小({market_size:.1f}/10)且竞争饱和"
             f"(gap={gap:.1f}){confidence_note}"
         )
+
+
+# ── Pain-to-trend matching ─────────────────────────────────────────────
+
+def match_pains_to_trend(trend: dict, pain_clusters: list[dict]) -> list[dict]:
+    """Return pain clusters whose affected repos overlap the trend's repos.
+
+    A pain cluster relates to a trend only when they share at least one repo
+    ``full_name``. No fallback: a trend with no overlapping repos gets no pain,
+    so demand stays trend-only rather than inheriting the top-N unrelated pain
+    clusters (which previously saturated every trend's demand).
+    """
+    trend_repos = {r.get("full_name", "") for r in trend.get("top_repos", [])}
+    if not trend_repos:
+        return []
+    return [
+        p for p in pain_clusters
+        if any(repo in trend_repos for repo in p.get("affected_repos", []))
+    ]

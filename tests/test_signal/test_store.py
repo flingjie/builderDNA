@@ -53,6 +53,29 @@ class TestSignalStore:
         trends = store.get_topic_trends(days=30)
         assert len(trends) >= 1
 
+    def test_get_topic_trends_filters_to_allowed_topics(self, tmp_path):
+        """Trend aggregation must only count topics in the allowed set.
+
+        Repos carry incidental topic tags (codewords, unrelated tags). When a
+        domain's configured topics are passed, those extras must be dropped so
+        they can't surface as fake trends.
+        """
+        store = SignalStore(str(tmp_path / "filter.db"))
+        signals = [
+            Signal(
+                id=f"sig-{i}", source="github", type="repo_created",
+                actor="dev", target_repo=f"org/repo{i}",
+                timestamp=datetime.now(timezone.utc), velocity=5.0,
+                payload={"topics": ["agent-framework", "cordis"]},
+            )
+            for i in range(5)
+        ]
+        store.insert(signals)
+        trends = store.get_topic_trends(days=30, topics={"agent-framework"})
+        topics = {t.topic for t in trends}
+        assert "agent-framework" in topics
+        assert "cordis" not in topics
+
     def test_empty_store(self, tmp_path):
         store = SignalStore(str(tmp_path / "empty.db"))
         assert store.count() == 0

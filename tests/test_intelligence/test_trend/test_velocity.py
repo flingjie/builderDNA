@@ -14,18 +14,13 @@ from intelligence.trend.velocity import (
 
 
 class TestComputeVelocity:
-    def test_zero_days_returns_stars(self):
-        """When days_since_creation is <= 0, return the raw star count."""
-        assert compute_velocity(100, 0) == 100.0
-        assert compute_velocity(100, -5) == 100.0
-
     def test_normal_velocity(self):
         """100 stars over 50 days = 2.0 stars/day."""
         assert compute_velocity(100, 50) == 2.0
 
     def test_fractional_velocity(self):
-        """1 star over 3 days = 0.33 stars/day."""
-        assert compute_velocity(1, 3) == 0.33
+        """1 star over 45 days = 0.02 stars/day."""
+        assert compute_velocity(1, 45) == 0.02
 
     def test_large_values(self):
         """10_000 stars over 365 days ≈ 27.4 stars/day."""
@@ -34,6 +29,22 @@ class TestComputeVelocity:
     def test_zero_stars(self):
         """0 stars always returns 0.0."""
         assert compute_velocity(0, 30) == 0.0
+
+    def test_young_repo_velocity_is_age_floored(self):
+        """A young viral repo must not read its raw star count as velocity.
+
+        ``stars / days_since_creation`` treats a launch spike as a sustainable
+        velocity (207k stars in 3 days → 69k/day). Young repos are floored to a
+        minimum age so a single star-burst repo can't dominate a topic's trend.
+        """
+        assert compute_velocity(207000, 3) == 6900.0
+        assert compute_velocity(100, 0) == 3.33
+        assert compute_velocity(100, -5) == 3.33
+
+    def test_old_repo_velocity_unchanged(self):
+        """Repos older than the floor keep their normal stars/day velocity."""
+        assert compute_velocity(100, 50) == 2.0
+        assert compute_velocity(10000, 365) == 27.4
 
 
 # ── compute_acceleration ──────────────────────────────────────────────────

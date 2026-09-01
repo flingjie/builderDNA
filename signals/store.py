@@ -161,8 +161,12 @@ class SignalStore:
         ).fetchall()
         return [{"target_repo": r["target_repo"], "avg_velocity": round(r["avg_v"], 2), "count": r["cnt"]} for r in rows]
 
-    def get_topic_trends(self, days: int = 30) -> list[TopicTrend]:
+    def get_topic_trends(self, days: int = 30, topics: set[str] | None = None) -> list[TopicTrend]:
         """Compute topic-level trend aggregations from the signal table.
+
+        When ``topics`` is provided, only those topic tags are aggregated —
+        incidental tags on a repo (codewords, unrelated labels) are dropped so
+        they can't surface as fake trends.
 
         Returns canonical TopicTrend objects (acceleration and top_repos
         are left at defaults — callers enrich them as needed).
@@ -178,6 +182,8 @@ class SignalStore:
             payload = json.loads(row["payload_json"])
             velocity = row["velocity"]
             for topic in payload.get("topics", []):
+                if topics is not None and topic not in topics:
+                    continue
                 topic_velocities.setdefault(topic, []).append(velocity)
 
         results = []

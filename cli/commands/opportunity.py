@@ -25,7 +25,7 @@ from models.user_dna_schema import load_user_dna
 from intelligence.opportunity.scoring import (
     compute_demand, compute_competition, compute_gap,
     compute_market_size, compute_confidence, classify_quadrant,
-    recommend_action,
+    recommend_action, match_pains_to_trend,
 )
 from intelligence.opportunity.alignment import compute_alignment
 from observability import RunTelemetry, OutputLevel, vprint, record_command, record_output_retention
@@ -53,10 +53,7 @@ def _generate_cards(
     for trend in top_trends:
         topic = trend.get("topic", "unknown")
 
-        related_pains = [
-            p for p in top_pains
-            if any(topic.lower() in r.lower() for r in p.get("affected_repos", []))
-        ] or top_pains[:2]
+        related_pains = match_pains_to_trend(trend, top_pains)
 
         # ── Core scoring ──────────────────────────────────────────
         demand = compute_demand([trend], related_pains, weights=weights)

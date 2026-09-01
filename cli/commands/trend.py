@@ -7,6 +7,7 @@ import typer
 
 from signals.store import SignalStore
 from signals.models import Signal
+from config import load_config
 from intelligence.trend.velocity import compute_acceleration, _resolve_stage
 from models.payload import (
     SandboxResult, TrendPayload, TopicTrend, RepoSummary,
@@ -58,10 +59,15 @@ def trend(
             )
             repo_signals.append(s)
 
+    # Restrict aggregation to this domain's configured topics so incidental
+    # repo tags (codewords, unrelated labels) can't surface as fake trends.
+    cfg = load_config("config.yaml")
+    allowed_topics = set(cfg.domains.get(domain, {}).get("topics", [])) or None
+
     # Insert into store and query aggregated trends
     with SignalStore() as store:
         store.insert(repo_signals)
-        trend_rows = store.get_topic_trends(days=window)
+        trend_rows = store.get_topic_trends(days=window, topics=allowed_topics)
 
     # Group signals by topic
     topic_signals: dict[str, list[Signal]] = {}

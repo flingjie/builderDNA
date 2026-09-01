@@ -56,18 +56,23 @@ def compute_acceleration(signals: list[Signal], window_days: int = 30) -> float:
     return round((v2 - v1) / dt, 4)
 
 
+MIN_VELOCITY_AGE_DAYS = 30
+
+
 def compute_velocity(stars: int, days_since_creation: int) -> float:
     """Compute first derivative: star velocity for a repo.
+
+    Young repos are floored to ``MIN_VELOCITY_AGE_DAYS`` so a launch spike (a
+    viral repo that gained many stars in a few days) doesn't read as a
+    sustainable stars/day velocity and dominate a topic's trend ranking.
 
     Args:
         stars: Total star count.
         days_since_creation: Days since the repo was created.
 
     Returns:
-        Velocity as stars per day, rounded to 2 decimals.
-        Returns float(stars) if days_since_creation <= 0 to avoid
-        division by zero.
+        Velocity as stars per day, rounded to 2 decimals. Repos younger than
+        ``MIN_VELOCITY_AGE_DAYS`` are treated as that age.
     """
-    if days_since_creation <= 0:
-        return float(stars)
-    return round(stars / days_since_creation, 2)
+    effective_days = max(days_since_creation, MIN_VELOCITY_AGE_DAYS)
+    return round(stars / effective_days, 2)
