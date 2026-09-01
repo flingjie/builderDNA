@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "source_phase": "verify",
+  "coverage": "complete",
+  "coverage_notes": [],
+  "items": [
+    {
+      "source": "github",
+      "role": "adoption",
+      "author": "external_user",
+      "url": "https://github.com/exampleorg/example-repo/issues/42",
+      "published_at": "2026-08-26T15:00:00Z",
+      "excerpt": "An external user filed an issue that the agent produced a plausible but incorrect SQL migration.",
+      "directness": "direct",
+      "strength": "moderate",
+      "upstream_origin": null,
+      "independence_key": "github:exampleorg/example-repo:actor:external_user",
+      "topics": ["agent-reliability", "hallucination"],
+      "proposed_concept": null
+    }
+  ]
+}

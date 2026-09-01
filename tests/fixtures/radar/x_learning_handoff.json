@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "source_phase": "x-discovery",
+  "coverage": "partial",
+  "coverage_notes": ["X thread replies unavailable"],
+  "items": [
+    {
+      "source": "x",
+      "role": "problem",
+      "author": "alice_dev",
+      "url": "https://x.com/alice_dev/status/1234567890",
+      "published_at": "2026-08-28T10:00:00Z",
+      "excerpt": "Teams report that long-running agents silently drift from their stated goals after a few hours.",
+      "directness": "direct",
+      "strength": "moderate",
+      "upstream_origin": null,
+      "independence_key": "x:x.com/alice_dev/status/1234567890",
+      "topics": ["agent-reliability", "goal-drift"],
+      "proposed_concept": {
+        "title": "Agent goal-drift detector",
+        "problem": "Long-running agents silently drift from their stated goals",
+        "why_now": "More teams run agents for hours at a time"
+      }
+    }
+  ]
+}

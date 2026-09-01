@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "source_phase": "reddit-scan",
+  "coverage": "partial",
+  "coverage_notes": ["Comments not read; RSS returns title/body only"],
+  "items": [
+    {
+      "source": "reddit",
+      "role": "problem",
+      "author": "u_frustrated_dev",
+      "url": "https://www.reddit.com/r/ExperiencedDevs/comments/abc123/agent_ignored_constraints",
+      "published_at": "2026-08-27T08:30:00Z",
+      "excerpt": "A developer reports their AI coding agent kept ignoring explicit constraints in a large codebase.",
+      "directness": "direct",
+      "strength": "moderate",
+      "upstream_origin": null,
+      "independence_key": "post:www.reddit.com/r/experiencesdevs/comments/abc123/agent_ignored_constraints",
+      "topics": ["agent-reliability", "constraint-violation"],
+      "proposed_concept": null
+    }
+  ]
+}
