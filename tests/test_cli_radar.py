@@ -385,7 +385,7 @@ class TestVerify:
         payload = read_payload(out_json)
         assert payload["passed"] is True
         assert payload["missing"] == []
-        assert len(payload["requirements"]) == 4
+        assert len(payload["requirements"]) == 6
         assert all(r["met"] for r in payload["requirements"])
 
     def test_verify_reports_missing_requirements(self, store, tmp_path):
@@ -400,10 +400,12 @@ class TestVerify:
         assert result.exit_code == 0, result.output
         payload = read_payload(out_json)
         assert payload["passed"] is False
+        assert len(payload["requirements"]) == 6
         missing = payload["missing"]
-        assert any(m.startswith("two source types") for m in missing)
-        assert any(m.startswith("two independent supporting chains") for m in missing)
-        assert any(m == "a bounded smallest experiment" for m in missing)
+        assert "two_source_types" in missing
+        assert "two_independent_chains" in missing
+        assert "smallest_experiment_present" in missing
+        assert "experiment_thresholds_and_budget" in missing
 
     def test_verify_missing_concept_exits_nonzero(self, store, tmp_path):
         out_json = tmp_path / "verify.json"
@@ -428,6 +430,227 @@ class TestVerify:
         md = out_json.with_suffix(".md").read_text(encoding="utf-8")
         assert "Build-gate verification" in md
         assert "Requirements" in md
+
+
+# ── verify --handoff ──
+
+def _write_handoff(tmp_path, *, name="github_handoff.json", items=None):
+    """Write a verification handoff JSON file into ``tmp_path``."""
+    envelope = {
+        "schema_version": 1,
+        "source_phase": "verify",
+        "coverage": "complete",
+        "coverage_notes": [],
+        "items": items
+        if items is not None
+        else [
+            {
+                "source": "github",
+                "role": "adoption",
+                "author": "external_user",
+                "url": "https://github.com/exampleorg/example-repo/issues/42",
+                "published_at": "2026-08-26T15:00:00Z",
+                "excerpt": (
+                    "An external user filed an issue that the agent produced a "
+                    "plausible but incorrect SQL migration."
+                ),
+                "directness": "direct",
+                "strength": "moderate",
+                "upstream_origin": None,
+                "independence_key": "github:exampleorg/example-repo:actor:external_user",
+                "topics": ["agent-reliability"],
+                "proposed_concept": None,
+            }
+        ],
+    }
+    path = tmp_path / name
+    path.write_text(json.dumps(envelope), encoding="utf-8")
+    return path
+
+
+class TestVerifyHandoff:
+    def test_handoff_imports_evidence_and_reports_six_gates(self, store, tmp_path):
+        card = make_card(
+            id="c-pass", title="Passing card", stage=PortfolioStage.VERIFY,
+            smallest_experiment=make_smallest_experiment(),
+        )
+        store.upsert_concept(card)
+        store.add_evidence(make_evidence(
+            id="r1", concept_id="c-pass", source_type=SourceType.REDDIT,
+            role=EvidenceRole.PROBLEM, independence_key="chain-b",
+        ))
+        handoff = _write_handoff(tmp_path)
+        out_json = tmp_path / "verify.json"
+        result = run_radar(
+            "verify", "c-pass",
+            "--handoff", str(handoff),
+            "--state-dir", str(store.state_dir),
+            "--output", str(out_json),
+        )
+        assert result.exit_code == 0, result.output
+        payload = read_payload(out_json)
+        assert payload["handoff"]["imported"] == 1
+        assert payload["handoff"]["attached_evidence_ids"]
+        # six gates, all passed: github + reddit, two chains, experiment present
+        assert len(payload["requirements"]) == 6
+        assert all(r["met"] for r in payload["requirements"])
+        assert payload["passed"] is True
+        assert payload["missing"] == []
+        # the imported github evidence is now attached to the concept in the store
+        attached = [
+            e for e in store.list_evidence("c-pass")
+            if e.source_type == SourceType.GITHUB
+        ]
+        assert attached
+
+    def test_handoff_missing_file_exits_nonzero(self, store, tmp_path):
+        card = make_card(id="c1", title="Card")
+        store.upsert_concept(card)
+        out_json = tmp_path / "verify.json"
+        result = run_radar(
+            "verify", "c1",
+            "--handoff", str(tmp_path / "nope.json"),
+            "--state-dir", str(store.state_dir),
+            "--output", str(out_json),
+        )
+        assert result.exit_code == 1
+        assert "not found" in result.output
+
+    def test_handoff_invalid_envelope_exits_nonzero(self, store, tmp_path):
+        card = make_card(id="c1", title="Card")
+        store.upsert_concept(card)
+        # A direct github item with no url/upstream_origin is structurally invalid,
+        # so the whole handoff is rejected with no partial import.
+        handoff = _write_handoff(tmp_path, items=[
+            {
+                "source": "github",
+                "role": "problem",
+                "excerpt": "a claim",
+                "directness": "direct",
+                "strength": "moderate",
+                "url": "",
+                "upstream_origin": None,
+            }
+        ])
+        out_json = tmp_path / "verify.json"
+        result = run_radar(
+            "verify", "c1",
+            "--handoff", str(handoff),
+            "--state-dir", str(store.state_dir),
+            "--output", str(out_json),
+        )
+        assert result.exit_code == 1
+
+
+# ── experiment ──
+
+EXPERIMENT_SIMULATION = dict(
+    failure_mode="the agent silently skips a post-run cleanup step",
+    environment="a sandboxed shell with a persistent working directory",
+    agent_goal="complete the assigned task and exit cleanly",
+    hidden_constraints=["the working directory must be empty on exit"],
+    counterexample="a naive agent reports success while intermediate files remain",
+    replay_reset="reset the working directory to a fixed seed state before each run",
+)
+
+
+class TestExperiment:
+    def _add_buildable_card(self, store):
+        card = make_card(
+            id="c1", title="Agent Reliability",
+            problem="operators lose time to uncaught failures",
+            evidence_ids=["ev1", "ev2"],
+            smallest_experiment=make_smallest_experiment(),
+        )
+        store.upsert_concept(card)
+        store.add_evidence(make_evidence(
+            id="ev1", concept_id="c1", source_type=SourceType.GITHUB,
+            role=EvidenceRole.IMPLEMENTATION, independence_key="chain-a",
+            note="UNVERIFIABLE TRANSCRIPT: the agent skipped cleanup at 03:12 UTC",
+        ))
+        store.add_evidence(make_evidence(
+            id="ev2", concept_id="c1", source_type=SourceType.REDDIT,
+            role=EvidenceRole.PROBLEM, independence_key="chain-b",
+        ))
+        return card
+
+    def test_experiment_produces_proposal_with_linked_evidence(self, store, tmp_path):
+        self._add_buildable_card(store)
+        out_json = tmp_path / "experiment.json"
+        result = run_radar(
+            "experiment", "c1",
+            "--format", "fde-gym",
+            "--budget", "4 hours",
+            "--failure-mode", EXPERIMENT_SIMULATION["failure_mode"],
+            "--environment", EXPERIMENT_SIMULATION["environment"],
+            "--agent-goal", EXPERIMENT_SIMULATION["agent_goal"],
+            "--hidden-constraint", EXPERIMENT_SIMULATION["hidden_constraints"][0],
+            "--counterexample", EXPERIMENT_SIMULATION["counterexample"],
+            "--replay-reset", EXPERIMENT_SIMULATION["replay_reset"],
+            "--state-dir", str(store.state_dir),
+            "--output", str(out_json),
+        )
+        assert result.exit_code == 0, result.output
+        payload = read_payload(out_json)
+        assert payload["concept_id"] == "c1"
+        assert payload["evidence_ids"] == ["ev1", "ev2"]
+        # evidence is linked, not copied: unverifiable prose never leaks into the export
+        assert "UNVERIFIABLE TRANSCRIPT" not in out_json.read_text(encoding="utf-8")
+
+    def test_experiment_rejects_without_smallest_experiment(self, store, tmp_path):
+        card = make_card(id="c1", title="Card", evidence_ids=["ev1"])
+        store.upsert_concept(card)
+        store.add_evidence(make_evidence(id="ev1", concept_id="c1"))
+        out_json = tmp_path / "experiment.json"
+        result = run_radar(
+            "experiment", "c1",
+            "--budget", "4 hours",
+            "--state-dir", str(store.state_dir),
+            "--output", str(out_json),
+        )
+        assert result.exit_code == 1
+        assert "Build-gated" in result.output
+        assert not out_json.exists()
+
+    def test_experiment_rejects_identical_thresholds(self, store, tmp_path):
+        experiment = make_smallest_experiment().model_copy(
+            update={"success_threshold": "same", "failure_threshold": "same"}
+        )
+        card = make_card(id="c1", title="Card", smallest_experiment=experiment)
+        store.upsert_concept(card)
+        out_json = tmp_path / "experiment.json"
+        result = run_radar(
+            "experiment", "c1",
+            "--budget", "4 hours",
+            "--state-dir", str(store.state_dir),
+            "--output", str(out_json),
+        )
+        assert result.exit_code == 1
+        assert "distinct" in result.output or "falsifiable" in result.output
+
+    def test_experiment_rejects_missing_budget(self, store, tmp_path):
+        card = make_card(
+            id="c1", title="Card", smallest_experiment=make_smallest_experiment()
+        )
+        store.upsert_concept(card)
+        out_json = tmp_path / "experiment.json"
+        result = run_radar(
+            "experiment", "c1",
+            "--state-dir", str(store.state_dir),
+            "--output", str(out_json),
+        )
+        assert result.exit_code == 1
+        assert "budget" in result.output
+
+    def test_experiment_missing_concept_exits_nonzero(self, store, tmp_path):
+        out_json = tmp_path / "experiment.json"
+        result = run_radar(
+            "experiment", "nope",
+            "--state-dir", str(store.state_dir),
+            "--output", str(out_json),
+        )
+        assert result.exit_code == 1
+        assert "not found" in result.output
 
 
 # ── review ──

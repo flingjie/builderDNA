@@ -1,195 +1,90 @@
-"""concept — capture, move, merge, score, and review concept cards.
+"""concept — capture, move, merge, score, and record outcomes for concept cards.
 
-Thin orchestrator over the deterministic concept layer (``concepts/``): the
-store persists state, ``matching`` decides created-vs-merged, and ``scoring``
-enforces the hard build gates. This module only wires those together and
+Thin Typer layer over :mod:`concepts.service`. All business logic lives in the
+service; this module only parses Typer options, delegates to the service, and
 renders a JSON-first result (with optional Markdown).
+
+Exit codes:
+
+- ``0`` — success.
+- ``1`` — unexpected failure (``ConceptServiceError`` base, a store error like
+  ``CorruptionError``, or an unhandled ``ValueError``).
+- ``2`` — validation error (``ConceptValidationError``): bad input, unknown
+  concept, disallowed transition, ambiguous capture, invalid handoff.
+- ``3`` — conflict (``ConceptConflictError`` or ``concepts.store.ConflictError``).
+- ``4`` — blocked gate (``ConceptGateBlockedError``).
 
 Design rules honoured here:
 
 - **JSON first.** Every command prints one versioned JSON payload to stdout;
   ``--format md`` is the only escape hatch that renders Markdown instead.
-  Human notices go to stderr so stdout stays machine-readable.
-- **Never silently advance a stage.** A failed gate aborts with a non-zero
-  exit and a message listing every missing requirement.
-- **Never silently mutate state.** Every payload carries a ``changed`` list
-  describing exactly what was written.
-- **Capture is idempotent** by normalized URL/content fingerprint (the same
-  fingerprint the manual-X adapter derives for evidence IDs).
+- **Never silently advance a stage.** A failed gate aborts with exit 4 and a
+  message listing every missing requirement.
+- **Never silently mutate state.** Every payload carries a ``changed`` list.
+- **Capture is idempotent** by normalized URL/content fingerprint, and matches
+  via ``classify_match`` (``suggested`` never auto-merges).
 - **Build predictions cannot be rewritten.** ``move ... build`` records the
-  prediction; ``review`` records the outcome and lesson without touching it.
+  prediction; ``outcome`` records the result and lesson without touching it.
 """
 
 from __future__ import annotations
 
 import json
-import re
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-from uuid import uuid4
 
 import typer
 
-from concepts.adapters.manual_x import to_evidence
-from concepts.matching import find_candidates, is_ambiguous, normalize_name
-from concepts.scoring import evaluate_build_gate, score_components
-from concepts.store import ConceptStore, ConceptStoreError
-from models.concept import (
-    ConceptCard,
-    ConceptEvidence,
-    OutcomeState,
-    PortfolioStage,
-    RadarReview,
-    SmallestExperiment,
-    SourceType,
+from concepts.service import (
+    ConceptConflictError,
+    ConceptGateBlockedError,
+    ConceptServiceError,
+    ConceptValidationError,
+    capture,
+    capture_handoff,
+    derive_title,
+    list_cards,
+    merge,
+    move,
+    parse_experiment,
+    parse_review_date,
+    record_outcome,
+    score,
+    show,
+    slugify,
 )
+from concepts.store import ConceptStore, ConceptStoreError
+from concepts.store import ConflictError as StoreConflictError
 from observability import RunTelemetry
 
 SCHEMA_VERSION = "builderdna.concept.v1"
 
 concept = typer.Typer(
     name="concept",
-    help="Capture, move, merge, score, and review concept cards (Inbox -> Watch -> Verify -> Build/Drop).",
+    help="Capture, move, merge, score, and record outcomes for concept cards (Inbox -> Watch -> Verify -> Build/Drop).",
     no_args_is_help=True,
 )
 
-# ── Errors ──
+# Backward-compatible alias: the old generic command error now maps to validation (exit 2).
+ConceptCommandError = ConceptValidationError
 
-
-class ConceptCommandError(Exception):
-    """A domain error surfaced as a clean JSON failure (exit code 1)."""
-
-    def __init__(self, message: str, *, details: dict | None = None):
-        super().__init__(message)
-        self.message = message
-        self.details = details or {}
+__all__ = [
+    "concept",
+    "ConceptCommandError",
+    "capture",
+    "record_outcome",
+    "derive_title",
+    "slugify",
+]
 
 
 # ── Small utilities ──
 
 
-def _now_utc() -> datetime:
-    return datetime.now(timezone.utc)
-
-
 def _now_iso() -> str:
-    return _now_utc().isoformat()
-
-
-def _notice(message: str) -> None:
-    """Human-facing notice on stderr, keeping stdout a pure JSON stream."""
-    print(message, file=sys.stderr)
-
-
-def slugify(title: str) -> str:
-    """Derive a stable concept-ID slug from a display title."""
-    norm = re.sub(r"[^a-z0-9]+", "-", (title or "").lower()).strip("-")
-    return norm or "concept"
-
-
-def derive_title(note: str) -> str:
-    """Derive a display title from the first line of a note (or "")."""
-    text = (note or "").strip()
-    if not text:
-        return ""
-    return text.splitlines()[0].strip()[:80]
-
-
-def _parse_source(value: str) -> SourceType:
-    try:
-        return SourceType(value.strip().lower())
-    except ValueError:
-        raise ConceptCommandError(
-            f"invalid source {value!r}; expected one of {[s.value for s in SourceType]}"
-        )
-
-
-def _parse_review_date(value: str) -> datetime:
-    try:
-        dt = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
-    except ValueError as exc:
-        raise ConceptCommandError(f"invalid --review-date {value!r}: {exc}")
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    if dt.utcoffset() != timedelta(0):
-        raise ConceptCommandError(
-            "--review-date must be UTC (e.g. 2026-09-08T00:00:00Z)"
-        )
-    return dt
-
-
-def _load_experiment(
-    experiment_json: str | None, experiment_file: str | None
-) -> SmallestExperiment | None:
-    if experiment_json and experiment_file:
-        raise ConceptCommandError(
-            "provide only one of --experiment or --experiment-file"
-        )
-    raw: str | None = None
-    if experiment_file:
-        path = Path(experiment_file)
-        if not path.exists():
-            raise ConceptCommandError(f"experiment file not found: {experiment_file}")
-        raw = path.read_text(encoding="utf-8")
-    elif experiment_json:
-        raw = experiment_json
-    if raw is None:
-        return None
-    try:
-        data = json.loads(raw)
-    except json.JSONDecodeError as exc:
-        raise ConceptCommandError(f"invalid experiment JSON: {exc}")
-    if not isinstance(data, dict):
-        raise ConceptCommandError("experiment must be a JSON object")
-    try:
-        return SmallestExperiment(**data)
-    except Exception as exc:  # pydantic validation -> clean CLI error
-        raise ConceptCommandError(f"invalid smallest experiment: {exc}")
-
-
-def _review_id(concept_id: str) -> str:
-    """A unique, append-only review record ID."""
-    return f"rev-{concept_id}-{int(_now_utc().timestamp() * 1000)}-{uuid4().hex[:8]}"
-
-
-def _unique_id(store: ConceptStore, base: str) -> str:
-    """Return ``base`` unless it collides with an existing concept ID."""
-    existing = {c.id for c in store.list_concepts()}
-    if base not in existing:
-        return base
-    i = 2
-    while f"{base}-{i}" in existing:
-        i += 1
-    return f"{base}-{i}"
-
-
-def _existing_urls(store: ConceptStore) -> dict[str, list[str]]:
-    """Map concept_id -> source URLs, for deterministic URL matching."""
-    out: dict[str, list[str]] = {}
-    for evidence in store.list_evidence():
-        if evidence.source_url:
-            out.setdefault(evidence.concept_id, []).append(evidence.source_url)
-    return out
-
-
-def _candidates_payload(matches: list) -> list[dict]:
-    return [
-        {
-            "concept_id": m.concept_id,
-            "title": m.title,
-            "score": m.score,
-            "name_score": m.name_score,
-            "url_score": m.url_score,
-            "problem_score": m.problem_score,
-            "reasons": [
-                {"signal": r.signal, "detail": r.detail, "score": r.score}
-                for r in m.reasons
-            ],
-        }
-        for m in matches
-    ]
+    return datetime.now(timezone.utc).isoformat()
 
 
 # ── Result envelope ──
@@ -208,12 +103,15 @@ def _ok(command: str, action: str, data: dict, changed: list[str], stats: dict) 
     }
 
 
-def _error(command: str, message: str, details: dict | None = None) -> dict:
+def _error(
+    command: str, message: str, details: dict | None = None, exit_code: int = 1
+) -> dict:
     return {
         "schema": SCHEMA_VERSION,
         "command": command,
         "ok": False,
         "error": message,
+        "exit_code": exit_code,
         "details": details or {},
         "computed_at": _now_iso(),
     }
@@ -226,15 +124,27 @@ def _emit_payload(payload: dict, output_format: str) -> None:
         print(json.dumps(payload, indent=2, ensure_ascii=False))
 
 
-def _emit_error(command: str, message: str, details: dict | None = None) -> None:
-    print(json.dumps(_error(command, message, details), indent=2, ensure_ascii=False))
+def _emit_error(
+    command: str, message: str, details: dict | None = None, exit_code: int = 1
+) -> None:
+    print(
+        json.dumps(
+            _error(command, message, details, exit_code),
+            indent=2,
+            ensure_ascii=False,
+        )
+    )
 
 
 def _finalize(command: str, output_format: str, func) -> None:
     """Run ``func`` and emit its JSON/Markdown result; translate known errors."""
     if output_format not in ("json", "md"):
-        _emit_error(command, f"invalid --format {output_format!r}; expected 'json' or 'md'")
-        raise typer.Exit(1)
+        _emit_error(
+            command,
+            f"invalid --format {output_format!r}; expected 'json' or 'md'",
+            exit_code=2,
+        )
+        raise typer.Exit(2)
     tel = RunTelemetry()
     try:
         result = func()
@@ -246,430 +156,47 @@ def _finalize(command: str, output_format: str, func) -> None:
             stats={"elapsed_seconds": tel.elapsed_seconds},
         )
         _emit_payload(payload, output_format)
-    except ConceptCommandError as exc:
-        _emit_error(command, exc.message, exc.details)
-        raise typer.Exit(1)
+    except ConceptGateBlockedError as exc:
+        _emit_error(command, exc.message, exc.details, exit_code=exc.exit_code)
+        raise typer.Exit(exc.exit_code)
+    except ConceptConflictError as exc:
+        _emit_error(command, exc.message, exc.details, exit_code=exc.exit_code)
+        raise typer.Exit(exc.exit_code)
+    except ConceptValidationError as exc:
+        _emit_error(command, exc.message, exc.details, exit_code=exc.exit_code)
+        raise typer.Exit(exc.exit_code)
+    except StoreConflictError as exc:
+        _emit_error(command, str(exc), exit_code=3)
+        raise typer.Exit(3)
+    except ConceptServiceError as exc:
+        _emit_error(command, exc.message, exc.details, exit_code=exc.exit_code)
+        raise typer.Exit(exc.exit_code)
     except ConceptStoreError as exc:
-        _emit_error(command, str(exc))
+        _emit_error(command, str(exc), exit_code=1)
         raise typer.Exit(1)
     except ValueError as exc:
-        _emit_error(command, str(exc))
+        _emit_error(command, str(exc), exit_code=1)
         raise typer.Exit(1)
 
 
-# ── Core helpers (unit-testable, no stdout side effects) ──
-
-
-def capture(
-    store: ConceptStore,
-    *,
-    source: str = "x",
-    url: str = "",
-    note: str = "",
-    title: str | None = None,
-    problem: str | None = None,
-    concept_id: str | None = None,
-    aliases: list[str] | None = None,
-    author: str = "",
-    quoted_source_url: str | None = None,
-    upstream_origin: str | None = None,
-    role: str | None = None,
-    directness: str | None = None,
-    strength: str | None = None,
-    merge_into: str | None = None,
-) -> dict:
-    """Capture one weak signal, creating or merging a concept card.
-
-    Returns ``action`` in {"created", "merged", "already_captured"}. Raises
-    ``ConceptCommandError`` on ambiguity (never auto-merges an ambiguous match).
-    """
-    aliases = list(aliases or [])
-    source_type = _parse_source(source)
-
-    if not title:
-        title = derive_title(note)
-    if not title or not title.strip():
-        raise ConceptCommandError(
-            "capture requires a --title or a non-empty --note to derive one"
-        )
-    title = title.strip()
-    if problem is None:
-        problem = (note or "").strip()
-    problem = problem or ""
-
-    # A provisional card drives matching; its ID is not used by the matcher.
-    provisional_id = concept_id or slugify(title)
-    candidate = ConceptCard(
-        id=provisional_id, title=title, aliases=aliases, problem=problem
-    )
-
-    # Idempotency fingerprint: the adapter derives a deterministic evidence ID
-    # from the normalized URL (or an author|note content hash when URL-less).
-    probe = to_evidence(
-        concept_id="__probe__",
-        url=url,
-        author=author,
-        note=note,
-        quoted_source_url=quoted_source_url,
-        upstream_origin=upstream_origin,
-        role=role,
-        strength=strength,
-        directness=directness,
-        source_type=source_type,
-    )
-    existing_evidence = store.get_evidence(probe.id)
-    if existing_evidence is not None:
-        card = store.get_concept(existing_evidence.concept_id)
-        return {
-            "action": "already_captured",
-            "changed": [],
-            "data": {
-                "concept": card.model_dump(mode="json") if card else None,
-                "evidence": existing_evidence.model_dump(mode="json"),
-                "candidates": [],
-            },
-        }
-
-    matches = find_candidates(
-        candidate,
-        store.list_concepts(),
-        candidate_urls=[url],
-        existing_urls=_existing_urls(store),
-    )
-    candidates_payload = _candidates_payload(matches)
-
-    target_id: str | None = None
-    action = "created"
-    if matches:
-        if merge_into:
-            if store.get_concept(merge_into) is None:
-                raise ConceptCommandError(f"merge target {merge_into!r} not found")
-            target_id = merge_into
-            action = "merged"
-        elif is_ambiguous(matches):
-            raise ConceptCommandError(
-                "capture is ambiguous — multiple or conflicting matches; "
-                "re-run with --into <ID> to disambiguate (never auto-merged)",
-                details={
-                    "candidates": candidates_payload,
-                    "hint": "pass --into with one of the candidate concept IDs",
-                },
-            )
-        else:
-            target_id = matches[0].concept_id
-            action = "merged"
-
-    if target_id is None:
-        final_id = _unique_id(store, provisional_id)
-        card = ConceptCard(
-            id=final_id,
-            title=title,
-            aliases=aliases,
-            problem=problem,
-            stage=PortfolioStage.INBOX,
-        )
-        evidence = to_evidence(
-            concept_id=final_id,
-            url=url,
-            author=author,
-            note=note,
-            quoted_source_url=quoted_source_url,
-            upstream_origin=upstream_origin,
-            role=role,
-            strength=strength,
-            directness=directness,
-            source_type=source_type,
-        )
-        card = card.model_copy(update={"evidence_ids": [evidence.id]})
-        store.add_evidence(evidence)
-        store.upsert_concept(card)
-        changed = ["concept created", "evidence appended"]
+def _read_handoff_raw(handoff: str, stdin: bool) -> dict:
+    """Read a handoff JSON object from ``--stdin`` or a ``--handoff`` file."""
+    if stdin:
+        raw = sys.stdin.read()
+        if not raw.strip():
+            raise ConceptValidationError("--stdin provided but stdin is empty")
     else:
-        surviving = store.get_concept(target_id)
-        evidence = to_evidence(
-            concept_id=target_id,
-            url=url,
-            author=author,
-            note=note,
-            quoted_source_url=quoted_source_url,
-            upstream_origin=upstream_origin,
-            role=role,
-            strength=strength,
-            directness=directness,
-            source_type=source_type,
-        )
-        new_aliases = list(surviving.aliases)
-        existing_norms = {normalize_name(a) for a in surviving.aliases}
-        if normalize_name(title) != normalize_name(surviving.title) and normalize_name(
-            title
-        ) not in existing_norms:
-            new_aliases.append(title)
-        evidence_ids = list(surviving.evidence_ids)
-        if evidence.id not in evidence_ids:
-            evidence_ids.append(evidence.id)
-        card = surviving.model_copy(
-            update={"aliases": new_aliases, "evidence_ids": evidence_ids}
-        )
-        store.add_evidence(evidence)
-        store.upsert_concept(card)
-        changed = ["evidence appended", "concept merged (alias/evidence updated)"]
-
-    return {
-        "action": action,
-        "changed": changed,
-        "data": {
-            "concept": card.model_dump(mode="json"),
-            "evidence": evidence.model_dump(mode="json"),
-            "candidates": candidates_payload,
-            "merged_into": target_id,
-        },
-    }
-
-
-def apply_move(
-    store: ConceptStore,
-    concept_id: str,
-    target_stage: str,
-    *,
-    reason: str,
-    prediction: str = "",
-    expected_evidence: str = "",
-    review_date: datetime | None = None,
-    experiment: SmallestExperiment | None = None,
-) -> dict:
-    """Move a card to ``target_stage``, enforcing the hard build gate.
-
-    Moving to ``build`` requires ``prediction``, ``expected_evidence``, a
-    ``review_date`` (Task 6.1), and a passing ``evaluate_build_gate``. Every
-    successful move appends a ``RadarReview``.
-    """
-    card = store.get_concept(concept_id)
-    if card is None:
-        raise ConceptCommandError(f"concept {concept_id!r} not found")
+        path = Path(handoff)
+        if not path.exists():
+            raise ConceptValidationError(f"handoff file not found: {handoff}")
+        raw = path.read_text(encoding="utf-8")
     try:
-        target = PortfolioStage(target_stage)
-    except ValueError:
-        raise ConceptCommandError(
-            f"invalid stage {target_stage!r}; expected one of {[s.value for s in PortfolioStage]}"
-        )
-    if card.stage == target:
-        raise ConceptCommandError(
-            f"concept {concept_id!r} is already in stage '{target.value}'"
-        )
-    if not reason or not reason.strip():
-        raise ConceptCommandError("move requires --reason")
-
-    evidence = store.list_evidence(concept_id)
-    review_dt = review_date if review_date is not None else _now_utc()
-    from_stage = card.stage
-
-    if target == PortfolioStage.BUILD:
-        missing = []
-        if not prediction.strip():
-            missing.append("--prediction")
-        if not expected_evidence.strip():
-            missing.append("--expected-evidence")
-        if review_date is None:
-            missing.append("--review-date")
-        if missing:
-            raise ConceptCommandError(
-                "move to 'build' requires " + ", ".join(missing)
-            )
-        if experiment is not None:
-            card = card.model_copy(update={"smallest_experiment": experiment})
-        gate = evaluate_build_gate(card, evidence)
-        if not gate.passed:
-            raise ConceptCommandError(
-                "build gate failed — missing: " + "; ".join(gate.missing),
-                details={"missing": list(gate.missing)},
-            )
-        # A prediction recorded on an earlier Build entry is never rewritten.
-        final_prediction = card.prediction.strip() or prediction.strip()
-        card = card.model_copy(
-            update={"stage": target, "prediction": final_prediction}
-        )
-    else:
-        card = card.model_copy(update={"stage": target})
-
-    card = store.upsert_concept(card)
-    review = RadarReview(
-        id=_review_id(concept_id),
-        concept_id=concept_id,
-        from_stage=from_stage,
-        to_stage=target,
-        reason=reason.strip(),
-        expected_evidence=expected_evidence.strip(),
-        review_date=review_dt,
-    )
-    store.add_review(review)
-
-    return {
-        "action": "moved",
-        "changed": [
-            f"stage {from_stage.value} -> {target.value}",
-            "review recorded",
-        ],
-        "data": {
-            "concept": card.model_dump(mode="json"),
-            "review": review.model_dump(mode="json"),
-            "gate": {"passed": True, "missing": []},
-        },
-    }
-
-
-def apply_merge(store: ConceptStore, survivor_id: str, merged_id: str) -> dict:
-    """Merge ``merged_id`` into ``survivor_id``.
-
-    Unions aliases, re-points the merged-away card's evidence to the survivor
-    via append-only superseding records, and marks the merged-away card dropped.
-    """
-    if survivor_id == merged_id:
-        raise ConceptCommandError("cannot merge a concept into itself")
-    survivor = store.get_concept(survivor_id)
-    merged = store.get_concept(merged_id)
-    if survivor is None:
-        raise ConceptCommandError(f"concept {survivor_id!r} not found")
-    if merged is None:
-        raise ConceptCommandError(f"concept {merged_id!r} not found")
-
-    survivor_norm = normalize_name(survivor.title)
-    alias_set = set(survivor.aliases) | set(merged.aliases) | {merged.title}
-    new_aliases = sorted(a for a in alias_set if normalize_name(a) != survivor_norm)
-
-    repointed: list[str] = []
-    for evidence in store.list_evidence(merged_id):
-        new_id = f"{evidence.id}->{survivor_id}"
-        if store.get_evidence(new_id) is None:
-            store.add_evidence(
-                ConceptEvidence(
-                    id=new_id,
-                    concept_id=survivor_id,
-                    source_type=evidence.source_type,
-                    source_url=evidence.source_url,
-                    role=evidence.role,
-                    directness=evidence.directness,
-                    strength=evidence.strength,
-                    independence_key=evidence.independence_key,
-                    note=evidence.note,
-                    supersedes=evidence.id,
-                )
-            )
-        repointed.append(new_id)
-
-    evidence_ids = sorted(set(survivor.evidence_ids) | set(repointed))
-    survivor = survivor.model_copy(
-        update={"aliases": new_aliases, "evidence_ids": evidence_ids}
-    )
-    survivor = store.upsert_concept(survivor)
-
-    from_stage = merged.stage
-    merged = merged.model_copy(update={"stage": PortfolioStage.DROP})
-    merged = store.upsert_concept(merged)
-    review = RadarReview(
-        id=_review_id(merged_id),
-        concept_id=merged_id,
-        from_stage=from_stage,
-        to_stage=PortfolioStage.DROP,
-        reason=f"merged into {survivor_id}",
-        expected_evidence="",
-        review_date=_now_utc(),
-    )
-    store.add_review(review)
-
-    return {
-        "action": "merged",
-        "changed": [
-            f"evidence re-pointed {merged_id} -> {survivor_id}",
-            f"{merged_id} marked dropped",
-            "review recorded",
-        ],
-        "data": {
-            "survivor": survivor.model_dump(mode="json"),
-            "merged_away": merged.model_dump(mode="json"),
-            "repointed_evidence_ids": repointed,
-            "review": review.model_dump(mode="json"),
-        },
-    }
-
-
-def score_card(
-    store: ConceptStore,
-    concept_id: str,
-    *,
-    user_alignment: int = 0,
-    hype: int | None = None,
-) -> dict:
-    """Return derived component scores, per-component reasons, and the gate."""
-    card = store.get_concept(concept_id)
-    if card is None:
-        raise ConceptCommandError(f"concept {concept_id!r} not found")
-    evidence = store.list_evidence(concept_id)
-    scored = score_components(card, evidence, user_alignment=user_alignment, hype=hype)
-    gate = evaluate_build_gate(card, evidence)
-    return {
-        "action": "scored",
-        "changed": [],
-        "data": {
-            "concept_id": concept_id,
-            "scores": scored.scores.model_dump(mode="json"),
-            "reasons": scored.reasons,
-            "gate": {"passed": gate.passed, "missing": list(gate.missing)},
-        },
-    }
-
-
-def record_outcome(
-    store: ConceptStore, concept_id: str, outcome: str, lesson: str
-) -> dict:
-    """Record a Build outcome + lesson without rewriting the prediction (Task 6.1).
-
-    Requires a prior prediction (proof the card entered Build). The original
-    prediction is left untouched, and every review appends an immutable
-    ``RadarReview`` so the outcome history stays traceable.
-    """
-    card = store.get_concept(concept_id)
-    if card is None:
-        raise ConceptCommandError(f"concept {concept_id!r} not found")
-    if not card.prediction.strip():
-        raise ConceptCommandError(
-            f"concept {concept_id!r} has no recorded prediction — enter Build first "
-            "('concept move <id> build --prediction ...') before recording an outcome"
-        )
-    try:
-        outcome_state = OutcomeState(outcome)
-    except ValueError:
-        raise ConceptCommandError(
-            f"invalid outcome {outcome!r}; expected one of {[o.value for o in OutcomeState]}"
-        )
-    if not lesson or not lesson.strip():
-        raise ConceptCommandError("review requires --lesson")
-
-    original_prediction = card.prediction
-    card = card.model_copy(
-        update={"outcome": outcome_state, "lesson": lesson.strip()}
-    )
-    card = store.upsert_concept(card)
-    review = RadarReview(
-        id=_review_id(concept_id),
-        concept_id=concept_id,
-        from_stage=card.stage,
-        to_stage=card.stage,
-        reason=f"Build outcome recorded: {outcome_state.value}. Lesson: {lesson.strip()}",
-        expected_evidence="",
-        review_date=_now_utc(),
-    )
-    store.add_review(review)
-
-    return {
-        "action": "reviewed",
-        "changed": ["outcome recorded", "review appended for traceability"],
-        "data": {
-            "concept": card.model_dump(mode="json"),
-            "review": review.model_dump(mode="json"),
-            "prediction_preserved": True,
-            "original_prediction": original_prediction,
-        },
-    }
+        data = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ConceptValidationError(f"invalid handoff JSON: {exc}")
+    if not isinstance(data, dict):
+        raise ConceptValidationError("handoff must be a JSON object")
+    return data
 
 
 # ── CLI subcommands ──
@@ -691,14 +218,19 @@ def capture_cmd(
     directness: str | None = typer.Option(None, "--directness", help="Directness: direct, indirect, inferred"),
     strength: str | None = typer.Option(None, "--strength", help="Strength: weak, moderate, strong"),
     merge_into: str | None = typer.Option(None, "--into", help="Explicit concept ID to merge into (disambiguates)"),
-    stdin: bool = typer.Option(False, "--stdin", help="Read a JSON capture object from stdin"),
+    handoff: str | None = typer.Option(None, "--handoff", help="Path to a source handoff JSON file (combine with --stdin to read it from stdin)"),
+    stdin: bool = typer.Option(False, "--stdin", help="Read a JSON capture object (or, with --handoff, a handoff envelope) from stdin"),
     state_dir: str = typer.Option("state", "--state-dir", help="Concept store directory"),
     output_format: str = typer.Option("json", "--format", "-f", help="Output format: json or md"),
 ) -> None:
-    """Capture a weak signal, creating a new card or merging into an existing one."""
+    """Capture a weak signal or a source handoff, creating/merging concept cards."""
     store = ConceptStore(state_dir=state_dir)
 
     def run() -> dict:
+        if handoff is not None:
+            raw = _read_handoff_raw(handoff, stdin)
+            return capture_handoff(store, raw, merge_into=merge_into)
+
         kwargs: dict[str, Any] = {
             "source": source,
             "url": url,
@@ -718,13 +250,13 @@ def capture_cmd(
         if stdin:
             raw = sys.stdin.read()
             if not raw.strip():
-                raise ConceptCommandError("--stdin provided but stdin is empty")
+                raise ConceptValidationError("--stdin provided but stdin is empty")
             try:
                 data = json.loads(raw)
             except json.JSONDecodeError as exc:
-                raise ConceptCommandError(f"invalid stdin JSON: {exc}")
+                raise ConceptValidationError(f"invalid stdin JSON: {exc}")
             if not isinstance(data, dict):
-                raise ConceptCommandError("stdin JSON must be an object")
+                raise ConceptValidationError("stdin JSON must be an object")
             for key in (
                 "source", "url", "note", "title", "problem", "author",
                 "quoted_source_url", "upstream_origin", "role", "directness",
@@ -744,30 +276,15 @@ def capture_cmd(
 @concept.command("list")
 def list_cmd(
     stage: str | None = typer.Option(None, "--stage", help="Filter by portfolio stage"),
+    radar: str | None = typer.Option(None, "--radar", help="Filter by radar name (no-op until cards carry a radar field)"),
     state_dir: str = typer.Option("state", "--state-dir", help="Concept store directory"),
     output_format: str = typer.Option("json", "--format", "-f", help="Output format: json or md"),
 ) -> None:
-    """List concept cards, optionally filtered by stage."""
+    """List concept cards, optionally filtered by stage and/or radar name."""
     store = ConceptStore(state_dir=state_dir)
 
     def run() -> dict:
-        cards = store.list_concepts()
-        if stage:
-            try:
-                st = PortfolioStage(stage)
-            except ValueError:
-                raise ConceptCommandError(
-                    f"invalid stage {stage!r}; expected one of {[s.value for s in PortfolioStage]}"
-                )
-            cards = [c for c in cards if c.stage == st]
-        return {
-            "action": "listed",
-            "changed": [],
-            "data": {
-                "cards": [c.model_dump(mode="json") for c in cards],
-                "count": len(cards),
-            },
-        }
+        return list_cards(store, stage=stage, radar=radar)
 
     _finalize("concept.list", output_format, run)
 
@@ -782,22 +299,7 @@ def show_cmd(
     store = ConceptStore(state_dir=state_dir)
 
     def run() -> dict:
-        card = store.get_concept(concept_id)
-        if card is None:
-            raise ConceptCommandError(f"concept {concept_id!r} not found")
-        return {
-            "action": "shown",
-            "changed": [],
-            "data": {
-                "concept": card.model_dump(mode="json"),
-                "evidence": [
-                    e.model_dump(mode="json") for e in store.list_evidence(concept_id)
-                ],
-                "reviews": [
-                    r.model_dump(mode="json") for r in store.list_reviews(concept_id)
-                ],
-            },
-        }
+        return show(store, concept_id)
 
     _finalize("concept.show", output_format, run)
 
@@ -819,9 +321,9 @@ def move_cmd(
     store = ConceptStore(state_dir=state_dir)
 
     def run() -> dict:
-        review_dt = _parse_review_date(review_date) if review_date else None
-        smallest = _load_experiment(experiment, experiment_file)
-        return apply_move(
+        review_dt = parse_review_date(review_date) if review_date else None
+        smallest = parse_experiment(experiment, experiment_file)
+        return move(
             store,
             concept_id,
             stage,
@@ -846,7 +348,7 @@ def merge_cmd(
     store = ConceptStore(state_dir=state_dir)
 
     def run() -> dict:
-        return apply_merge(store, survivor_id, merged_id)
+        return merge(store, survivor_id, merged_id)
 
     _finalize("concept.merge", output_format, run)
 
@@ -863,17 +365,12 @@ def score_cmd(
     store = ConceptStore(state_dir=state_dir)
 
     def run() -> dict:
-        if not (0 <= user_alignment <= 3):
-            raise ConceptCommandError("--user-alignment must be 0-3")
-        if hype is not None and not (0 <= hype <= 3):
-            raise ConceptCommandError("--hype must be 0-3")
-        return score_card(store, concept_id, user_alignment=user_alignment, hype=hype)
+        return score(store, concept_id, user_alignment=user_alignment, hype=hype)
 
     _finalize("concept.score", output_format, run)
 
 
-@concept.command("review")
-def review_cmd(
+def outcome_cmd(
     concept_id: str = typer.Argument(..., help="Concept ID"),
     outcome: str = typer.Option(..., "--outcome", "-o", help="Outcome: confirmed, partially_confirmed, rejected, inconclusive"),
     lesson: str = typer.Option(..., "--lesson", "-l", help="Lesson learned from the outcome"),
@@ -886,7 +383,11 @@ def review_cmd(
     def run() -> dict:
         return record_outcome(store, concept_id, outcome, lesson)
 
-    _finalize("concept.review", output_format, run)
+    _finalize("concept.outcome", output_format, run)
+
+
+concept.command("outcome")(outcome_cmd)
+concept.command("review", deprecated=True)(outcome_cmd)
 
 
 # ── Markdown rendering ──
@@ -911,6 +412,11 @@ def _render_markdown(payload: dict) -> str:
             lines.append("**Missing requirements:**")
             for m in details["missing"]:
                 lines.append(f"- {m}")
+        if details.get("conflicts"):
+            lines.append("")
+            lines.append("**Conflicts:**")
+            for c in details["conflicts"]:
+                lines.append(f"- {c}")
         return "\n".join(lines)
 
     lines.append(f"**Action:** `{payload.get('action', '')}`")
@@ -924,21 +430,36 @@ def _render_markdown(payload: dict) -> str:
     lines.append("")
 
     if command == "concept.capture":
-        card = data.get("concept") or {}
-        lines.append(f"- concept: `{card.get('id', '?')}` ({card.get('title', '?')})")
-        lines.append(
-            f"- stage: {card.get('stage', '?')} / maturity: {card.get('maturity', '?')}"
-        )
-        if data.get("merged_into"):
-            lines.append(f"- merged into: `{data['merged_into']}`")
-        evidence = data.get("evidence") or {}
-        lines.append(
-            f"- evidence: `{evidence.get('id', '?')}` [{evidence.get('source_type', '?')}]"
-        )
-        for c in data.get("candidates") or []:
+        if payload.get("action") == "handoff_captured":
+            imp = data.get("import") or {}
+            lines.append(f"- imported: {imp.get('imported', 0)} evidence record(s)")
+            lines.append(f"- skipped (idempotent): {imp.get('skipped_idempotent', 0)}")
             lines.append(
-                f"  - candidate `{c['concept_id']}` — {c['title']} (score={c['score']:.2f})"
+                f"- created: {', '.join(data.get('created_ids') or []) or '(none)'}"
             )
+            lines.append(
+                f"- merged: {', '.join(data.get('merged_ids') or []) or '(none)'}"
+            )
+            for c in data.get("created") or []:
+                lines.append(f"  - created `{c.get('id')}` — {c.get('title')}")
+            for c in data.get("merged") or []:
+                lines.append(f"  - merged `{c.get('id')}` — {c.get('title')}")
+        else:
+            card = data.get("concept") or {}
+            lines.append(f"- concept: `{card.get('id', '?')}` ({card.get('title', '?')})")
+            lines.append(
+                f"- stage: {card.get('stage', '?')} / maturity: {card.get('maturity', '?')}"
+            )
+            if data.get("merged_into"):
+                lines.append(f"- merged into: `{data['merged_into']}`")
+            evidence = data.get("evidence") or {}
+            lines.append(
+                f"- evidence: `{evidence.get('id', '?')}` [{evidence.get('source_type', '?')}]"
+            )
+            for c in data.get("candidates") or []:
+                lines.append(
+                    f"  - candidate `{c['concept_id']}` — {c['title']} (score={c['score']:.2f})"
+                )
     elif command == "concept.list":
         for c in data.get("cards") or []:
             lines.append(f"- `{c.get('id')}` [{c.get('stage')}] {c.get('title')}")
@@ -975,7 +496,7 @@ def _render_markdown(payload: dict) -> str:
             lines.append(
                 "- build gate: missing " + ", ".join(gate.get("missing", []))
             )
-    elif command == "concept.review":
+    elif command in ("concept.review", "concept.outcome"):
         card = data.get("concept") or {}
         lines.append(f"- outcome: {card.get('outcome')}")
         lines.append(f"- lesson: {card.get('lesson')}")

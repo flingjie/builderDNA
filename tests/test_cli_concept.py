@@ -24,6 +24,7 @@ from cli.commands.concept import (
     derive_title,
     slugify,
 )
+from concepts.service import capture_handoff
 from concepts.store import ConceptStore
 from models.concept import (
     ConceptCard,
@@ -125,7 +126,7 @@ class TestCapture:
             "--problem", "exceeding latency budgets",
             "--note", "latency",
         )
-        assert result.exit_code == 1
+        assert result.exit_code == 2
         payload = load(result)
         assert payload["ok"] is False
         assert "ambiguous" in payload["error"]
@@ -204,7 +205,7 @@ class TestListShow:
 
     def test_show_missing_card_errors(self, app, runner, tmp_path):
         result = invoke(app, runner, tmp_path, "show", "nope")
-        assert result.exit_code == 1
+        assert result.exit_code == 2
         assert load(result)["ok"] is False
 
 
@@ -216,7 +217,7 @@ class TestMove:
         s = ConceptStore(state_dir=tmp_path)
         s.upsert_concept(ConceptCard(id="c1", title="C1", stage=PortfolioStage.VERIFY))
         result = invoke(app, runner, tmp_path, "move", "c1", "build", "--reason", "r")
-        assert result.exit_code == 1
+        assert result.exit_code == 2
         error = load(result)["error"]
         assert "--prediction" in error
         assert "--expected-evidence" in error
@@ -236,7 +237,7 @@ class TestMove:
             "--review-date", "2026-09-08T00:00:00Z",
             "--experiment", experiment,
         )
-        assert result.exit_code == 1
+        assert result.exit_code == 4
         payload = load(result)
         assert payload["ok"] is False
         joined = " ".join(payload["details"]["missing"])
@@ -291,7 +292,7 @@ class TestMove:
     def test_move_same_stage_aborts(self, app, runner, tmp_path):
         invoke(app, runner, tmp_path, "capture", "--title", "Agent Reliability", "--note", "n")
         result = invoke(app, runner, tmp_path, "move", "agent-reliability", "inbox", "--reason", "r")
-        assert result.exit_code == 1
+        assert result.exit_code == 2
         assert "already in stage" in load(result)["error"]
 
 
@@ -332,7 +333,7 @@ class TestMerge:
     def test_merge_missing_card_errors(self, app, runner, tmp_path):
         invoke(app, runner, tmp_path, "capture", "--title", "Agent Reliability", "--note", "n")
         result = invoke(app, runner, tmp_path, "merge", "agent-reliability", "nope")
-        assert result.exit_code == 1
+        assert result.exit_code == 2
         assert load(result)["ok"] is False
 
 
@@ -377,3 +378,120 @@ class TestHelpers:
         assert out1["action"] == "created"
         assert out2["action"] == "already_captured"
         assert len(store.list_concepts()) == 1
+
+
+# ── capture --handoff (Task 7) ──
+
+
+def _handoff_envelope(**item_overrides) -> dict:
+    item = {
+        "source": "x",
+        "role": "problem",
+        "author": "alice_dev",
+        "url": "https://x.com/alice_dev/status/1234567890",
+        "excerpt": "Long-running agents silently drift from their stated goals.",
+        "directness": "direct",
+        "strength": "moderate",
+        "proposed_concept": {
+            "title": "Agent goal-drift detector",
+            "problem": "Long-running agents silently drift from their stated goals",
+            "why_now": "More teams run agents for hours at a time",
+        },
+    }
+    item.update(item_overrides)
+    return {
+        "schema_version": 1,
+        "source_phase": "x-discovery",
+        "coverage": "partial",
+        "coverage_notes": [],
+        "items": [item],
+    }
+
+
+class TestCaptureHandoff:
+    def test_capture_handoff_service_imports_and_returns_created_ids(self, store):
+        result = capture_handoff(store, _handoff_envelope())
+        assert result["action"] == "handoff_captured"
+        assert result["data"]["created_ids"] == ["agent-goal-drift-detector"]
+        assert result["data"]["merged_ids"] == []
+        assert result["data"]["import"]["imported"] == 1
+        assert result["data"]["import"]["conflicts"] == []
+        assert store.get_concept("agent-goal-drift-detector") is not None
+        assert len(store.list_evidence()) == 1
+
+    def test_capture_handoff_service_merges_exact_match(self, store):
+        store.upsert_concept(ConceptCard(
+            id="agent-goal-drift-detector",
+            title="Agent goal-drift detector",
+            problem="Long-running agents silently drift from their stated goals",
+        ))
+        result = capture_handoff(store, _handoff_envelope())
+        assert result["data"]["created_ids"] == []
+        assert result["data"]["merged_ids"] == ["agent-goal-drift-detector"]
+
+    def test_capture_handoff_cli_returns_exit_0(self, app, runner, tmp_path):
+        path = tmp_path / "handoff.json"
+        path.write_text(json.dumps(_handoff_envelope()))
+        result = invoke(app, runner, tmp_path, "capture", "--handoff", str(path))
+        assert result.exit_code == 0, result.stdout
+        payload = load(result)
+        assert payload["ok"] is True
+        assert payload["action"] == "handoff_captured"
+        assert payload["data"]["created_ids"] == ["agent-goal-drift-detector"]
+
+    def test_capture_handoff_conflict_exits_3(self, app, runner, tmp_path):
+        ConceptStore(state_dir=tmp_path).add_evidence(ConceptEvidence(
+            id="x:x.com/alice_dev/status/1234567890",
+            concept_id="unassigned",
+            source_type=SourceType.X,
+            source_url="https://x.com/alice_dev/status/1234567890",
+            role=EvidenceRole.PROBLEM,
+            directness=Directness.DIRECT,
+            strength=EvidenceStrength.MODERATE,
+            independence_key="x:x.com/alice_dev/status/1234567890",
+            note="a different pre-existing payload",
+        ))
+        path = tmp_path / "handoff.json"
+        path.write_text(json.dumps(_handoff_envelope()))
+        result = invoke(app, runner, tmp_path, "capture", "--handoff", str(path))
+        assert result.exit_code == 3
+        assert load(result)["ok"] is False
+        assert load(result)["error"]
+
+    def test_capture_handoff_suggested_never_auto_merges(self, app, runner, tmp_path):
+        s = ConceptStore(state_dir=tmp_path)
+        s.upsert_concept(ConceptCard(
+            id="agent-goal-drift-detector",
+            title="Agent goal-drift detector",
+            problem="an entirely different failure mode",
+        ))
+        path = tmp_path / "handoff.json"
+        path.write_text(json.dumps(_handoff_envelope()))
+        result = invoke(app, runner, tmp_path, "capture", "--handoff", str(path))
+        assert result.exit_code == 2
+        assert "ambiguous" in load(result)["error"]
+        assert len(s.list_concepts()) == 1  # nothing merged, nothing created
+
+
+# ── exit-code contract (Task 7) ──
+
+
+class TestExitCodes:
+    def test_blocked_build_gate_exits_4(self, app, runner, tmp_path):
+        ConceptStore(state_dir=tmp_path).upsert_concept(
+            ConceptCard(id="c1", title="C1", stage=PortfolioStage.VERIFY)
+        )
+        experiment = json.dumps({
+            "hypothesis": "h", "target": "t", "artifact": "a",
+            "success_threshold": "s", "failure_threshold": "f",
+            "stop_condition": "stop",
+        })
+        result = invoke(
+            app, runner, tmp_path, "move", "c1", "build",
+            "--reason", "r", "--prediction", "p", "--expected-evidence", "e",
+            "--review-date", "2026-09-08T00:00:00Z", "--experiment", experiment,
+        )
+        assert result.exit_code == 4
+        payload = load(result)
+        assert payload["ok"] is False
+        assert "missing" in payload["details"]

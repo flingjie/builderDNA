@@ -7,7 +7,10 @@ Subcommands
 -----------
 ``radar scan <name>``          — scan a radar across its sources; record per-source
                                  coverage and surface affected concept cards.
-``radar verify <concept_id>``  — run the hard build gate on one concept card.
+``radar verify <concept_id>``  — run the six-gate build check on one concept card;
+                                 ``--handoff`` imports a verification handoff first.
+``radar experiment <id>``      — export a reviewable FDE-Gym scenario proposal from a
+                                 Build-gated card (rejects unfalsifiable experiments).
 ``radar review <name>``        — weekly summary; surface build-eligible cards,
                                  respecting ``weekly_build_cap``.
 ``radar source-audit <name>``  — list per-source coverage status for a radar.
@@ -32,6 +35,7 @@ gaps: an unavailable source is never silently substituted by another source.
 """
 from __future__ import annotations
 
+import json
 from collections import defaultdict
 from pathlib import Path
 from typing import Callable
@@ -40,8 +44,30 @@ import typer
 import yaml
 from pydantic import BaseModel, ValidationError
 
-from concepts.scoring import evaluate_build_gate
+from concepts.handoffs import (
+    SourceHandoffEnvelope,
+    import_handoff,
+    normalize_handoff,
+)
+from concepts.scoring import (
+    GATE_COUNTEREVIDENCE_REVIEWED,
+    GATE_DESCRIPTIONS,
+    GATE_EXPERIMENT_THRESHOLDS_AND_BUDGET,
+    GATE_ORDER,
+    GATE_SMALLEST_EXPERIMENT_PRESENT,
+    GATE_TWO_INDEPENDENT_CHAINS,
+    GATE_TWO_SOURCE_TYPES,
+    GATE_WEEKLY_BUILDS_AVAILABLE,
+    evaluate_build_gate,
+    score,
+)
 from concepts.store import ConceptStore
+from experiments.fde_gym import (
+    FdeGymScenarioProposal,
+    ScenarioExportError,
+    export_fde_gym_scenario,
+)
+from experiments.generator import ExperimentGenerationError, generate_experiment
 from models.concept import (
     ConceptEvidence,
     EvidenceRole,
@@ -90,7 +116,7 @@ class RadarConfig(BaseModel):
 # ── Verify payload (no canonical model exists for the build-gate report) ──
 
 class GateRequirement(BaseModel):
-    """One of the four hard build-gate requirements and whether it is met."""
+    """One of the six hard build-gate requirements and whether it is met."""
 
     name: str
     met: bool
@@ -106,15 +132,26 @@ class VerifyEvidence(BaseModel):
     counterevidence_count: int
 
 
+class HandoffImportSummary(BaseModel):
+    """Summary of one atomic verification-handoff import."""
+
+    imported: int
+    skipped_idempotent: int
+    conflicts: list[str] = []
+    attached_evidence_ids: list[str] = []
+
+
 class VerifyPayload(BaseModel):
-    """Structured build-gate report for ``radar verify``."""
+    """Structured six-gate build-gate report for ``radar verify``."""
 
     concept_id: str
     title: str
     passed: bool
+    total: int = 0
     requirements: list[GateRequirement]
     missing: list[str]
     evidence: VerifyEvidence
+    handoff: HandoffImportSummary | None = None
 
 
 # ── Errors ──
@@ -135,24 +172,43 @@ GAP_MARKER = "[coverage gap"
 # PARTIAL (comments not read) unless a record is explicitly annotated otherwise.
 COMMENTS_READ_MARKER = "[comments read]"
 
-# The four hard build-gate requirements, in a stable display order. Each name
-# must be a prefix of the corresponding "missing" string emitted by
-# ``concepts.scoring.evaluate_build_gate`` so we can map met/unmet.
-GATE_REQUIREMENT_SPECS: tuple[tuple[str, str], ...] = (
-    ("two source types", "at least two distinct evidence source types"),
-    (
-        "two independent supporting chains",
-        "at least two independent supporting evidence chains (counterevidence excluded)",
-    ),
-    (
-        "reviewed counterevidence",
-        "counterevidence is absent or resolved (maturity is not 'contested')",
-    ),
-    (
-        "a bounded smallest experiment",
-        "a bounded, falsifiable smallest experiment is defined",
-    ),
-)
+# Specific "missing" detail per failed six-gate name, rendered only for gates the
+# scorer reports failed. Pass/fail itself comes from ``concepts.scoring.score``;
+# these strings just make each failure actionable without re-deriving the check.
+def _gate_missing_details(card, evidence) -> dict[str, str]:
+    source_types = {e.source_type for e in evidence}
+    supporting = [e for e in evidence if e.role != EvidenceRole.COUNTER]
+    chains = {e.independence_key for e in supporting}
+    return {
+        GATE_TWO_SOURCE_TYPES: f"at least two source types (have {len(source_types)})",
+        GATE_TWO_INDEPENDENT_CHAINS: (
+            f"at least two independent supporting chains (have {len(chains)})"
+        ),
+        GATE_COUNTEREVIDENCE_REVIEWED: (
+            "counterevidence present but unresolved (maturity is 'contested')"
+        ),
+        GATE_SMALLEST_EXPERIMENT_PRESENT: "a bounded smallest experiment is defined",
+        GATE_EXPERIMENT_THRESHOLDS_AND_BUDGET: (
+            "experiment must include success threshold, failure threshold, and a "
+            "stop condition"
+        ),
+        GATE_WEEKLY_BUILDS_AVAILABLE: "weekly build budget exhausted for this run",
+    }
+
+
+def _verify_requirements(
+    card,
+    evidence,
+    passed_gates: set[str],
+) -> list[GateRequirement]:
+    """Render the six build gates, with a specific detail for each failed gate."""
+    missing_details = _gate_missing_details(card, evidence)
+    requirements = []
+    for gate_name in GATE_ORDER:
+        met = gate_name in passed_gates
+        detail = GATE_DESCRIPTIONS[gate_name] if met else missing_details[gate_name]
+        requirements.append(GateRequirement(name=gate_name, met=met, detail=detail))
+    return requirements
 
 
 # ── Config loading ──
@@ -391,7 +447,7 @@ def _render_verify_md(payload: VerifyPayload) -> str:
 
 radar_app = typer.Typer(
     name="radar",
-    help="Cross-source concept radar: scan, verify, review, and source-audit.",
+    help="Cross-source concept radar: scan, verify, experiment, review, and source-audit.",
     no_args_is_help=True,
 )
 
@@ -470,15 +526,106 @@ def scan(
     vprint(f"[green]radar scan → {out}[/green]", level=OutputLevel.NORMAL)
 
 
+def _read_verification_handoff(path: str) -> SourceHandoffEnvelope:
+    """Read and validate a verification handoff JSON file.
+
+    Raises :class:`RadarConfigError` for a missing file, invalid JSON, or a
+    handoff that fails envelope validation. Validation is atomic: one
+    structurally invalid item rejects the whole handoff, matching
+    ``concepts.handoffs.import_handoff``.
+    """
+    handoff_path = Path(path)
+    if not handoff_path.exists():
+        raise RadarConfigError(f"handoff file not found: {handoff_path}")
+    try:
+        raw = handoff_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise RadarConfigError(f"cannot read handoff file {handoff_path}: {exc}") from exc
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise RadarConfigError(f"invalid JSON in handoff {handoff_path}: {exc}") from exc
+    if not isinstance(data, dict):
+        raise RadarConfigError(f"handoff {handoff_path} must be a JSON object")
+    try:
+        return SourceHandoffEnvelope.model_validate(data)
+    except ValidationError as exc:
+        raise RadarConfigError(f"invalid verification handoff {handoff_path}: {exc}") from exc
+
+
+def _attach_handoff_evidence(
+    store: ConceptStore,
+    concept_id: str,
+    envelope: SourceHandoffEnvelope,
+) -> HandoffImportSummary:
+    """Import a verification handoff and attach its evidence to ``concept_id``.
+
+    Verification handoffs (GitHub / paper / official doc) attach to an existing
+    concept the envelope does not name, so ``import_handoff`` lands them under a
+    placeholder ``concept_id``. This re-points each imported record to
+    ``concept_id`` with the same append-only ``supersedes`` pattern as a concept
+    merge, then links the attached IDs onto the card's ``evidence_ids``. Replay
+    is idempotent: a re-targeted record is only appended once and the card's
+    ``evidence_ids`` stays de-duplicated.
+    """
+    result = import_handoff(store, envelope)
+
+    attached: list[str] = []
+    for record in normalize_handoff(envelope):
+        if record.concept_id == concept_id:
+            attached.append(record.id)
+            continue
+        re_targeted_id = f"{record.id}->{concept_id}"
+        if store.get_evidence(re_targeted_id) is None:
+            store.add_evidence(
+                ConceptEvidence(
+                    id=re_targeted_id,
+                    concept_id=concept_id,
+                    source_type=record.source_type,
+                    source_url=record.source_url,
+                    role=record.role,
+                    directness=record.directness,
+                    strength=record.strength,
+                    independence_key=record.independence_key,
+                    note=record.note,
+                    supersedes=record.id,
+                )
+            )
+        attached.append(re_targeted_id)
+
+    card = store.get_concept(concept_id)
+    evidence_ids = list(card.evidence_ids)
+    for evidence_id in attached:
+        if evidence_id not in evidence_ids:
+            evidence_ids.append(evidence_id)
+    store.upsert_concept(card.model_copy(update={"evidence_ids": evidence_ids}))
+
+    return HandoffImportSummary(
+        imported=result.imported,
+        skipped_idempotent=result.skipped_idempotent,
+        conflicts=list(result.conflicts),
+        attached_evidence_ids=attached,
+    )
+
+
 @radar_app.command("verify")
 def verify(
     concept_id: str = typer.Argument(..., help="Concept card ID to verify"),
+    handoff: str | None = typer.Option(
+        None, "--handoff", help="Path to a verification handoff JSON file to import"
+    ),
     state_dir: str = typer.Option("state", "--state-dir", help="Concept store directory"),
     output: str = typer.Option(
         "output/radar/verify.json", "--output", "-o", help="Output JSON path"
     ),
 ) -> None:
-    """Run the hard build gate on one concept card and report what is missing."""
+    """Run the six-gate build check on one card and report what is missing.
+
+    ``--handoff`` imports a verification handoff atomically (via
+    ``concepts.handoffs.import_handoff``) and attaches its evidence to the card
+    before scoring. Without it, the card and its already-stored evidence are
+    scored as-is.
+    """
     store = ConceptStore(state_dir=state_dir)
     card = store.get_concept(concept_id)
     if card is None:
@@ -488,15 +635,20 @@ def verify(
         )
         raise typer.Exit(1)
 
-    evidence = store.list_evidence(concept_id)
-    gate = evaluate_build_gate(card, evidence)
+    handoff_summary: HandoffImportSummary | None = None
+    if handoff is not None:
+        try:
+            envelope = _read_verification_handoff(handoff)
+        except (RadarConfigError, ValidationError) as exc:
+            vprint(f"[red]{exc}[/red]", level=OutputLevel.QUIET)
+            raise typer.Exit(1)
+        handoff_summary = _attach_handoff_evidence(store, concept_id, envelope)
+        card = store.get_concept(concept_id)
 
-    requirements = []
-    for name, description in GATE_REQUIREMENT_SPECS:
-        miss = next((m for m in gate.missing if m.startswith(name)), None)
-        requirements.append(
-            GateRequirement(name=name, met=miss is None, detail=miss or description)
-        )
+    evidence = store.list_evidence(concept_id)
+    result = score(card, evidence)
+
+    requirements = _verify_requirements(card, evidence, set(result.passed_gates))
 
     evidence_summary = VerifyEvidence(
         source_types=sorted({e.source_type.value for e in evidence}),
@@ -512,16 +664,135 @@ def verify(
     payload = VerifyPayload(
         concept_id=concept_id,
         title=card.title,
-        passed=gate.passed,
+        passed=not result.failed_gates,
+        total=result.total,
         requirements=requirements,
-        missing=list(gate.missing),
+        missing=list(result.failed_gates),
         evidence=evidence_summary,
+        handoff=handoff_summary,
     )
     out = _emit(payload, Path(output), VerifyPayload, _render_verify_md)
     vprint(
-        f"[green]build gate {'passed' if gate.passed else 'not passed'} → {out}[/green]",
+        f"[green]build gate {'passed' if payload.passed else 'not passed'} → {out}[/green]",
         level=OutputLevel.NORMAL,
     )
+
+
+@radar_app.command("experiment")
+def experiment(
+    concept_id: str = typer.Argument(..., help="Concept card ID"),
+    output_format: str = typer.Option(
+        "json", "--format", "-f", help="Output format: json or fde-gym"
+    ),
+    budget: str = typer.Option(
+        None, "--budget", help="Time/cost budget committed to the experiment"
+    ),
+    scenario_name: str = typer.Option(
+        None, "--scenario-name", help="Scenario name (default: card title)"
+    ),
+    failure_mode: str = typer.Option(
+        None, "--failure-mode",
+        help="The specific failure the simulated environment reproduces",
+    ),
+    environment: str = typer.Option(
+        None, "--environment",
+        help="The simulated environment (state, tools, feedback)",
+    ),
+    agent_goal: str = typer.Option(
+        None, "--agent-goal", help="The visible goal given to the agent"
+    ),
+    hidden_constraints: list[str] | None = typer.Option(
+        None, "--hidden-constraint", help="A hidden constraint (repeatable)"
+    ),
+    counterexample: str = typer.Option(
+        None, "--counterexample", help="A concrete case where naive behaviour fails"
+    ),
+    replay_reset: str = typer.Option(
+        None, "--replay-reset",
+        help="How the scenario resets and replays deterministically",
+    ),
+    smallest_prototype: str = typer.Option(
+        None, "--smallest-prototype",
+        help="Minimal prototype (default: experiment core artifact)",
+    ),
+    success_criteria: list[str] | None = typer.Option(
+        None, "--success-criteria", help="Observable success criterion (repeatable)"
+    ),
+    state_dir: str = typer.Option("state", "--state-dir", help="Concept store directory"),
+    output: str = typer.Option(
+        "output/radar/experiment.json", "--output", "-o", help="Output JSON path"
+    ),
+) -> None:
+    """Export a reviewable FDE-Gym scenario proposal from a Build-gated card.
+
+    Loads the card and its evidence, requires a smallest experiment, generates a
+    bounded, falsifiable ``Experiment`` (rejecting anything missing a
+    success/failure threshold, budget, or stop condition), then exports an
+    ``FdeGymScenarioProposal``. Unsupported or unfalsifiable experiments are
+    rejected before export; this writes a proposal only and never mutates
+    FDE-Gym or any external repo.
+    """
+    if output_format not in ("json", "fde-gym"):
+        vprint(
+            f"[red]invalid --format {output_format!r}; expected 'json' or 'fde-gym'[/red]",
+            level=OutputLevel.QUIET,
+        )
+        raise typer.Exit(1)
+
+    store = ConceptStore(state_dir=state_dir)
+    card = store.get_concept(concept_id)
+    if card is None:
+        vprint(
+            f"[red]concept {concept_id!r} not found in store[/red]",
+            level=OutputLevel.QUIET,
+        )
+        raise typer.Exit(1)
+
+    if card.smallest_experiment is None:
+        vprint(
+            f"[red]concept {concept_id!r} is not Build-gated: no smallest "
+            "experiment is defined, so the success/failure thresholds and stop "
+            "condition are absent[/red]",
+            level=OutputLevel.QUIET,
+        )
+        raise typer.Exit(1)
+
+    evidence = store.list_evidence(concept_id)
+
+    try:
+        generated = generate_experiment(card, evidence, budget=budget)
+    except ExperimentGenerationError as exc:
+        vprint(f"[red]{exc}[/red]", level=OutputLevel.QUIET)
+        raise typer.Exit(1)
+
+    try:
+        proposal = export_fde_gym_scenario(
+            card,
+            evidence,
+            generated,
+            scenario_name=scenario_name,
+            failure_mode=failure_mode,
+            environment=environment,
+            agent_goal=agent_goal,
+            hidden_constraints=hidden_constraints,
+            success_criteria=success_criteria,
+            counterexample=counterexample,
+            replay_reset_requirements=replay_reset,
+            smallest_prototype=smallest_prototype,
+        )
+    except ScenarioExportError as exc:
+        vprint(f"[red]{exc}[/red]", level=OutputLevel.QUIET)
+        raise typer.Exit(1)
+
+    # JSON-first: write the proposal, re-validate the written JSON, done. A
+    # proposal only — no Markdown render, no external mutation.
+    out_path = Path(output)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    proposal_json = proposal.to_json()
+    out_path.write_text(proposal_json, encoding="utf-8")
+    FdeGymScenarioProposal.model_validate_json(proposal_json)
+
+    vprint(f"[green]radar experiment → {out_path}[/green]", level=OutputLevel.NORMAL)
 
 
 @radar_app.command("review")

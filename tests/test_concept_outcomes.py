@@ -113,7 +113,7 @@ class TestBuildRequiresPrediction:
             app, runner, tmp_path, "move", "agent-reliability", "build",
             "--reason", "r",
         )
-        assert result.exit_code == 1
+        assert result.exit_code == 2
         error = load(result)["error"]
         assert "--prediction" in error
         assert "--expected-evidence" in error
@@ -169,19 +169,19 @@ class TestReviewPreservesPrediction:
             ConceptCard(id="c1", title="C1", stage=PortfolioStage.WATCH)
         )
         result = invoke(app, runner, tmp_path, "review", "c1", "--outcome", "confirmed", "--lesson", "l")
-        assert result.exit_code == 1
+        assert result.exit_code == 2
         assert "no recorded prediction" in load(result)["error"]
 
     def test_review_invalid_outcome_rejected(self, app, runner, tmp_path):
         seed_build_card(ConceptStore(state_dir=tmp_path))
         result = invoke(app, runner, tmp_path, "review", "agent-reliability", "--outcome", "maybe", "--lesson", "l")
-        assert result.exit_code == 1
+        assert result.exit_code == 2
         assert "invalid outcome" in load(result)["error"]
 
     def test_review_requires_lesson(self, app, runner, tmp_path):
         seed_build_card(ConceptStore(state_dir=tmp_path))
         result = invoke(app, runner, tmp_path, "review", "agent-reliability", "--outcome", "confirmed", "--lesson", "")
-        assert result.exit_code == 1
+        assert result.exit_code == 2
         assert "requires --lesson" in load(result)["error"]
 
     def test_outcome_history_stays_traceable(self, app, runner, tmp_path):
@@ -220,3 +220,29 @@ class TestRecordOutcomeDirect:
         assert [o.value for o in OutcomeState] == [
             "confirmed", "partially_confirmed", "rejected", "inconclusive",
         ]
+
+
+# ── renamed outcome command (Task 7: review -> outcome) ──
+
+
+class TestOutcomeCommand:
+    def test_outcome_command_records_outcome(self, app, runner, tmp_path):
+        seed_build_card(ConceptStore(state_dir=tmp_path))
+        result = invoke(
+            app, runner, tmp_path, "outcome", "agent-reliability",
+            "--outcome", "confirmed", "--lesson", "the failure was real and fixable",
+        )
+        assert result.exit_code == 0, result.stdout
+        payload = load(result)
+        assert payload["action"] == "reviewed"
+        assert payload["data"]["concept"]["outcome"] == "confirmed"
+        assert payload["data"]["prediction_preserved"] is True
+
+    def test_review_alias_still_works(self, app, runner, tmp_path):
+        seed_build_card(ConceptStore(state_dir=tmp_path))
+        result = invoke(
+            app, runner, tmp_path, "review", "agent-reliability",
+            "--outcome", "rejected", "--lesson", "did not hold",
+        )
+        assert result.exit_code == 0, result.stdout
+        assert load(result)["data"]["concept"]["outcome"] == "rejected"

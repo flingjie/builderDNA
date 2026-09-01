@@ -7,9 +7,16 @@ Encodes the Task 5.2 acceptance criteria:
 - The output can be serialized to JSON and reconstructed.
 - The export composes (does not duplicate) the ``Experiment`` from Task 5.1 and
   fails closed when a required semantic field cannot be resolved.
+- The ``radar experiment`` CLI produces a linked proposal and rejects
+  unsupported/unfalsifiable experiments before export.
 """
-import pytest
+import json
 
+import pytest
+from typer.testing import CliRunner
+
+from cli.commands.radar import radar_app
+from concepts.store import ConceptStore
 from experiments.fde_gym import (
     FdeGymScenarioProposal,
     ScenarioExportError,
@@ -357,3 +364,67 @@ class TestFailsClosed:
                 replay_reset_requirements="r",
                 smallest_prototype="p",
             )
+
+
+# ── radar experiment CLI ──
+
+class TestRadarExperimentCli:
+    """The `radar experiment` CLI links evidence and fails closed before export."""
+
+    def _store(self, tmp_path, *, smallest_experiment=True):
+        store = ConceptStore(state_dir=tmp_path / "state")
+        card = make_card(
+            smallest_experiment=make_core() if smallest_experiment else None,
+        )
+        store.upsert_concept(card)
+        store.add_evidence(make_evidence("ev1"))
+        store.add_evidence(make_evidence("ev2"))
+        return store
+
+    def _export_args(self, store, out_json, **extra):
+        args = [
+            "experiment", "agent-reliability",
+            "--format", "fde-gym",
+            "--budget", "4 hours",
+            "--failure-mode", SCENARIO_KWARGS["failure_mode"],
+            "--environment", SCENARIO_KWARGS["environment"],
+            "--agent-goal", SCENARIO_KWARGS["agent_goal"],
+            "--hidden-constraint", SCENARIO_KWARGS["hidden_constraints"][0],
+            "--counterexample", SCENARIO_KWARGS["counterexample"],
+            "--replay-reset", SCENARIO_KWARGS["replay_reset_requirements"],
+            "--state-dir", str(store.state_dir),
+            "--output", str(out_json),
+        ]
+        return args
+
+    def test_experiment_produces_proposal_with_linked_evidence(self, tmp_path):
+        store = self._store(tmp_path)
+        out_json = tmp_path / "experiment.json"
+        result = CliRunner().invoke(radar_app, self._export_args(store, out_json))
+        assert result.exit_code == 0, result.output
+        payload = json.loads(out_json.read_text(encoding="utf-8"))
+        assert payload["concept_id"] == "agent-reliability"
+        assert payload["evidence_ids"] == ["ev1", "ev2"]
+        assert UNVERIFIABLE_SENTINEL not in out_json.read_text(encoding="utf-8")
+
+    def test_unfalsifiable_experiment_rejected_before_export(self, tmp_path):
+        store = self._store(tmp_path, smallest_experiment=False)
+        out_json = tmp_path / "experiment.json"
+        result = CliRunner().invoke(radar_app, self._export_args(store, out_json))
+        assert result.exit_code == 1
+        assert "Build-gated" in result.output or "smallest experiment" in result.output
+        assert not out_json.exists()
+
+    def test_missing_budget_rejected_before_export(self, tmp_path):
+        store = self._store(tmp_path)
+        out_json = tmp_path / "experiment.json"
+        args = [
+            "experiment", "agent-reliability",
+            "--format", "fde-gym",
+            "--state-dir", str(store.state_dir),
+            "--output", str(out_json),
+        ]
+        result = CliRunner().invoke(radar_app, args)
+        assert result.exit_code == 1
+        assert "budget" in result.output
+        assert not out_json.exists()

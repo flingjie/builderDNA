@@ -30,7 +30,7 @@ dev = [
 builderdna = "cli.main:app"
 
 [tool.setuptools.packages.find]
-include = ["models*", "collector*", "intelligence*", "signals*", "cli*"]
+include = ["models*", "collector*", "intelligence*", "signals*", "cli*", "observability*", "adapters*", "concepts*", "radar_cycles*", "experiments*"]
 exclude = ["snapshots*", "tests*"]
 
 [tool.setuptools]
