@@ -142,6 +142,7 @@ class IssueSignal(BaseModel):
     reactions: int = Field(default=0, description="Total reaction count (sum of all reaction types)")
     labels: list[str] = Field(default_factory=list, description="GitHub issue labels. Used for demand signal filtering.")
     url: str = Field(default="", description="Full GitHub issue URL")
+    created_at: str = Field(default="", description="Issue creation date (ISO 8601). Used for recurrence time-span computation.")
 
 
 class CollectPayload(BaseModel):
@@ -246,6 +247,10 @@ class OpportunityCard(BaseModel):
     demand_score: float = Field(description="Aggregate demand signal from trends + pain clusters (0-10)")
     competition_score: float = Field(description="Competition intensity from existing repo activity (0-10)")
     gap_score: float = Field(description="Opportunity gap = demand_score / max(0.1, competition_score). Higher = more underserved demand.")
+    rank_score: float = Field(
+        default=0.0,
+        description="Composite objective rank: gap × confidence × evidence diversity. gap is auxiliary — confidence and evidence breadth reorder. Default sort key when unpersonalized.",
+    )
     signals: list[str] = Field(default_factory=list, description="Supporting evidence: top repos and representative issues")
     recommended_action: str = Field(default="", description="Suggested next action: 'Build', 'Niche', 'Monitor', or 'Avoid'")
     quadrant: Literal["Build", "Niche", "Monitor", "Avoid"] = Field(

@@ -1,6 +1,7 @@
 """pain — cluster issue signals via HDBSCAN, output pain clusters."""
 import json
 import math
+from datetime import datetime
 from pathlib import Path
 
 import typer
@@ -14,6 +15,8 @@ from models.payload import (
 )
 from observability import RunTelemetry, OutputLevel, vprint, record_command, record_output_retention
 from observability.snapshot import save_pain_snapshot
+from observability.versions import algorithm_version
+from cli.commands.schema_validation import validate_collect_payload, validate_and_exit
 
 
 _WORKAROUND_KEYWORDS = (
@@ -39,6 +42,25 @@ def _extract_workarounds(issues: list[dict]) -> list[str]:
                     found.append(snippet)
                 break
     return found[:5]
+
+
+def _compute_time_span_days(issues: list[dict]) -> int:
+    """Days between the earliest and latest issue in a cluster (recurrence span).
+
+    Returns 0 when there are fewer than two dated issues (span unknown).
+    """
+    dates = []
+    for iss in issues:
+        ca = (iss.get("created_at") or "").strip()
+        if not ca:
+            continue
+        try:
+            dates.append(datetime.fromisoformat(ca.replace("Z", "+00:00")))
+        except (ValueError, TypeError):
+            continue
+    if len(dates) < 2:
+        return 0
+    return max(0, (max(dates) - min(dates)).days)
 
 
 def _get_embeddings(texts: list[str], model: str, base_url: str) -> list[list[float]]:
@@ -87,6 +109,8 @@ def pain(
     raw = json.loads(data_path.read_text())
     payload = raw.get("payload", raw)
     issues = payload.get("issues", [])
+
+    validate_and_exit(payload, "pain", validate_collect_payload(payload), vprint, OutputLevel)
 
     if not issues:
         diag = Diagnostics()
@@ -146,6 +170,7 @@ def pain(
                 frequency=len(cluster_issues),
                 affected_repos=repos,
                 independent_repo_count=len(repos),
+                time_span_days=_compute_time_span_days(cluster_issues),
                 existing_workarounds=_extract_workarounds(cluster_issues),
                 top_issues=[
                     IssueSummary(
@@ -202,7 +227,8 @@ def pain(
             repos_analyzed=list(set(iss.get("repo", "") for iss in issues)),
         ).model_dump(),
         stats={"clusters": len(pain_clusters_list), "issues_analyzed": len(issues),
-               "noise_count": noise_count, **tel.to_stats()},
+               "noise_count": noise_count, "algorithm_version": algorithm_version("pain"),
+               **tel.to_stats()},
         diagnostics=diag,
     )
 

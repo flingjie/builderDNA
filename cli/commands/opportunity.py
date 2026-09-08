@@ -31,6 +31,10 @@ from intelligence.opportunity.scoring import (
 from intelligence.opportunity.alignment import compute_alignment
 from observability import RunTelemetry, OutputLevel, vprint, record_command, record_output_retention
 from observability.snapshot import save_opportunity_snapshot
+from observability.versions import algorithm_version
+from cli.commands.schema_validation import (
+    validate_trend_payload, validate_pain_payload, validate_and_exit,
+)
 
 
 def _generate_cards(
@@ -101,7 +105,11 @@ def _generate_cards(
 
         action = recommend_action(topic, gap, quadrant, market_size, confidence)
 
-        # ── Alignment ─────────────────────────────────────────────
+        # ── Composite rank (P6) + alignment ────────────────────────
+        # gap is auxiliary; confidence and evidence breadth reorder it.
+        diversity_factor = 1.0 if len(top_repos) >= 2 else 0.5  # single-source penalty
+        rank_score = round(gap * confidence * diversity_factor, 2)
+
         personalized_score = None
         alignment_reason = ""
         alignment_multiplier = 1.0
@@ -109,7 +117,7 @@ def _generate_cards(
             alignment_multiplier, alignment_reason = compute_alignment(
                 trend, top_repos, user_dna, known_orgs=known_orgs,
             )
-            personalized_score = round(gap * alignment_multiplier, 1)
+            personalized_score = round(rank_score * alignment_multiplier, 1)
 
         # ── Evidence + bounded validation (P6) ────────────────────
         demand_evidence = [
@@ -142,6 +150,7 @@ def _generate_cards(
             demand_score=demand,
             competition_score=competition,
             gap_score=gap,
+            rank_score=rank_score,
             signals=signals[:5],
             recommended_action=action,
             quadrant=quadrant,
@@ -159,7 +168,7 @@ def _generate_cards(
             invalidation_condition=invalidation_condition,
         ))
 
-    cards.sort(key=lambda c: c.personalized_score if c.personalized_score is not None else c.gap_score, reverse=True)
+    cards.sort(key=lambda c: c.personalized_score if c.personalized_score is not None else c.rank_score, reverse=True)
     return cards
 
 
@@ -193,6 +202,9 @@ def opportunity(
     trends_data = json.loads(trends_path.read_text())
     t_payload = trends_data.get("payload", trends_data)
     p_payload = pains_data.get("payload", pains_data)
+
+    validate_and_exit(t_payload, "opportunity", validate_trend_payload(t_payload), vprint, OutputLevel)
+    validate_and_exit(p_payload, "opportunity", validate_pain_payload(p_payload), vprint, OutputLevel)
 
     trend_list = t_payload.get("trends", [])
     pain_list = p_payload.get("clusters", [])
@@ -280,6 +292,7 @@ def opportunity(
             "total": len(cards),
             "avg_gap": round(sum(c.gap_score for c in cards) / max(1, len(cards)), 2),
             "personalized": dna is not None,
+            "algorithm_version": algorithm_version("opportunity"),
             **tel.to_stats(),
         },
         diagnostics=diag,

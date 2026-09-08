@@ -15,6 +15,8 @@ from models.payload import (
 )
 from observability import RunTelemetry, OutputLevel, vprint, record_command, record_output_retention
 from observability.snapshot import save_trend_snapshot
+from observability.versions import algorithm_version
+from cli.commands.schema_validation import validate_collect_payload, validate_and_exit
 
 
 def trend(
@@ -32,6 +34,8 @@ def trend(
 
     raw = json.loads(data_path.read_text())
     payload = raw.get("payload", raw)
+
+    validate_and_exit(payload, "trend", validate_collect_payload(payload), vprint, OutputLevel)
 
     # Reconstruct Signal objects — prefer normalized signals when available
     signal_dicts = payload.get("signals", [])
@@ -168,7 +172,7 @@ def trend(
         command="trend",
         domain=domain,
         payload=TrendPayload(trends=trends, domain=domain, window_days=window).model_dump(),
-        stats={"total_trends": len(trends), **tel.to_stats()},
+        stats={"total_trends": len(trends), "algorithm_version": algorithm_version("trend"), **tel.to_stats()},
         diagnostics=diag,
     )
 

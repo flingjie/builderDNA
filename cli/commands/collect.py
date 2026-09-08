@@ -299,6 +299,7 @@ async def _run_collect(
                 reactions=s.payload.get("reactions", 0),
                 labels=s.payload.get("labels") or [],
                 url=s.payload.get("url") or "",
+                created_at=s.timestamp.isoformat() if s.timestamp else "",
             ))
 
     # Serialize normalized signals for downstream consumption

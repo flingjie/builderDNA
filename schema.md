@@ -46,7 +46,7 @@ Every SandboxResult includes structured diagnostics for downstream optimization:
 ## collect -> output/signals.json
 
 payload.repos[]: { full_name, owner, stars, forks, contributors, velocity, topics[], description, language, created_at }
-payload.issues[]: { repo, issue_number, title, body, comments, participants, reactions, labels[], url }
+payload.issues[]: { repo, issue_number, title, body, comments, participants, reactions, labels[], url, created_at }
 
 stats: { total_signals, repos, issues, topics_searched, topics_with_results, vendors_scanned, personalized }
 
@@ -69,12 +69,13 @@ stats: { clusters, issues_analyzed, noise_count }
 
 ## opportunity -> output/opportunities.json
 
-payload.opportunities[]: { title, demand_score, competition_score, gap_score, personalized_score, alignment_reason, alignment_multiplier, scoring_breakdown, signals[], recommended_action, demand_evidence[], competition_evidence[], counter_evidence[], minimal_validation_action, why_now, invalidation_condition }
+payload.opportunities[]: { title, demand_score, competition_score, gap_score, rank_score, personalized_score, alignment_reason, alignment_multiplier, scoring_breakdown, signals[], recommended_action, demand_evidence[], competition_evidence[], counter_evidence[], minimal_validation_action, why_now, invalidation_condition }
 
+- `rank_score` = gap × confidence × evidence-diversity — the default sort key. `gap_score` is auxiliary.
 - `demand_evidence` / `competition_evidence` / `counter_evidence` — the reasons behind each score, incl. evidence against.
 - `why_now` — why the opportunity is timely; `invalidation_condition` — what would disprove it.
 - `minimal_validation_action` — a bounded validation action, never full product development.
-- Low sample / single source triggers a confidence downgrade; `gap_score` is auxiliary, not the sole ranking key.
+- Low sample / single source triggers a confidence downgrade.
 stats: { total, avg_gap, personalized }
 
 ## report -> output/report-*.md|json

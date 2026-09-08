@@ -16,6 +16,7 @@ from models.payload import (
 )
 from intelligence.developer_dna import compute_developer_dna
 from observability import RunTelemetry, OutputLevel, vprint, record_command, record_output_retention
+from observability.versions import algorithm_version
 
 
 def dna(
@@ -63,6 +64,7 @@ def dna(
             "observed": sum(1 for d in result_dna.dimensions if d.status == "observed"),
             "inferred": sum(1 for d in result_dna.dimensions if d.status == "inferred"),
             "unknown": sum(1 for d in result_dna.dimensions if d.status == "unknown"),
+            "algorithm_version": algorithm_version("developer_dna"),
             **tel.to_stats(),
         },
         diagnostics=diag,
