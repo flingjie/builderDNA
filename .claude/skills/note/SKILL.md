@@ -309,7 +309,7 @@ Show status:
 
 Records are passive until `/reflect` runs. When reflect's Step 0 loads context, it now also reads `state/records.jsonl` for records where `processed_at` is null. These become additional signal sources for all three Lens agents, alongside the conversation transcript. After processing, `processed_at` is set.
 
-**Tag cross-pollination:** Value tags applied during `/note amplify` feed into the next `/reflect` as user self-tagged signals — the Value Lens treats these as higher-confidence inputs. See Tag Catalog in `references/reflection-protocol.md`.
+**Tag cross-pollination:** Value tags applied during `/note amplify` feed into the next `/reflect` as user self-tagged signals — the Decision Lens treats these as higher-confidence inputs. See Tag Catalog in `references/reflection-protocol.md`.
 
 (See `/reflect` skill for the integration point.)
 

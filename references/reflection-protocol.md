@@ -3,14 +3,13 @@
 Shared protocol specification for the `/reflect` and `/distill` skills. **Single source of truth** — both skills reference this file for schemas, lens definitions, adversary rules, and storage conventions.
 
 > **Convergence note (P4):** the `/reflect` and `/distill` skills now focus on
-> *technical judgment and cognition* only. Any reference in this protocol to
-> `state/user_dna.json`, a "self-model", `values`/`beliefs`/`criteria` diffs, or
-> a "Value Lens" is **superseded**. Those are no longer maintained: interests
-> live in `state/builder_interest_profile.json` (6 fields, ranking-only), and
-> cognitive blind-spots live in `state/digest_gaps.jsonl`. The lens/agent names
-> are interpreted as Decision/Assumption/Pattern (technical) rather than
-> Value/Ability (personality). See the `reflect`/`distill` SKILL.md files for
-> the current runtime orchestration.
+> *technical judgment and cognition* only. The legacy `state/user_dna.json`
+> "self-model" (a `values`/`beliefs`/`criteria` diff model, with Value/Ability
+> lens framing) is **superseded**. Interests live in
+> `state/builder_interest_profile.json` (6 fields, ranking-only); cognitive
+> blind-spots live in `state/digest_gaps.jsonl`. Lens names are interpreted as
+> Decision/Assumption/Pattern (technical), not Value/Ability (personality). See
+> the `reflect`/`distill` SKILL.md files for current runtime orchestration.
 
 ---
 
@@ -26,12 +25,12 @@ RAL Recording Layer (daily, passive)
   ▼
 /reflect (single conversation + unprocessed records → extraction)
   │
-  ├─ Load context: user_dna.json + reflections.jsonl + records.jsonl
+  ├─ Load context: builder_interest_profile.json + reflections.jsonl + records.jsonl
   ├─ Check pending action experiments from previous reflection
   ├─ Step 0.5: Preprocess (long conversations: extract signal-rich excerpts → condensed map)
   ├─ Pass 1: Parallel 3-Lens Extraction
-  │   ├─ Value Lens Agent   (segments → focus → attract/extract)
-  │   ├─ Ability Lens Agent (segments → focus → detect edges)
+  │   ├─ Decision Lens Agent   (segments → focus → attract/extract)
+  │   ├─ Assumption Lens Agent (segments → focus → detect edges)
   │   └─ Pattern Lens Agent (segments → focus → abstract 3 levels)
   ├─ Validation Gate (check schemas, handle failures, degraded modes)
   ├─ Pass 2: Adversary Agent (calibrate + reframe + concretize)
@@ -43,31 +42,31 @@ RAL Recording Layer (daily, passive)
   ├─ Gather unprocessed reflections
   ├─ Semantic search via claude-mem
   ├─ Produce Tension + Resolution narrative
-  ├─ Propose user_dna.json diffs
+  ├─ Propose technical-judgment updates → state/reflections.jsonl
   ├─ Write markdown report to state/distill_reports/
-  └─ User confirms/rejects → update user_dna.json
+  └─ User confirms/rejects → update state/reflections.jsonl
 ```
 
 ---
 
 ## The Three Lenses (Pass 1)
 
-Run all three in parallel. Each receives the conversation (full transcript or condensed signal map from Step 0.5 preprocessing) as input, plus the current user_dna.json as context.
+Run all three in parallel. Each receives the conversation (full transcript or condensed signal map from Step 0.5 preprocessing) as input, plus the current builder_interest_profile.json as context.
 
-### Value Lens
+### Decision Lens
 
 **Prompt:**
 
-> You are a Value Extraction Agent. Analyze the following conversation and extract what the user deeply cares about.
+> You are a Decision Extraction Agent. Analyze the following conversation and extract what technical decisions the user makes and why.
 >
 > **STEP 0 — Segment (切分):** Before any analysis, break the conversation into distinct segments by topic, task, or emotional register. A single undifferentiated "conversation" hides nuance. Identify 2-5 segments. For each, label the dominant topic and emotional tone.
 >
 > **STEP 1 — Focus (聚焦):** Not all segments are equal. Identify which segments contain the strongest signals — emotional spikes, unprompted initiation, flow states, or trade-off moments. Devote most of your analytical depth to the top 1-2 segments. Low-signal segments get a brief note; don't force findings from thin material.
 >
 > **STEP 2 — Extract:**
-> **Primary orientation: what is the user pursuing?** Look for direction, attraction, and energy — not just what they resist, but what they move toward.
+> **Primary orientation: what technical decisions is the user making, and why?** Look for direction, attraction, and energy — not just what they resist, but what they move toward.
 >
-> **Value tags MUST come from the Tag Catalog (see below).** Valid keys: `autonomy|collaboration|stability|competition|creation|exploration|optimization|execution|devtools|end_user|infrastructure|knowledge|growth|mastery|recognition|wealth`. Dimensions: `environment|activity|output|reward`. Never invent new keys.
+> **Interest tags MUST come from the Tag Catalog (see below).** Valid keys: `autonomy|collaboration|stability|competition|creation|exploration|optimization|execution|devtools|end_user|infrastructure|knowledge|growth|mastery|recognition|wealth`. Dimensions: `environment|activity|output|reward`. Never invent new keys.
 >
 > Focus on:
 > - **Attraction signals** — topics they initiate, explore, or lean into without being asked. What do they gravitate toward unprompted?
@@ -77,7 +76,7 @@ Run all three in parallel. Each receives the conversation (full transcript or co
 > - **Negative signals as navigation** — frustration, disappointment, and avoidance also point to what they value (strong reaction = something they care about was violated). Treat these as clues to underlying values, not as bugs to fix.
 > - **Self-initiated investment** — what they sacrifice time or attention for without external demand
 >
-> Current self-model context (from user_dna.json): [insert values]
+> Current interest profile context (from builder_interest_profile.json): [insert values]
 >
 > Output structured JSON:
 > ```json
@@ -92,7 +91,7 @@ Run all three in parallel. Each receives the conversation (full transcript or co
 >     }
 >   ],
 >   "focus_segments": ["labels of the segments that received deep analysis"],
->   "candidate_values": [
+>   "candidate_decisions": [
 >     {
 >       "key": "autonomy|collaboration|stability|competition|creation|exploration|optimization|execution|devtools|end_user|infrastructure|knowledge|growth|mastery|recognition|wealth",
 >       "dimension": "environment|activity|output|reward",
@@ -116,36 +115,35 @@ Run all three in parallel. Each receives the conversation (full transcript or co
 >       "trigger": "what caused it",
 >       "intensity": 1-10,
 >       "segment": "which segment",
->       "value_linked": "which value key this emotion connects to"
+>       "decision_linked": "which interest key this emotion connects to"
 >     }
 >   ],
->   "summary": "one-sentence synthesis of what this conversation reveals about the user's values — what they're moving TOWARD"
+>   "summary": "one-sentence synthesis of what this conversation reveals about the user's technical decisions — what they're moving TOWARD"
 > }
 > ```
 
-### Ability Lens
+### Assumption Lens
 
 **Prompt:**
 
-> You are an Ability Detection Agent. Analyze the following conversation and extract demonstrated or emerging capabilities.
+> You are an Assumption Detection Agent. Analyze the following conversation and extract the technical assumptions the user makes — unverified beliefs about how the technical world works, what they take for granted without testing.
 >
 > **STEP 0 — Segment (切分):** Before any analysis, break the conversation into distinct segments by topic, task, or register. Identify 2-5 segments. For each, label the dominant activity and cognitive demand.
 >
-> **STEP 1 — Focus (聚焦):** The highest-signal segments are where the user initiates, persists, or makes novel connections without prompting. Devote most analytical depth to the top 1-2 segments. Low-signal segments don't need forced findings.
+> **STEP 1 — Focus (聚焦):** The highest-signal segments are where the user asserts, generalizes, or dismisses without evidence. Devote most analytical depth to the top 1-2 segments. Low-signal segments don't need forced findings.
 >
 > **STEP 2 — Extract:**
-> **Primary orientation: what is the user becoming?** Look for capacities in motion — skills they're growing into, not just ones they've already mastered.
+> **Primary orientation: what does the user assume to be true?** Look for unverified beliefs, overgeneralizations, and taken-for-granted premises — the claims they make without a falsifiable test.
 >
 > Focus on:
-> - What they built, designed, or analyzed — especially work they initiated without external pressure
-> - What connections they made that show depth — novel links between concepts
-> - What frameworks or mental models they applied instinctively
-> - What they taught or explained to others with enthusiasm
-> - What complexity they navigated comfortably
-> - **Intrinsic persistence** — what they keep working at despite difficulty or lack of external reward
-> - **Emerging edges** — skills that are surfacing but not yet fully formed. What are they reaching toward that they can't do well yet but care about doing?
+> - **Unverified assertions** — claims stated as fact without a citation, benchmark, or prior test ("obviously X", "everyone knows Y", "it's always Z")
+> - **Overgeneralization** — a conclusion drawn from a single example, repo, or benchmark
+> - **Taken-for-granted premises** — design/architecture assumptions they never question
+> - **Dismissal without investigation** — a tool or approach rejected on reputation, not evidence
+> - **Falsifiability gap** — a belief stated in a form that no evidence could disprove
+> - **Emerging edges** — assumptions they're starting to form but haven't tested yet
 >
-> Current self-model context (from user_dna.json): [insert values/preferences]
+> Current interest profile context (from builder_interest_profile.json): [insert values/preferences]
 >
 > Output structured JSON:
 > ```json
@@ -160,18 +158,18 @@ Run all three in parallel. Each receives the conversation (full transcript or co
 >     }
 >   ],
 >   "focus_segments": ["labels of the segments that received deep analysis"],
->   "demonstrated_abilities": [
+>   "identified_assumptions": [
 >     {
->       "ability": "short label, e.g. system_design, code_architecture, strategic_thinking",
+>       "assumption": "short label, e.g. 'benchmarks_equal_reality', 'single_source_is_representative'",
 >       "evidence": "direct quote or behavioral observation",
 >       "segment": "which segment this came from",
->       "level": "emerging|developing|mastered",
+>       "testability": "falsifiable|unfalsifiable",
 >       "confidence": 0.0-1.0
 >     }
 >   ],
 >   "emerging_edges": [
 >     {
->       "ability": "what they're reaching toward",
+>       "assumption": "what they're starting to believe but haven't tested",
 >       "evidence": "what shows this direction of growth",
 >       "segment": "which segment",
 >       "confidence": 0.0-1.0
@@ -180,7 +178,7 @@ Run all three in parallel. Each receives the conversation (full transcript or co
 >   "new_connections": [
 >     "description of a novel link the user made between concepts"
 >   ],
->   "summary": "one-sentence synthesis of the user's demonstrated capabilities and growth direction"
+>   "summary": "one-sentence synthesis of the user's identified technical assumptions"
 > }
 > ```
 
@@ -214,9 +212,9 @@ Run all three in parallel. Each receives the conversation (full transcript or co
 > Example: "They spent 2 hours debugging a test config" (case) → "Invests heavily in toolchain reliability" (pattern) → "Values infrastructure-quality foundations that compound over time" (principle)
 >
 > Cross-reference data:
-> - Current self-model (user_dna.json): [insert full model]
+> - Current interest profile (builder_interest_profile.json): [insert full model]
 > - Historical reflections (if available): [insert search results from claude-mem]
-> - If this is the first reflection: state "First reflection — cross-referencing user_dna.json only. Historical patterns will emerge with more data."
+> - If this is the first reflection: state "First reflection — cross-referencing builder_interest_profile.json only. Historical patterns will emerge with more data."
 >
 > Output structured JSON:
 > ```json
@@ -286,18 +284,18 @@ Runs inline in the main conversation BEFORE the adversary agent is spawned. Vali
 For each lens output, verify these invariants before passing to adversary:
 
 ```
-Value Lens:
+Decision Lens:
   ✓ segments is non-empty array, each has label + signal_strength
   ✓ focus_segments is non-empty array
   ✓ summary is non-empty string
-  ✓ candidate_values: each has key from allowed enum (Tag Catalog), confidence 0-1, direction from allowed enum
-  ✓ NO candidate_value has a key outside the 16 allowed values. If found → drop that finding, flag as "invalid_tag"
+  ✓ candidate_decisions: each has key from allowed enum (Tag Catalog), confidence 0-1, direction from allowed enum
+  ✓ NO candidate_decision has a key outside the 16 allowed values. If found → drop that finding, flag as "invalid_tag"
 
-Ability Lens:
+Assumption Lens:
   ✓ segments is non-empty array
   ✓ focus_segments is non-empty array
   ✓ summary is non-empty string
-  ✓ demonstrated_abilities: each has ability label, evidence, level from allowed enum, confidence 0-1
+  ✓ identified_assumptions: each has ability label, evidence, level from allowed enum, confidence 0-1
 
 Pattern Lens:
   ✓ segments is non-empty array
@@ -336,7 +334,7 @@ The adversary does NOT simply filter everything. It distinguishes between two th
 
 **Corroboration sources:**
 1. Another lens agent found the same or related signal
-2. user_dna.json shows a consistent value pattern
+2. builder_interest_profile.json shows a consistent value pattern
 3. Historical reflections (if available) show the same pattern
 4. The evidence quote is specific and behavioral (not vague)
 
@@ -369,10 +367,10 @@ The adversary does NOT simply filter everything. It distinguishes between two th
 > Example: Insight "user values building tools over writing reports" → Experiment: "If I'm asked to produce a deliverable, then I'll spend 10 minutes building a small helper script before writing the narrative — and track which part energized me more."
 >
 > Inputs:
-> - Value Lens output: [insert]
-> - Ability Lens output: [insert]
+> - Decision Lens output: [insert]
+> - Assumption Lens output: [insert]
 > - Pattern Lens output: [insert]
-> - Current user_dna.json: [insert]
+> - Current builder_interest_profile.json: [insert]
 >
 > Output structured JSON:
 > ```json
@@ -431,7 +429,7 @@ Still save the reflection event to JSONL with `user_decisions: {accepted: [], re
 After the adversary produces surviving signals, Claude (in the main conversation) synthesizes them into:
 
 1. **Conversational summary** — "Here's what I noticed in this conversation..."
-2. **Proposed user_dna.json diffs** — specific, evidence-linked changes
+2. **Proposed technical-judgment updates** — specific, evidence-linked changes
 3. **Confirmation prompt** — immediate inline, user confirms/rejects each diff
 
 ---
@@ -450,14 +448,14 @@ Each line is a JSON object:
   "value_lens": {
     "segments": [{"label": "...", "topic": "...", "emotional_tone": "...", "signal_strength": "high", "rationale": "..."}],
     "focus_segments": ["..."],
-    "candidate_values": [
+    "candidate_decisions": [
       {"key": "creation", "dimension": "activity", "evidence": "...", "segment": "...", "confidence": 0.8, "direction": "strengthen"}
     ],
     "attraction_signals": [
       {"topic": "...", "trigger": "...", "segment": "...", "intensity": 8}
     ],
     "emotional_spikes": [
-      {"emotion": "excitement", "trigger": "...", "intensity": 8, "segment": "...", "value_linked": "creation"}
+      {"emotion": "excitement", "trigger": "...", "intensity": 8, "segment": "...", "decision_linked": "creation"}
     ],
     "summary": "..."
   },
@@ -465,7 +463,7 @@ Each line is a JSON object:
   "ability_lens": {
     "segments": [{"label": "...", "activity": "...", "cognitive_demand": "...", "signal_strength": "high", "rationale": "..."}],
     "focus_segments": ["..."],
-    "demonstrated_abilities": [
+    "identified_assumptions": [
       {"ability": "system_design", "evidence": "...", "segment": "...", "level": "developing", "confidence": 0.7}
     ],
     "emerging_edges": [
@@ -524,27 +522,23 @@ Each line is a JSON object:
     "surviving_signals_summary": "..."
   },
   
-  "proposed_dna_diffs": {
-    "values": {
-      "environment": {
-        "scores": {
-          "autonomy": {"from": 7, "to": 8, "evidence": "...", "confidence": 0.8}
-        }
-      }
-    },
-    "beliefs": [
-      {"statement": "...", "confidence": 0.85, "action": "add", "evidence": "..."}
+  "proposed_updates": {
+    "decisions": [
+      {"key": "autonomy", "dimension": "environment", "from": null, "to": 8, "evidence": "...", "confidence": 0.8, "direction": "strengthen"}
     ],
-    "criteria": [
-      {"decision_context": "技术选型", "rule": "...", "action": "add"}
+    "assumptions": [
+      {"assumption": "...", "testability": "falsifiable", "evidence": "...", "action": "add"}
+    ],
+    "patterns": [
+      {"pattern": "...", "principle": "...", "evidence": "...", "confidence": 0.8}
     ]
   },
   
   "user_decisions": {
-    "accepted": ["diff_reference_1"],
-    "rejected": ["diff_reference_2"],
+    "accepted": ["update_reference_1"],
+    "rejected": ["update_reference_2"],
     "modified": [
-      {"diff": "diff_reference_3", "user_override": "actual value the user chose"}
+      {"update": "update_reference_3", "user_override": "actual value the user chose"}
     ]
   },
   
@@ -555,47 +549,48 @@ Each line is a JSON object:
 
 ---
 
-## DNA Diff Format
+## Reflection Update Format
 
-When proposing changes to user_dna.json, use this format:
+When proposing technical-judgment updates (written to `state/reflections.jsonl`), use this format:
 
 ```json
 {
-  "values": {
-    "<dimension: environment|activity|output|reward>": {
-      "scores": {
-        "<key>": {
-          "from": <current_score_or_null_if_new>,
-          "to": <proposed_score>,
-          "evidence": "<quote or behavioral observation>",
-          "confidence": 0.0-1.0
-        }
-      },
-      "ranking": ["<proposed new ranking>"]
-    }
-  },
-  "beliefs": [
+  "decisions": [
     {
-      "statement": "<belief text>",
+      "key": "<interest key from the Tag Catalog>",
+      "dimension": "environment|activity|output|reward",
+      "from": null,
+      "to": "<proposed affinity>",
+      "evidence": "<quote or behavioral observation>",
       "confidence": 0.0-1.0,
-      "action": "add|remove|modify",
-      "previous": "<previous statement if modify>",
-      "evidence": "<supporting evidence>"
+      "direction": "strengthen|weaken|new"
     }
   ],
-  "criteria": [
+  "assumptions": [
     {
-      "decision_context": "<context>",
-      "rule": "<rule text>",
-      "action": "add|remove|modify",
-      "evidence": "<supporting evidence>"
+      "assumption": "<unverified belief text>",
+      "testability": "falsifiable|unfalsifiable",
+      "evidence": "<supporting evidence>",
+      "action": "add|remove|modify"
     }
   ],
-  "preferences": {
-    "<field>": {"from": "<current>", "to": "<proposed>", "evidence": "..."}
-  }
+  "patterns": [
+    {
+      "pattern": "<short label>",
+      "principle": "<underlying truth>",
+      "evidence": "<supporting evidence>",
+      "confidence": 0.0-1.0
+    }
+  ]
 }
 ```
+
+**Notes:**
+- These updates reflect *technical judgment* (decisions, assumptions, reasoning
+  patterns) — they are **not** personality/values updates, and they never touch
+  `state/builder_interest_profile.json`.
+- `decisions[].key` and `dimension` use the internal scoring affinity keys
+  (see the Tag Catalog); they only reorder/reweight, never change facts.
 
 ---
 
@@ -615,7 +610,7 @@ Written to `state/distill_reports/YYYY-MM-DD_distill.md`.
 ## Resolution
 [How the tension was resolved — or why it's still unresolved]
 
-## Value Evolution
+## Decision & Assumption Evolution
 | Value | Before | After | Evidence |
 |-------|--------|-------|----------|
 | ... | ... | ... | ... |
@@ -638,7 +633,7 @@ Written to `state/distill_reports/YYYY-MM-DD_distill.md`.
 ## Emerging Edges
 - **[ability]**: [what they're reaching toward, with evidence across reflections]
 
-## Proposed Self-Model Updates
+## Proposed Technical-Cognition Updates
 - [diff 1]: [rationale]
 - [diff 2]: [rationale]
 
@@ -691,18 +686,18 @@ If the user declines, wait until the next `/reflect` completes before suggesting
 
 | Scenario | Behavior |
 |----------|----------|
-| user_dna.json missing or empty | `/reflect` runs without self-model context. Report notes: "没有现有的自我模型做对比，建议先运行 value-discovery。" |
+| builder_interest_profile.json missing or empty | `/reflect` runs without interest profile context. Report notes: "没有现有的兴趣画像做对比，建议先运行 value-discovery。" |
 | One lens agent fails/returns empty | Validation gate classifies as `failed`. Surviving lenses proceed per degraded mode rules. Report flags the missing lens. |
 | All three lens agents fail | Abort. Save minimal event with `status: "aborted"`. Report: "本轮复盘无法完成。" |
 | Adversary filters ALL signals | Don't force survival. Output: "本轮复盘没有发现足够置信度的信号。但这不代表对话没有价值——可能这次对话更多是探索性的，信号仍然积累在你的记录中。当下一个高频情绪信号出现时，它会和这次的信号产生联结。No proposed diffs." |
-| Proposed diff conflicts with current user_dna.json | Flag explicitly: "你之前认为[旧值]，这次信号建议[新值]。这可能代表成长，也可能代表这次对话的情绪强度放大了信号。你怎么看？" |
+| Proposed update conflicts with a prior reflection | Flag explicitly: "你之前认为[旧值]，这次信号建议[新值]。这可能代表成长，也可能代表这次对话的情绪强度放大了信号。你怎么看？" |
 | reflections.jsonl / records.jsonl has corrupt lines | Skip unparseable lines. Report: "跳过 [N] 行损坏数据，已修复 [K] 行。" Proceed with readable data. |
 | reflections.jsonl / records.jsonl >50% corrupt | Recommend manual recovery. Don't auto-delete. |
 | records.jsonl missing (first note capture) | Create new file. Not an error. |
 | claude-mem unavailable | Both skills work without semantic search. `/distill` falls back to date-range queries on JSONL. |
-| User rejects ALL proposed diffs | No update to user_dna.json. Reflection saved with rejection record. This IS signal for future adversary calibration. |
+| User rejects ALL proposed updates | No update written. Reflection saved with rejection record. This IS signal for future adversary calibration. |
 | Conversation too short/low-signal | KEEP the multi-pass protocol. Extraction confidence will naturally be lower. Adversary will flag thin evidence. Output is honest about signal quality. |
-| First reflection (cold start) | Full 3-agent protocol. Pattern Lens and Adversary cross-reference user_dna.json only (no historical reflections). Output notes: "这是你的第一次复盘——历史模式会随着更多复盘数据而浮现。" |
+| First reflection (cold start) | Full 3-agent protocol. Pattern Lens and Adversary cross-reference builder_interest_profile.json only (no historical reflections). Output notes: "这是你的第一次复盘——历史模式会随着更多复盘数据而浮现。" |
 | Emotion intensity but no clear value link | Adversary flags: "情绪信号真实但无法映射到具体价值——建议用户自行确认。" Survives with `requires_user_judgment: true`. Added to `deep_dive_candidates`. |
 | High-intensity signal with thin evidence | Don't filter. Survive with `requires_user_judgment: true`. Intensity IS evidence — of importance. The uncertainty is about interpretation, not about whether it matters. |
 
@@ -712,11 +707,11 @@ If the user declines, wait until the next `/reflect` completes before suggesting
 
 | File | Purpose | Writer | Reader |
 |------|---------|--------|--------|
-| `state/user_dna.json` | User cognitive model | value-discovery, `/distill` | All skills |
+| `state/builder_interest_profile.json` | Interest profile (ranking-only) | value-discovery, `/distill` | All skills |
 | `state/reflections.jsonl` | Full reflection event log | `/reflect` | `/distill` |
 | `state/records.jsonl` | RAL daily event captures | `/note` | `/reflect`, `/note` |
 | `state/distill_reports/` | Distill markdown reports | `/distill` | User (readable) |
-| `models/user_dna_schema.py` | Pydantic schema contract | (read-only reference) | All skills |
+| `models/builder_interest_profile.py` | Interest profile schema | (read-only reference) | All skills |
 
 ---
 
@@ -761,9 +756,9 @@ When appending to JSONL files in this project:
 
 ## Tag Catalog
 
-Single source of truth for all tagging in the reflection ecosystem. Both Value Lens agents and the `/note` amplify step reference this catalog.
+Single source of truth for all tagging in the reflection ecosystem. Both Decision Lens agents and the `/note` amplify step reference this catalog.
 
-### Value Tags (closed enumeration — tracked in user_dna.json)
+### Interest Tags (closed enumeration — tracked in builder_interest_profile.json)
 
 | Dimension | Keys | Description |
 |-----------|------|-------------|
@@ -785,9 +780,9 @@ Single source of truth for all tagging in the reflection ecosystem. Both Value L
 | | `wealth` | Financial outcomes and resources |
 
 These 16 keys are the ONLY valid values for:
-- Value Lens `candidate_values[].key`
+- Decision Lens `candidate_decisions[].key`
 - Note `value_tags[]`
-- user_dna.json value scoring
+- builder_interest_profile.json value scoring
 
 ### Energy Tags (closed enumeration)
 
@@ -797,17 +792,17 @@ These 16 keys are the ONLY valid values for:
 | `draining` | Activity consistently depletes energy |
 | `neutral` | No clear energy signal |
 
-### Domain Tags (open — user-defined, not tracked in user_dna)
+### Domain Tags (open — user-defined, not tracked in the profile)
 
-Domain tags are free-form and context-specific. Common examples: `coding`, `design`, `writing`, `meeting`, `teaching`, `research`, `management`, `hiring`, `sales`, `strategy`. These help group records but don't feed into the self-model.
+Domain tags are free-form and context-specific. Common examples: `coding`, `design`, `writing`, `meeting`, `teaching`, `research`, `management`, `hiring`, `sales`, `strategy`. These help group records but don't feed into the interest profile.
 
 When amplifying a record, suggest relevant domain tags from the user's existing tag vocabulary (look at past records for common values), and invite new ones.
 
 ### Tag Usage Rules
 
-1. **Value Lens**: MUST use only the 16 value keys. Never invent new ones.
+1. **Decision Lens**: MUST use only the 16 value keys. Never invent new ones.
 2. **Note amplify**: Suggest from the value tag catalog. Allow free-form domain tags. If the user consistently uses a domain tag that maps to a value key, note it.
-3. **Cross-population**: When a user adds a value tag during amplify, the next reflect's Value Lens gets a "user self-tagged" signal — higher confidence than purely extracted signals.
+3. **Cross-population**: When a user adds a value tag during amplify, the next reflect's Decision Lens gets a "user self-tagged" signal — higher confidence than purely extracted signals.
 4. **Evolution**: If a value tag is never used across 10+ reflections, flag it as potential prune candidate in the next distill. If a new value dimension consistently emerges in domain tags, flag it as a potential new value key.
 
 ---
@@ -823,9 +818,9 @@ This project uses two distinct version fields:
 | Field | Scope | Examples |
 |-------|-------|----------|
 | `protocol_version` | Reflection events in `reflections.jsonl`, digest gap reports in `digest_gaps.jsonl` | `"protocol_version": 6`, `"protocol_version": 2` |
-| `version` | Persistent state files that track their own schema independently | `user_dna.json` (`"version": 1`), `hypotheses.json` (`"version": 1`), `watches.json` (`"version": 1`) |
+| `version` | Persistent state files that track their own schema independently | `builder_interest_profile.json` (`"version": 1`), `hypotheses.json` (`"version": 1`), `watches.json` (`"version": 1`) |
 
-They evolve at different rates: `protocol_version` tracks the reflection/digest process format (frequently updated), while `version` tracks the data schema of each state file (rarely changed). A v1 `user_dna.json` is valid regardless of whether reflections are produced under v6 of the protocol.
+They evolve at different rates: `protocol_version` tracks the reflection/digest process format (frequently updated), while `version` tracks the data schema of each state file (rarely changed). A v1 `builder_interest_profile.json` is valid regardless of whether reflections are produced under v6 of the protocol.
 
 ### Backward Compatibility
 
@@ -835,7 +830,7 @@ When loading reflections.jsonl, events may have been written under older protoco
 |---------------|----------|
 | v6 (current) | Full field set available. Use as-is. |
 | v3-v5 | Missing fields from v6 additions: `action_experiments[].activated_at`, `action_experiments[].expires_at`, `action_experiments[].status`, `attraction_signals`, `emerging_edges`, `abstraction_layers`, `deep_dive_candidates`, `alternative_framing`, `perspective_switch`, `segments`, `focus_segments`, `energy_signature`, `cross_domain_connections`. Treat all as absent (null/empty). |
-| v1-v2 (legacy) | Original schema only: `candidate_values`, `emotional_spikes`, `demonstrated_abilities`, `identified_patterns`, `recurring_dilemmas`, `decision_heuristics`, `verdicts`, `filtered_signals`. All v3-v6 fields absent. Note: "此记录使用旧版协议 (v1/v2)，部分字段缺失。" |
+| v1-v2 (legacy) | Original schema only: `candidate_decisions`, `emotional_spikes`, `identified_assumptions`, `identified_patterns`, `recurring_dilemmas`, `decision_heuristics`, `verdicts`, `filtered_signals`. All v3-v6 fields absent. Note: "此记录使用旧版协议 (v1/v2)，部分字段缺失。" |
 
 **Key compat rules:**
 1. Missing `attraction_signals` → don't error. Just use emotional_spikes as the sole value signals.
@@ -855,7 +850,7 @@ When loading reflections.jsonl, events may have been written under older protoco
 - Added Agent Output Validation Gate — 6 failure modes, per-lens invariant checks, 4 degraded mode paths including full abort
 - Added State Integrity checks for JSONL files — line parsing, field validation, duplicate detection, write safety
 - Added action experiment lifecycle: `status` tracking (active|completed|expired|skipped), `activated_at`/`expires_at` timestamps, age-based nudging (gentle at 5+ days, auto-expire at 14+ days)
-- Added Unified Tag Catalog — single source of truth for 16 value keys, 3 energy tags, free-form domain tags. Value Lens and note amplify both reference the catalog. Cross-pollination: amplify tags feed reflect as higher-confidence signals.
+- Added Unified Tag Catalog — single source of truth for 16 value keys, 3 energy tags, free-form domain tags. Decision Lens and note amplify both reference the catalog. Cross-pollination: amplify tags feed reflect as higher-confidence signals.
 
 ### v5 (2026-07-25): "Validation Gate & Degraded Modes"
 - Added Agent Output Validation Gate between Pass 1 and Pass 2
@@ -878,8 +873,8 @@ When loading reflections.jsonl, events may have been written under older protoco
 - **Distill Report**: Added Abstraction Layers, Action Experiments, Cross-Domain Connections, Energy Signature, and Emerging Edges sections.
 
 ### v2 (2026-07-25): "Pursuit Orientation"
-- **Value Lens**: Added `attraction_signals`. Reframed focus from "what they defend" to "what they're drawn toward." Negative emotions repositioned as navigation signals, not bugs.
-- **Ability Lens**: Added `emerging_edges` and `intrinsic persistence` focus. Reframed from "what they can do" to "what they're becoming."
+- **Decision Lens**: Added `attraction_signals`. Reframed focus from "what they defend" to "what they're drawn toward." Negative emotions repositioned as navigation signals, not bugs.
+- **Assumption Lens**: Added `emerging_edges` and `intrinsic persistence` focus. Reframed from "what they can do" to "what they're becoming."
 - **Pattern Lens**: Added `cross_domain_connections` and `energy_signature`. Reframed from "what repeats" to "what direction does it point."
 - **Adversary**: Flipped calibration logic — emotional intensity is evidence of importance, not a threat to filter aggressively. Added `alternative_framing`, `perspective_switch`, and `deep_dive_candidates`.
 - **Distill Report**: Added Cross-Domain Connections, Energy Signature, and Emerging Edges sections.

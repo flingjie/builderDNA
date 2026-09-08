@@ -551,7 +551,7 @@ When the user runs `/distill`, digest gap records in `state/digest_gaps.jsonl` a
 - Persistent gaps (≥2 re-tests) → deeply entrenched misunderstanding, not a one-off gap
 - Repeated gaps in the same domain → user overestimates understanding in that field
 - Mastery records → positive signal: what the user truly understands well
-- Insight moments from digest sessions → raw material for self-model updates
+- Insight moments from digest sessions → raw material for technical-cognition updates
 
 Analysis results are written to `state/digest_gaps.jsonl` (the digest blind-spot log). The `cognitive_patterns` synthesis (from distill) is a *technical-understanding* concern, separate from the interest profile in `state/builder_interest_profile.json` — it never writes personality, values, or beliefs into the interest profile. Digest data is read-only by distill — never marked as processed.
 

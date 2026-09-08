@@ -20,7 +20,7 @@ You are a Distill Agent. Your goal is to synthesize accumulated reflections into
 
 > **Convergence note (P4):** distill synthesizes *technical cognition* only. It does **not** maintain a personality/values self-model. Never write `values`/`beliefs`/`criteria`/`cognitive_patterns` into `state/builder_interest_profile.json` — that file holds only the 6-field interest profile. Cognitive blind-spots are `state/digest_gaps.jsonl`.
 
-**Protocol reference**: `references/reflection-protocol.md` — the single source of truth for the distill report template, DNA diff format, and auto-suggest threshold.
+**Protocol reference**: `references/reflection-protocol.md` — the single source of truth for the distill report template, reflection update format, and auto-suggest threshold.
 
 ## When to Use
 
@@ -68,7 +68,7 @@ gaps. The five calibration dimensions and their radar signals:
 **Hard constraint.** Radar artifacts are **read-only** during distillation. A
 distill report may *explain* a recurring judgment error — e.g. "hype sensitivity:
 repeatedly over-ranked viral claims" — and fold that explanation into a proposed
-`user_dna.json` diff (including `cognitive_patterns`), but it must **never alter
+`builder_interest_profile.json` diff (including `cognitive_patterns`), but it must **never alter
 evidence strength, maturity, or source records**. Those corrections belong to the
 `concept-radar` skill. Proposed user-DNA changes still flow through the existing
 confirmation rules in Step 6 unchanged.
@@ -109,12 +109,12 @@ Analyze the reflections through the Tension + Resolution lens:
 - If unresolved, state it honestly: "这个时期的 tension 尚未完全解决"
 
 **Synthesize into a narrative arc:**
-- Beginning: what was the state at the start of this batch? (from `user_dna.json` at that time if recorded, or from earliest reflection)
+- Beginning: what was the state at the start of this batch? (from `builder_interest_profile.json` at that time if recorded, or from earliest reflection)
 - Middle: what challenged or complicated it? (patterns, emotional spikes, cross-domain connections)
 - End: where did it land? (abstraction principles, action experiment outcomes, emerging edges)
 - What's still unresolved? (recurring dilemmas with no resolution yet, high-intensity signals still flagged `requires_user_judgment`)
 
-### Step 3: Compute Proposed DNA Diffs
+### Step 3: Compute Proposed Technical-Cognition Updates
 
 Based on ALL unprocessed reflections (not just the ones that individually proposed diffs), compute a consolidated set of proposed changes:
 
@@ -127,7 +127,7 @@ Based on ALL unprocessed reflections (not just the ones that individually propos
 **Beliefs:**
 - New beliefs that appear in multiple reflections → propose adding
 - Existing beliefs contradicted by recent evidence → propose modifying or removing
-- Check against user_dna.json: if a belief already exists with high confidence, require stronger evidence to modify
+- Check against builder_interest_profile.json: if a belief already exists with high confidence, require stronger evidence to modify
 
 **Criteria:**
 - New decision rules that appear consistently → propose adding
@@ -312,7 +312,7 @@ After confirmation:
 
 > "合成完成。"
 > - 处理了 [N] 条复盘记录
-> - 更新了 [M] 项自我模型
+> - 更新了 [M] 项技术认知
 > - 报告: `state/distill_reports/YYYY-MM-DD_distill.md`
 
 ## Edge Cases
@@ -343,9 +343,9 @@ After confirmation:
 | File | Purpose |
 |------|---------|
 | `references/reflection-protocol.md` | Single source of truth — report template, diff format, threshold |
-| `state/user_dna.json` | Read current model, write accepted diffs |
+| `state/builder_interest_profile.json` | Read current model, write accepted diffs |
 | `state/reflections.jsonl` | Read all reflections, mark as distilled |
 | `state/records.jsonl` | RAL daily records — context between reflections (note skill) |
 | `state/digest_gaps.jsonl` | Feynman verification gap reports — cognitive patterns (digest skill, read-only by distill) |
 | `state/distill_reports/` | Write markdown reports |
-| `models/user_dna_schema.py` | Value dimension definitions |
+| `models/builder_interest_profile.py` | Interest profile schema |

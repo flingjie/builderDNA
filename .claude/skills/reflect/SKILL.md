@@ -43,7 +43,7 @@ Before running any agents, load:
 3. **reflection-protocol.md** — `Read references/reflection-protocol.md` for the latest lens prompts and schema definitions.
 4. **Unprocessed RAL records** — `Read state/records.jsonl` (if exists). Filter for records where `processed_at` is null. These are daily captures from the `/note` skill. Include them as additional signal sources for all three Lens agents alongside the conversation transcript. Records provide event-level signals (what happened between conversations) that conversation-only analysis misses.
 
-**Tag cross-pollination:** If a record has `value_tags` populated (from note amplify), pass these to the Value Lens as "user self-tagged" signals — they carry higher confidence than purely extracted signals, per the Tag Catalog in `references/reflection-protocol.md`.
+**Tag cross-pollination:** If a record has `value_tags` populated (from note amplify), pass these to the Decision Lens as "user self-tagged" signals — they carry higher confidence than purely extracted signals, per the Tag Catalog in `references/reflection-protocol.md`.
 5. **Pending action experiments** — Check the most recent reflection event in `reflections.jsonl`. If it contains `action_experiments` with `status: "active"` and `outcome: null`:
 
 Determine age in days since `activated_at`:
@@ -106,7 +106,7 @@ judgment-accuracy patterns. Five calibration dimensions map to radar artifacts:
 
 **Hard constraint.** Radar artifacts are **read-only** in reflection. A reflection
 may *explain* a judgment error — e.g. "I over-weighted one viral author (authority
-bias)" — and fold that explanation into a proposed `user_dna.json` diff, but it
+bias)" — and fold that explanation into a proposed technical-judgment update, but it
 must **never alter evidence strength, maturity, or source records**. Corrections to
 evidence, cards, or reviews belong to the `concept-radar` skill, not here. Proposed
 user-DNA changes still flow through the existing confirmation rules in Step 3
@@ -120,7 +120,7 @@ Announce to the user:
 
 Spawn three agents in parallel using the `Agent` tool. Each agent receives:
 - The FULL conversation transcript (everything since the last `/reflect` or the start of the session)
-- The current user_dna.json as context
+- The current builder_interest_profile.json as context
 - The lens-specific prompt from `references/reflection-protocol.md`
 
 ALL THREE LENS AGENTS now follow a common preprocessing workflow:
@@ -128,18 +128,18 @@ ALL THREE LENS AGENTS now follow a common preprocessing workflow:
 2. **Focus (聚焦)** — devote most depth to top 1-2 high-signal segments; don't force findings from thin material
 3. **Extract** — extract signals per lens specialty
 
-**Agent 1: Value Lens** (label: "reflect:value-lens")
+**Agent 1: Decision Lens** (label: "reflect:value-lens")
 - Purpose: Extract what the user is pursuing — direction, attraction, energy
-- Schema: segments, focus_segments, candidate_values, attraction_signals, emotional_spikes, summary
+- Schema: segments, focus_segments, candidate_decisions, attraction_signals, emotional_spikes, summary
 
-**Agent 2: Ability Lens** (label: "reflect:ability-lens")
+**Agent 2: Assumption Lens** (label: "reflect:ability-lens")
 - Purpose: Extract demonstrated and emerging capabilities — what the user is becoming
-- Schema: segments, focus_segments, demonstrated_abilities, emerging_edges, new_connections, summary
+- Schema: segments, focus_segments, identified_assumptions, emerging_edges, new_connections, summary
 
 **Agent 3: Pattern Lens** (label: "reflect:pattern-lens")
 - Purpose: Identify recurring patterns, cross-domain connections, energy signature, and abstraction layers (case → pattern → principle)
 - Schema: segments, focus_segments, identified_patterns, abstraction_layers, cross_domain_connections, energy_signature, recurring_dilemmas, decision_heuristics, summary
-- Cold start note: if no historical reflections, Pattern Lens cross-references user_dna.json only
+- Cold start note: if no historical reflections, Pattern Lens cross-references builder_interest_profile.json only
 
 Wait for all three agents to complete. If one fails, proceed with surviving outputs and flag the missing lens.
 
@@ -302,8 +302,8 @@ If user says yes: immediately invoke the `/distill` skill. If no: note it and mo
 
 On the very first `/reflect` (no `state/reflections.jsonl` or empty file):
 - Run the FULL 3-agent protocol. Do NOT simplify.
-- Pattern Lens prompt explicitly states: "First reflection — cross-referencing user_dna.json only. Historical patterns will emerge with more data."
-- Adversary prompt includes: "No historical data available — calibrate against user_dna.json and cross-lens corroboration only."
+- Pattern Lens prompt explicitly states: "First reflection — cross-referencing builder_interest_profile.json only. Historical patterns will emerge with more data."
+- Adversary prompt includes: "No historical data available — calibrate against builder_interest_profile.json and cross-lens corroboration only."
 - Output includes: "这是你的第一次复盘——历史模式会随着更多复盘数据而浮现。"
 
 ## Edge Cases
@@ -312,7 +312,7 @@ Follow the edge case table in `references/reflection-protocol.md`. Key reminders
 
 | Scenario | Action |
 |----------|--------|
-| user_dna.json missing | Run without. Note: "建议先运行 value-discovery。" |
+| builder_interest_profile.json missing | Run without. Note: "建议先运行 value-discovery。" |
 | Lens agent fails | Validation gate classifies as `failed`. Proceed per degraded mode rules (2/3 → relaxed, 1/3 → caveat, 0/3 → abort). |
 | All three lenses fail | Abort with minimal event. Report to user. |
 | All signals filtered | Honest output: no diffs proposed. Still save. |
