@@ -190,20 +190,24 @@ class TestDetectMismatches:
     """Tests for DNA-behavior mismatch detection."""
 
     def setup_method(self):
-        """Isolate behavior_log and DNA paths."""
+        """Isolate behavior_log, profile, and legacy DNA paths."""
         self.tmp = tempfile.mkdtemp()
         import observability.behavior as bmod
         self._orig_behavior = bmod.BEHAVIOR_LOG_PATH
         self._orig_dna = bmod.USER_DNA_PATH
+        self._orig_profile = bmod.PROFILE_PATH
         self._test_log = os.path.join(self.tmp, "behavior_log.jsonl")
         self._test_dna = os.path.join(self.tmp, "user_dna.json")
+        self._test_profile = os.path.join(self.tmp, "builder_interest_profile.json")
         bmod.BEHAVIOR_LOG_PATH = self._test_log
         bmod.USER_DNA_PATH = self._test_dna
+        bmod.PROFILE_PATH = self._test_profile
 
     def teardown_method(self):
         import observability.behavior as bmod
         bmod.BEHAVIOR_LOG_PATH = self._orig_behavior
         bmod.USER_DNA_PATH = self._orig_dna
+        bmod.PROFILE_PATH = self._orig_profile
 
     def test_no_dna_returns_empty(self):
         # No DNA file → no mismatches possible
