@@ -11,9 +11,8 @@ state/*
 !state/.gitkeep
 !state/traces/
 !state/distill_reports/.gitkeep
-# twitter skills runtime state (daily knowledge asset, dedup, reports, replies — not versioned)
+# twitter-learning runtime state (daily knowledge asset, dedup, reports — not versioned)
 .claude/skills/twitter-learning/state/
-.claude/skills/twitter-discussion/state/
 .venv/
 builderdna.egg-info/
 *-workspace/

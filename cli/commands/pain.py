@@ -16,6 +16,31 @@ from observability import RunTelemetry, OutputLevel, vprint, record_command, rec
 from observability.snapshot import save_pain_snapshot
 
 
+_WORKAROUND_KEYWORDS = (
+    "workaround", "hack", "temporary fix", "patch it", "bypass",
+    "绕过", "临时", "规避", "替代方案", "换一个", "先用",
+)
+
+
+def _extract_workarounds(issues: list[dict]) -> list[str]:
+    """Deterministic scan for workarounds the community already uses.
+
+    Best-effort keyword match over title+body; empty when none found. This is
+    a deterministic hint, not a semantic judgment.
+    """
+    found: list[str] = []
+    for iss in issues:
+        text = f"{iss.get('title', '')} {iss.get('body', '')}".lower()
+        for kw in _WORKAROUND_KEYWORDS:
+            idx = text.find(kw)
+            if idx >= 0:
+                snippet = text[max(0, idx - 20):idx + 40].strip()
+                if snippet not in found:
+                    found.append(snippet)
+                break
+    return found[:5]
+
+
 def _get_embeddings(texts: list[str], model: str, base_url: str) -> list[list[float]]:
     """Get embeddings for a list of texts with exponential backoff retry."""
     import time
@@ -120,6 +145,8 @@ def pain(
                 severity=round(sum(severities) / len(severities), 2),
                 frequency=len(cluster_issues),
                 affected_repos=repos,
+                independent_repo_count=len(repos),
+                existing_workarounds=_extract_workarounds(cluster_issues),
                 top_issues=[
                     IssueSummary(
                         repo=iss.get("repo", ""),

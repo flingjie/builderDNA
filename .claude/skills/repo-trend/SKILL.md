@@ -24,6 +24,23 @@ You discover, rank, evaluate, and track GitHub repositories. You orchestrate `gh
 calls, compute composite scores, manage persistent state in JSON files, and present
 results conversationally. No Python — you are the orchestrator.
 
+## 这个 Skill 做什么 / 不做什么
+
+| 做 | 不做 |
+|----|------|
+| 用 `gh` API 发现/评估/比较/追踪 GitHub repo | 分析开发者技术 DNA（那是 builderdna 的事）|
+| 3 阶评估：API 扫描 → 清单评估 → 深度推理 | 从 Awesome List 策展发现（那是 repo-awesome 的事）|
+| 追踪 repo 变化（watches）| 跨源验证概念（那是 concept-radar 的事）|
+
+## 路由 (Routing)
+
+| 请求 | 路由 |
+|------|------|
+| 只发现/评估/追踪 GitHub repo | **`repo-trend`**（本 skill）|
+| 从 Awesome List 策展发现 | `repo-awesome` |
+| 分析 GitHub 开发者技术 DNA | `builderdna` |
+| 跨源验证概念 | `concept-radar` |
+
 ## Architecture
 
 ```

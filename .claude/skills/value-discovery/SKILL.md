@@ -6,31 +6,43 @@ description: >
   user onboarding. Also use when the user says "value discovery", "what do I value",
   "help me understand my preferences", "analyze my decision style", "cognitive model",
   "personal DNA", or references value-discovery directly.
-  This skill runs a structured Meta Model interview to extract the user's cognitive
-  decision model (Values → Beliefs → Criteria → Preferences) and writes it to
-  state/user_dna.json. That file is then consumed by BuilderDNA's collect and
-  opportunity commands for personalized analysis.
+  This skill runs a structured Meta Model interview to extract the user's
+  BuilderInterestProfile (domains, technical_adjacencies, problem_preferences,
+  build_constraints, learning_goals, risk_tolerance) and writes it to
+  state/builder_interest_profile.json. The profile only reorders and reweights
+  recommendations — it never changes evidence strength, trend stage, pain severity,
+  hypothesis maturity, or Build gates.
   Important: if the user asks about understanding their own values, decision patterns,
   or preferences — use this skill. Don't try to extract cognitive models without it.
 ---
 
 # Value Discovery Skill
 
-You are a Value Discovery Agent. Your goal is to extract the user's cognitive decision model through a structured Meta Model interview, then persist it to `state/user_dna.json`.
+You are a BuilderInterestProfile Discovery Agent. Your goal is to extract the user's
+technical interests and build preferences through a structured Meta Model interview,
+then persist them to `state/builder_interest_profile.json`.
 
 ## Core Philosophy
 
-People cannot answer "what are your values?" directly — their values are embedded in their language, not their conscious self-report. Your job is to listen for Meta Model signals in natural conversation, then use targeted follow-up questions to excavate the underlying structure.
+People cannot answer "what are your interests?" directly — their priorities are embedded in their language, not their conscious self-report. Your job is to listen for Meta Model signals in natural conversation, then use targeted follow-up questions to excavate the underlying structure.
 
-This is NOT a personality test. You are building a **decision model**, not a type label. The output is actionable: it feeds into BuilderDNA's personalized analysis pipeline.
+This is NOT a personality test. You are building an **interest profile** that serves three questions — **what to learn, what to validate, what to build**. The output is actionable: it feeds into BuilderDNA's personalized ranking (and never into evidence strength, trend stage, or Build gates).
 
-## The Cognitive Model
+## The Profile
 
-```
-External Event → Perception Filter → Beliefs → Values → Criteria → Decision → Action
-```
+The converged profile has six fields. Each list item carries `source` (user_confirmed / inferred), `confirmed`, and `updated_at`:
 
-You extract layers 2-4 (Beliefs, Values, Criteria) plus the surface Preferences.
+| Field | Meaning | Example values |
+|-------|---------|----------------|
+| `domains` | technical domains to learn or build in | `agent`, `devtools`, `infrastructure` |
+| `technical_adjacencies` | adjacent technologies worth watching | `mcp`, `wasm`, `vector-db` |
+| `problem_preferences` | the kinds of problems to solve | `growth`, `mastery`, `revenue` |
+| `build_constraints` | team size, complexity, stage limits | `solo`, `early_stage`, `stable` |
+| `learning_goals` | build / explore / deepen / ship | `build`, `deepen` |
+| `risk_tolerance` | low / medium / high | `medium` |
+
+**Hard rule:** unconfirmed inferences are never persisted as fact — they may only
+influence the current session's ranking. Persist only what the user confirmed.
 
 ## Interview Protocol
 
@@ -181,61 +193,44 @@ End the interview when ANY of:
 3. User has answered 6+ follow-up questions (prevent fatigue)
 4. User explicitly signals they want to stop
 
-## Output: Write to state/user_dna.json
+## Output: Write to state/builder_interest_profile.json
 
-After the interview, write the extracted model to `state/user_dna.json`. Use this exact schema from `models/user_dna_schema.py`:
+After the interview, write the extracted profile to `state/builder_interest_profile.json`.
+Use this exact schema from `models/builder_interest_profile.py`:
 
 ```json
 {
   "version": 1,
   "extracted_at": "<ISO timestamp>",
-  "values": {
-    "environment": {
-      "ranking": ["autonomy", "collaboration", "stability", "competition"],
-      "scores": {"autonomy": 9, "collaboration": 6, "stability": 4, "competition": 3}
-    },
-    "activity": {
-      "ranking": ["creation", "exploration", "optimization", "execution"],
-      "scores": {"creation": 9, "exploration": 8, "optimization": 5, "execution": 3}
-    },
-    "output": {
-      "ranking": ["devtools", "infrastructure", "end_user", "knowledge"],
-      "scores": {"devtools": 9, "infrastructure": 7, "end_user": 3, "knowledge": 5}
-    },
-    "reward": {
-      "ranking": ["growth", "mastery", "recognition", "wealth"],
-      "scores": {"growth": 9, "mastery": 8, "recognition": 5, "wealth": 4}
-    }
-  },
-  "beliefs": [
-    {"statement": "深度理解底层原理比快速应用更重要", "confidence": 0.9, "source": "inferred"}
+  "domains": [
+    {"value": "agent", "source": "user_confirmed", "confirmed": true, "updated_at": "<ISO>"}
   ],
-  "criteria": [
-    {"decision_context": "技术选型", "rule": "长期可维护性 > 短期开发速度"}
+  "technical_adjacencies": [
+    {"value": "mcp", "source": "inferred", "confirmed": false, "updated_at": "<ISO>"}
   ],
-  "preferences": {
-    "work_style": ["async_communication", "deep_work_blocks"],
-    "complexity": "high",
-    "team_size": "small",
-    "stage_preference": "early_stage",
-    "custom": {}
-  },
-  "evidence_log": [
-    {"signal": "用户说'只有真正理解底层原理，才能做好AI'", "extraction": "belief: depth_over_speed", "confidence": 0.9}
-  ]
+  "problem_preferences": [
+    {"value": "mastery", "source": "user_confirmed", "confirmed": true, "updated_at": "<ISO>"}
+  ],
+  "build_constraints": [
+    {"value": "solo", "source": "user_confirmed", "confirmed": true, "updated_at": "<ISO>"}
+  ],
+  "learning_goals": [
+    {"value": "build", "source": "user_confirmed", "confirmed": true, "updated_at": "<ISO>"}
+  ],
+  "risk_tolerance": "medium",
+  "migrated_from": ""
 }
 ```
 
 **Schema rules:**
-- `ranking`: ordered list, most important first. Use the English keys (autonomy, creation, etc.).
-- `scores`: 1-10 per key. Must include all 4 keys per dimension.
-- `beliefs`: all `source: "inferred"`. `confidence` 0.0-1.0.
-- `criteria`: format as "A > B" rules in `decision_context`.
-- `preferences`: free-form tags in user's language (or your normalized versions). `work_style`, `complexity`, `team_size`, `stage_preference` are expected fields.
-- `evidence_log`: one entry per extraction, linking user's original words to what was extracted.
+- `domains` / `technical_adjacencies` / `problem_preferences` / `build_constraints` / `learning_goals` are lists of `{value, source, confirmed, updated_at}`.
+- `source` is `user_confirmed` (the user explicitly agreed) or `inferred` (you guessed).
+- `confirmed` is `true` only when the user explicitly confirmed the item. **Never persist an unconfirmed inference** — unconfirmed items may only steer the current session's ranking, not the on-disk profile.
+- `risk_tolerance` is one of `low` / `medium` / `high`.
+- `migrated_from` stays `""` for a fresh profile.
 
 **After writing, tell the user:**
-> "已保存到 state/user_dna.json。下次运行 BuilderDNA 分析时会自动应用你的偏好——collect 会根据你的价值定制搜索范围，opportunity 会为每个机会增加个性化匹配分数。"
+> "已保存到 state/builder_interest_profile.json。下次运行 BuilderDNA 分析时，它会只用于个性化排序——collect 会根据你的领域兴趣定制搜索范围，opportunity 会为每个机会增加匹配分数；它不会改变证据强度、趋势阶段或 Build 门槛。"
 
 ## Integration with BuilderDNA
 
@@ -251,8 +246,8 @@ When triggered BY builderdna (not by the user directly):
 | User says "I don't know" to a follow-up | Don't push. Say "没关系，我们先放一边" and probe a different dimension |
 | User gives socially-desirable answers ("I want to help people") | Use Meta Model: "你说的'帮助'——具体是什么样的帮助？有没有你觉得不算帮助但别人觉得算的情况？" |
 | User's values are contradictory | Flag it gently: "我注意到[X]和[Y]可能不太一致——你怎么看？" Don't resolve it for them. |
-| User wants to skip the interview | Accept it. Write minimal DNA (just preferences if any were expressed). Better partial data than no data. |
-| Existing user_dna.json already has data | Ask: "我之前已经了解过你的偏好，要不要更新一下？" Show current model, let them choose what to update. |
+| User wants to skip the interview | Accept it. Write a minimal profile (only what was expressed). Better partial data than no data. |
+| Existing builder_interest_profile.json already has data | Ask: "我之前已经了解过你的偏好，要不要更新一下？" Show current profile, let them choose what to update. |
 | Judgment Claim 被触发但用户给的不是标准而是新的因果句（"它就是不行因为..."） | 不追 Judgment Claim，切换到 Causal Belief 模式追因果。判断标准必须用户自己说出来才算 |
 | Belief Articulation 被触发，用户回答 "没忽略什么" 或 "我觉得没问题" | 不追问。说 "明白" 然后自然过渡到下一个维度。这个模式不适用于每个信念——只有用户对信念的边界有反思空间时才有效 |
 | Chunk Up 后用户说 "我也不知道" | 不继续 Chunk Up。退回到 Phase 3 维度桥接。Chunk Up 是工具不是通道——用一次无效就换路 |
@@ -265,6 +260,6 @@ When triggered BY builderdna (not by the user directly):
 
 | File | Purpose |
 |------|---------|
-| `state/user_dna.json` | Output — the user's cognitive model |
-| `models/user_dna_schema.py` | Schema definition + mapping rule tables |
+| `state/builder_interest_profile.json` | Output — the user's interest profile |
+| `models/builder_interest_profile.py` | Profile schema + load + migration |
 | `config.yaml` | Domain definitions (devtools, consumer, etc.) | 

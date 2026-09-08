@@ -80,5 +80,8 @@ class Signal(BaseModel):
     independence_key: str | None = None
     """Shared by reposts/citations of one upstream claim so duplicate
     propagation does not inflate recurrence counts."""
+    supersedes: str | None = None
+    """ID of an earlier Signal this one corrects. Signals are append-only:
+    corrections add a superseding record rather than editing history."""
 
     payload: dict[str, Any] = Field(default_factory=dict)  # raw source-specific snapshot

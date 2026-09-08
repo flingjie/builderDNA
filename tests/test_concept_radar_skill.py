@@ -17,9 +17,6 @@ CONCEPT_RADAR_SCHEMA = (
     PROJECT_ROOT / ".claude/skills/concept-radar/references/schema.md"
 )
 TWITTER_LEARNING_SKILL = PROJECT_ROOT / ".claude/skills/twitter-learning/SKILL.md"
-TWITTER_DISCUSSION_SKILL = (
-    PROJECT_ROOT / ".claude/skills/twitter-discussion/SKILL.md"
-)
 RADAR_CONFIG = PROJECT_ROOT / "config/radars/agent-reliability.yaml"
 REDDIT_FEED = (
     PROJECT_ROOT / "config/reddit_feeds/production-agent-failures.yaml"
@@ -27,7 +24,6 @@ REDDIT_FEED = (
 
 SPECIALIST_SKILLS = (
     "twitter-learning",
-    "twitter-discussion",
     "reddit-opportunity",
     "repo-trend",
 )
@@ -109,13 +105,19 @@ def test_twitter_learning_clarifies_x_only_and_radar_feed():
     assert "跨源验证" in body
 
 
-def test_twitter_discussion_clarifies_engagement_only():
-    body = read_text(TWITTER_DISCUSSION_SKILL)
+def test_x_engagement_routes_out_of_scope():
+    """X reply/engagement and customer outreach have no owning skill."""
+    radar_body = read_text(CONCEPT_RADAR_SKILL)
+    learning_body = read_text(TWITTER_LEARNING_SKILL)
 
-    assert "concept-radar" in body
-    # Owns outward engagement only, never concept cards.
-    assert "outward engagement" in body
-    assert "概念卡片" in body
+    # No deleted outreach skill is routed to.
+    for body in (radar_body, learning_body):
+        assert "twitter-discussion" not in body
+        assert "reddit-outreach" not in body
+
+    # Both skills mark X reply/engagement as out of scope.
+    assert "超出本项目范围" in radar_body or "out of scope" in radar_body
+    assert "超出本项目范围" in learning_body or "out of scope" in learning_body
 
 
 # --- Task 0.2: Agent Reliability radar config -------------------------------

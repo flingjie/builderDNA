@@ -4,6 +4,7 @@ import pytest
 
 from models.payload import (
     SandboxResult,
+    SandboxError,
     RepoSignal,
     IssueSignal,
     CollectPayload,
@@ -41,6 +42,42 @@ class TestSandboxResult:
         r = SandboxResult(command="x", domain="y", payload={})
         assert "T" in r.computed_at
         assert r.computed_at.endswith("Z") or "+" in r.computed_at
+
+    def test_schema_version_defaults(self):
+        r = SandboxResult(command="x", domain="y", payload={})
+        assert r.schema_version == "1.0"
+
+    def test_schema_round_trip(self):
+        """Schema round-trip: serialize → deserialize → equal (P3 contract)."""
+        r = SandboxResult(
+            command="collect",
+            domain="test",
+            payload={"repos": []},
+            stats={"total_signals": 0},
+            errors=[SandboxError(code="rate_limited", message="hit quota")],
+        )
+        r2 = SandboxResult(**r.model_dump())
+        assert r2 == r
+        assert r2.schema_version == "1.0"
+        assert r2.errors[0].code == "rate_limited"
+
+    def test_error_structure(self):
+        r = SandboxResult(
+            command="x",
+            domain="y",
+            payload={},
+            errors=[
+                SandboxError(
+                    code="source_unavailable",
+                    message="github down",
+                    source="collect",
+                    recoverable=True,
+                )
+            ],
+        )
+        assert r.errors[0].code == "source_unavailable"
+        assert r.errors[0].source == "collect"
+        assert r.errors[0].recoverable is True
 
 
 class TestRepoSignal:

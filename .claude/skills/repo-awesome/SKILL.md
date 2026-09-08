@@ -25,6 +25,23 @@ You mine curated Awesome Lists on GitHub to discover quality repositories. You f
 awesome lists for a topic, fetch their raw markdown, parse repo links, score each repo by
 curation consensus, and track everything in the shared state store.
 
+## 这个 Skill 做什么 / 不做什么
+
+| 做 | 不做 |
+|----|------|
+| 从 Awesome List 挖掘经策展的 repo，按策展评分 | 用 API 搜索趋势 repo（那是 repo-trend 的事）|
+| 跨多个 awesome list 交叉引用去重 | 分析开发者技术 DNA（那是 builderdna 的事）|
+| 呈现策展分数 + list 归属 | 跨源验证概念（那是 concept-radar 的事）|
+
+## 路由 (Routing)
+
+| 请求 | 路由 |
+|------|------|
+| 从 Awesome List 策展发现 | **`repo-awesome`**（本 skill）|
+| 只发现/评估 GitHub repo | `repo-trend` |
+| 分析 GitHub 开发者技术 DNA | `builderdna` |
+| 跨源验证概念 | `concept-radar` |
+
 ## Architecture
 
 ```

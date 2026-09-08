@@ -1,7 +1,7 @@
 """collect — fetch GitHub repos and issues for a domain, output structured signals.
 
-Supports User DNA personalization: reads state/user_dna.json and applies
-4 mapping rules to customize domain, topics, window, and repo sorting.
+Supports BuilderInterestProfile personalization: reads state/builder_interest_profile.json
+and applies mapping rules to customize domain, topics, window, and repo sorting.
 """
 import asyncio
 import json
@@ -21,8 +21,9 @@ from models.payload import (
     Diagnostics, DataQualityDiag, ConfidenceDiag,
 )
 from observability import RunTelemetry, OutputLevel, vprint, record_command, record_output_retention
+from models.builder_interest_profile import load_profile
 from models.user_dna_schema import (
-    load_user_dna, UserDNA,
+    UserDNA,
     OUTPUT_DOMAIN_MAP, ACTIVITY_CONFIG,
     REWARD_WEIGHTS, ENVIRONMENT_SOURCE_MIX,
 )
@@ -139,7 +140,7 @@ def _score_repo(repo: dict, weights: dict) -> float:
 
 async def _run_collect(
     domain: str, output: str, config_path: str,
-    user_dna_path: str | None = None,
+    profile_path: str | None = None,
     window_days: int | None = None,
     no_cache: bool = False,
     clear_cache: bool = False,
@@ -160,13 +161,14 @@ async def _run_collect(
         vprint(f"[red]Unknown domain: {domain}[/red]", level=OutputLevel.QUIET)
         raise typer.Exit(1)
 
-    # Load User DNA and apply mapping rules (only when explicitly requested)
-    user_dna = load_user_dna(user_dna_path) if user_dna_path else None
+    # Load BuilderInterestProfile and apply mapping rules (only when explicitly requested)
+    profile = load_profile(profile_path) if profile_path else None
+    user_dna = UserDNA(values=profile.to_values()) if profile else None
     if user_dna:
         final_domain, topics, w_days, sort_weights, source_mix = _apply_user_dna_rules(
             domain, cfg, user_dna
         )
-        vprint(f"[dim]User DNA loaded → domain={final_domain}, window={w_days}d, "
+        vprint(f"[dim]Interest profile loaded → domain={final_domain}, window={w_days}d, "
                f"topics={topics[:3]}...[/dim]", level=OutputLevel.VERBOSE)
     else:
         final_domain = domain
@@ -425,10 +427,10 @@ def collect(
     domain: str = typer.Argument(..., help="Domain to collect signals for"),
     output: str = typer.Option("output/signals.json", "--output", "-o", help="Output JSON file"),
     config: str = typer.Option("config.yaml", "--config", "-c", help="Config file path"),
-    user_dna: str | None = typer.Option(None, "--user-dna", help="User DNA file for personalization (optional)"),
+    profile: str | None = typer.Option(None, "--profile", "--user-dna", help="BuilderInterestProfile file for personalization (optional; --user-dna deprecated)"),
     window: int = typer.Option(None, "--window", "-w", help="Analysis window in days (default: 365)"),
     no_cache: bool = typer.Option(False, "--no-cache", help="Disable HTTP cache (all requests go to API)"),
     clear_cache: bool = typer.Option(False, "--clear-cache", help="Clear cache before collecting"),
 ) -> None:
-    """Collect GitHub signals for a domain (optionally personalized via User DNA)."""
-    asyncio.run(_run_collect(domain, output, config, user_dna, window, no_cache, clear_cache))
+    """Collect GitHub signals for a domain (optionally personalized via BuilderInterestProfile)."""
+    asyncio.run(_run_collect(domain, output, config, profile, window, no_cache, clear_cache))

@@ -75,14 +75,44 @@ class Diagnostics(BaseModel):
     parameter_sensitivity: list[ParamSensitivity] = Field(default_factory=list)
 
 
+class SandboxError(BaseModel):
+    """A structured, machine-readable error entry for a recoverable failure.
+
+    Core commands raise on hard failures; recoverable per-source or per-item
+    failures are recorded here so a run can still complete and report what went
+    wrong. Mirrors the structured error envelopes the concept/radar commands
+    already emit (stable code + human message + recoverable flag).
+    """
+    code: str = Field(
+        description="Stable machine-readable error code, e.g. 'rate_limited', 'source_unavailable', 'schema_validation'",
+    )
+    message: str = Field(description="Human-readable description of the error")
+    source: str = Field(
+        default="",
+        description="Which step, source, or item produced the error (empty when global)",
+    )
+    recoverable: bool = Field(
+        default=True,
+        description="Whether the command could continue past this error",
+    )
+
+
 class SandboxResult(BaseModel):
     """Every sandbox command wraps its output in this."""
     command: str = Field(description="CLI command name that produced this result: collect, trend, pain, opportunity, report, config, observability")
+    schema_version: str = Field(
+        default="1.0",
+        description="Version of the SandboxResult schema. Bump on breaking changes; readers check this before parsing payload.",
+    )
     domain: str = Field(description="Domain being analyzed (e.g. 'agent', 'devtools', 'consumer', 'infrastructure')")
     computed_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat(), description="ISO 8601 timestamp when this result was produced")
     payload: dict[str, Any] = Field(description="Command-specific output data — schema depends on command type. See TopicTrend, PainCluster, OpportunityCard, etc.")
     stats: dict[str, Any] = Field(default_factory=dict, description="Aggregate statistics: counts, elapsed time, cache metrics, API usage")
     diagnostics: Diagnostics = Field(default_factory=Diagnostics, description="Actionable diagnostics for the optimize skill: data quality issues, confidence warnings, parameter sensitivity hints")
+    errors: list[SandboxError] = Field(
+        default_factory=list,
+        description="Recoverable per-source/per-item failures. Hard failures raise instead of returning a result.",
+    )
 
 
 # ── collect command output ──
@@ -147,6 +177,14 @@ class TopicTrend(BaseModel):
     growth_velocity: float = Field(description="Weighted average star velocity across repos in this topic")
     acceleration: float = Field(default=0.0, description="Rate of velocity change. >2.0 + high confidence → 'accelerating'; <-1.0 → 'declining'.")
     evidence_count: int = Field(description="Number of repos contributing to this trend. <3 means low confidence.")
+    sample_coverage: float = Field(
+        default=0.0, ge=0.0, le=1.0,
+        description="Fraction of the domain's repos that carry this topic (0-1). A single hot repo ⇒ near-zero coverage.",
+    )
+    distinct_repos: int = Field(
+        default=0,
+        description="Number of distinct repos contributing to this topic. <2 means single-source.",
+    )
     top_repos: list[RepoSummary] = Field(default_factory=list, description="Top 5 repos by stars within this topic")
     classification_reason: str = Field(
         default="",
@@ -178,6 +216,18 @@ class PainCluster(BaseModel):
     severity: float = Field(description="Average severity score across issues in this cluster (0-10)")
     frequency: int = Field(description="Number of issues in this cluster")
     affected_repos: list[str] = Field(default_factory=list, description="Repositories affected by this pain cluster")
+    independent_repo_count: int = Field(
+        default=0,
+        description="Number of independent repositories affected (deduplicated). <2 means single-source.",
+    )
+    time_span_days: int = Field(
+        default=0,
+        description="Time span over which the pain recurred, in days. 0 when unknown.",
+    )
+    existing_workarounds: list[str] = Field(
+        default_factory=list,
+        description="Workarounds the community already uses (from issue text). Empty when unknown.",
+    )
     top_issues: list[IssueSummary] = Field(default_factory=list, description="Representative issues with highest pain scores")
 
 
@@ -215,8 +265,74 @@ class OpportunityCard(BaseModel):
         default_factory=dict,
         description="Decomposed scoring: velocity_contribution, severity_contribution, frequency_contribution, demand_score, competition_score, gap_formula, market_size_score, quadrant, confidence",
     )
+    # Evidence + validation (P6): an opportunity must justify itself and name
+    # what would disprove it, with a bounded validation action — not a full build.
+    demand_evidence: list[str] = Field(
+        default_factory=list,
+        description="Evidence backing the demand score (velocity, pain, frequency).",
+    )
+    competition_evidence: list[str] = Field(
+        default_factory=list,
+        description="Evidence backing the competition score (repo/issue volume).",
+    )
+    counter_evidence: list[str] = Field(
+        default_factory=list,
+        description="Evidence against the opportunity: low sample, single source, conflicting signals.",
+    )
+    minimal_validation_action: str = Field(
+        default="",
+        description="Bounded validation action (e.g. user interviews, landing-page test) — not full product development.",
+    )
+    why_now: str = Field(
+        default="",
+        description="Why this opportunity is timely right now.",
+    )
+    invalidation_condition: str = Field(
+        default="",
+        description="What would prove this opportunity not worth pursuing.",
+    )
 
 
 class OpportunityPayload(BaseModel):
     """Payload for opportunity command output."""
     opportunities: list[OpportunityCard] = Field(default_factory=list, description="Ranked opportunity cards, sorted by personalized_score (fallback: gap_score)")
+
+
+# ── developer DNA command output ──
+
+class DNAEvidence(BaseModel):
+    """One piece of evidence backing a DeveloperDNA judgment."""
+    ref: str = Field(description="Reference to the backing fact, e.g. 'repo:owner/repo' or 'issue:owner/repo#123'")
+    kind: Literal["repo", "issue", "commit", "pr", "release"] = Field(description="Kind of evidence the judgment cites")
+    note: str = Field(default="", description="What this evidence shows")
+
+
+class DNADimension(BaseModel):
+    """One DeveloperDNA dimension with an observed/inferred/unknown status.
+
+    ``observed`` = directly read from a repo/issue fact. ``inferred`` = derived
+    from such facts. ``unknown`` = no data — never story-completed.
+    """
+    dimension: str = Field(description="Dimension key (one of the 8 DNA dimensions)")
+    status: Literal["observed", "inferred", "unknown"] = Field(
+        default="unknown",
+        description="Whether the finding was observed, inferred, or is unknown for lack of data",
+    )
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0, description="Confidence in the finding (0 when unknown)")
+    summary: str = Field(default="", description="One-line finding in plain language")
+    evidence: list[DNAEvidence] = Field(default_factory=list, description="Backing evidence; empty when unknown")
+
+
+class DeveloperDNA(BaseModel):
+    """Developer technical-practice analysis — fully evidence-backed.
+
+    This is analysis of a developer's *technical practices*, not a relationship
+    profile. Every dimension cites repo/issue facts; dimensions without data are
+    ``unknown`` rather than fabricated. Re-running with unchanged evidence
+    returns the same result (idempotent at the computation layer).
+    """
+    developer: str = Field(description="Developer or org login being analyzed")
+    dimensions: list[DNADimension] = Field(default_factory=list, description="The 8 DNA dimensions with evidence")
+    computed_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    source_repos: list[str] = Field(default_factory=list, description="Repos this analysis drew evidence from")
+    source_issues: int = Field(default=0, description="Number of issues this analysis drew evidence from")

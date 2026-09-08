@@ -4,7 +4,7 @@ Delegates scoring to intelligence/opportunity/scoring.py and alignment
 to intelligence/opportunity/alignment.py. The CLI command is a thin
 orchestrator: read inputs → score → render → write output.
 
-With User DNA integration:
+With BuilderInterestProfile integration:
   personalized_score = gap_score × alignment_multiplier
 
 Scoring config (weights, thresholds) is loaded from config.yaml →
@@ -21,7 +21,8 @@ from models.payload import (
     SandboxResult, OpportunityPayload, OpportunityCard,
     Diagnostics, ConfidenceDiag,
 )
-from models.user_dna_schema import load_user_dna
+from models.builder_interest_profile import load_profile
+from models.user_dna_schema import UserDNA
 from intelligence.opportunity.scoring import (
     compute_demand, compute_competition, compute_gap,
     compute_market_size, compute_confidence, classify_quadrant,
@@ -64,7 +65,14 @@ def _generate_cards(
 
         total_evidence = trend.get("evidence_count", 0)
         total_pain_issues = sum(p.get("frequency", 0) for p in related_pains)
+        top_repos = trend.get("top_repos", [])
         confidence = compute_confidence(demand, competition, total_evidence, total_pain_issues)
+
+        # Low-sample / single-source confidence downgrade (never inflate).
+        if len(top_repos) <= 1:
+            confidence = min(confidence, 0.4)
+        elif total_evidence < 3:
+            confidence = min(confidence, 0.5)
 
         # ── Scoring breakdown for transparency ────────────────────
         import math as _math
@@ -85,7 +93,6 @@ def _generate_cards(
         }
 
         signals = []
-        top_repos = trend.get("top_repos", [])
         for r in top_repos[:3]:
             signals.append(f"{r.get('full_name', '')} ({r.get('stars', 0)}★)")
         for p in related_pains[:1]:
@@ -104,6 +111,32 @@ def _generate_cards(
             )
             personalized_score = round(gap * alignment_multiplier, 1)
 
+        # ── Evidence + bounded validation (P6) ────────────────────
+        demand_evidence = [
+            f"velocity={avg_velocity:.1f}（主题增长）",
+            f"severity={avg_severity:.1f}（痛点严重度）",
+            f"frequency={total_frequency}（痛点提及次数）",
+        ]
+        competition_evidence = [
+            f"{total_evidence} 个 repo 构成该主题",
+            f"{len(top_repos)} 个头部 repo（top: {top_repos[0].get('full_name', 'n/a') if top_repos else 'n/a'}）",
+        ]
+        counter_evidence: list[str] = []
+        if len(top_repos) <= 1:
+            counter_evidence.append("单源：仅 1 个 repo 支撑该主题")
+        if total_evidence < 3:
+            counter_evidence.append(f"样本小：仅 {total_evidence} 个 repo")
+        if not related_pains:
+            counter_evidence.append("无痛点数据：需求可能被高估")
+
+        why_now = f"{topic} 处于 {trend.get('stage', 'mainstream')} 阶段（velocity={avg_velocity:.1f}）"
+        invalidation_condition = (
+            f"若 demand<2 且 competition>3（gap<{gap_threshold}），或连续两周无新增证据，则不值得做"
+        )
+        minimal_validation_action = (
+            f"用 5 次用户访谈验证「{topic}」的付费意愿（而非直接开发完整产品）"
+        )
+
         cards.append(OpportunityCard(
             title=f"{topic} — gap={gap}",
             demand_score=demand,
@@ -118,6 +151,12 @@ def _generate_cards(
             alignment_reason=alignment_reason,
             alignment_multiplier=alignment_multiplier,
             scoring_breakdown=scoring_breakdown,
+            demand_evidence=demand_evidence,
+            competition_evidence=competition_evidence,
+            counter_evidence=counter_evidence,
+            minimal_validation_action=minimal_validation_action,
+            why_now=why_now,
+            invalidation_condition=invalidation_condition,
         ))
 
     cards.sort(key=lambda c: c.personalized_score if c.personalized_score is not None else c.gap_score, reverse=True)
@@ -129,11 +168,11 @@ def opportunity(
     pains: str = typer.Option(..., "--pains", "-p", help="Input pain clusters JSON"),
     output: str = typer.Option("output/opportunities.json", "--output", "-o", help="Output JSON file"),
     config: str = typer.Option("config.yaml", "--config", "-c", help="Config file path"),
-    user_dna: str | None = typer.Option(None, "--user-dna", help="User DNA file for personalization (optional)"),
+    profile: str | None = typer.Option(None, "--profile", "--user-dna", help="BuilderInterestProfile file for personalization (optional; --user-dna deprecated)"),
 ) -> None:
     """Generate opportunity cards from trends and pain clusters (rule engine).
 
-    Optionally applies User DNA for personalized scoring.
+    Optionally applies BuilderInterestProfile for personalized scoring.
 
     Scoring weights and thresholds are loaded from config.yaml → opportunity
     section (with sensible defaults if the section is absent).
@@ -174,10 +213,11 @@ def opportunity(
     for vendor_list in (cfg.vendors.domestic, cfg.vendors.overseas):
         known_orgs.update(vendor_list)
 
-    # Load User DNA if available (only when explicitly requested)
-    dna = load_user_dna(user_dna) if user_dna else None
+    # Load BuilderInterestProfile if available (only when explicitly requested)
+    prof = load_profile(profile) if profile else None
+    dna = UserDNA(values=prof.to_values()) if prof else None
     if dna:
-        vprint(f"[dim]User DNA loaded — applying personalized alignment[/dim]", level=OutputLevel.VERBOSE)
+        vprint(f"[dim]Interest profile loaded — applying personalized alignment[/dim]", level=OutputLevel.VERBOSE)
 
     cards = _generate_cards(
         trend_list, pain_list, dna,

@@ -8,8 +8,7 @@ description: >
   "帮我研究 Y 的推特", "今天 X 上有什么值得学的", "有哪些值得学习的高质量推文",
   "twitter learning", "daily twitter learning"), or to build a topic-specific knowledge
   base from daily signal. Defaults to the agent domain (Agent Engineering / Agent
-  Solution / FDE / AI Engineering). Focuses only on learning (Top 10 high-value posts);
-  for finding posts worth replying to or discussing, use twitter-discussion instead.
+  Solution / FDE / AI Engineering). Focuses only on learning (Top 10 high-value posts).
 ---
 
 # Twitter Learning
@@ -22,7 +21,7 @@ description: >
 |----|------|
 | 发现 → 筛选 → 评分 → 深度分析（七角） | 无脑抓取、堆数量 |
 | 产出 Top 10 学习日报 + 沉淀个人知识资产 | 把「热门」当「高质量」 |
-| 提炼可迁移到 {主题领域} 的认知 | 找值得回复 / 讨论的推文（那是 twitter-discussion 的事）|
+| 提炼可迁移到 {主题领域} 的认知 | 找值得回复 / 讨论的推文、设计回复（超出本项目范围）|
 | 只学 X / 建 X 知识库的请求走这里 | 跨源验证 / 概念卡片（那是 concept-radar 的事）|
 
 核心原则：**不追求「抓得多」，追求「值得学习、值得沉淀」。**
@@ -72,7 +71,7 @@ description: >
 
 > 发现行业 → 学习优秀实践 → 验证自己的判断 → 沉淀方法论 → 输出自己的观点。
 
-（想找值得互动 / 讨论的推文、设计回复，用 `twitter-discussion`。）
+（找值得互动 / 讨论的推文、设计回复超出本项目范围。）
 
 （被选中的发现可以进入跨源验证——喂给 `concept-radar` 走 Inbox → Watch → Verify → Build/Drop；方向不可逆，`concept-radar` 不会把单源学习任务反向派回来。）
 

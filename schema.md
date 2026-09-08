@@ -6,11 +6,34 @@ Claude Code reads these JSON outputs. Every command wraps results in `SandboxRes
 
 ```json
 {
-  "command": "<name>", "domain": "<domain>", "computed_at": "<ISO8601>",
+  "command": "<name>", "schema_version": "1.0", "domain": "<domain>", "computed_at": "<ISO8601>",
   "payload": {...}, "stats": {...},
-  "diagnostics": {"data_quality": {...}, "confidence": {...}, "parameter_sensitivity": [...]}
+  "diagnostics": {"data_quality": {...}, "confidence": {...}, "parameter_sensitivity": [...]},
+  "errors": [{"code": "...", "message": "...", "source": "...", "recoverable": true}]
 }
 ```
+
+### schema_version
+
+Every `SandboxResult` carries `schema_version` (semver string). Readers check it before
+parsing `payload`. Bump on breaking changes to the payload contract.
+
+### errors (unified error structure)
+
+Recoverable per-source/per-item failures are recorded in `errors`, not raised. Each entry:
+- `code` — stable machine-readable code (`rate_limited`, `source_unavailable`, `schema_validation`, …)
+- `message` — human-readable description
+- `source` — which step/source/item produced it (empty when global)
+- `recoverable` — whether the command could continue past it
+
+Hard failures raise (no `SandboxResult` is emitted). Partial source failures complete with
+their `errors` list preserved — diagnostics are never silently dropped.
+
+### immutability & correction
+
+Appended events are immutable. Corrections add a superseding record (`supersedes` points to
+the ID of the record it replaces) rather than editing history. Same input + same config
+version + same algorithm version ⇒ stable output.
 
 ### diagnostics (new in v2)
 
@@ -29,17 +52,29 @@ stats: { total_signals, repos, issues, topics_searched, topics_with_results, ven
 
 ## trend -> output/trends.json
 
-payload.trends[]: { topic, stage (accelerating|emerging|mainstream|declining), confidence, growth_velocity, acceleration, evidence_count, classification_reason, top_repos[{full_name, stars, stars_delta, forks, contributors, velocity, description}] }
+payload.trends[]: { topic, stage (accelerating|emerging|mainstream|declining), confidence, growth_velocity, acceleration, evidence_count, sample_coverage, distinct_repos, classification_reason, top_repos[{full_name, stars, stars_delta, forks, contributors, velocity, description}] }
+
+- `sample_coverage` — fraction of the domain's repos carrying this topic (0-1).
+- `distinct_repos` — distinct repos behind the topic; `<2` = single-source. A single hot repo is downgraded to `mainstream`, never `emerging`/`accelerating`.
 stats: { total_trends }
 
 ## pain -> output/pain_clusters.json
 
-payload.clusters[]: { cluster_id, title, severity, frequency, affected_repos[], top_issues[{repo, issue_number, title, pain_score}] }
+payload.clusters[]: { cluster_id, title, severity, frequency, affected_repos[], independent_repo_count, time_span_days, existing_workarounds[], top_issues[{repo, issue_number, title, pain_score}] }
+
+- `independent_repo_count` — deduplicated affected repos (`<2` = single-source).
+- `time_span_days` — recurrence span in days (0 = unknown).
+- `existing_workarounds[]` — deterministic keyword hints from issue text (empty = unknown).
 stats: { clusters, issues_analyzed, noise_count }
 
 ## opportunity -> output/opportunities.json
 
-payload.opportunities[]: { title, demand_score, competition_score, gap_score, personalized_score, alignment_reason, alignment_multiplier, scoring_breakdown, signals[], recommended_action }
+payload.opportunities[]: { title, demand_score, competition_score, gap_score, personalized_score, alignment_reason, alignment_multiplier, scoring_breakdown, signals[], recommended_action, demand_evidence[], competition_evidence[], counter_evidence[], minimal_validation_action, why_now, invalidation_condition }
+
+- `demand_evidence` / `competition_evidence` / `counter_evidence` — the reasons behind each score, incl. evidence against.
+- `why_now` — why the opportunity is timely; `invalidation_condition` — what would disprove it.
+- `minimal_validation_action` — a bounded validation action, never full product development.
+- Low sample / single source triggers a confidence downgrade; `gap_score` is auxiliary, not the sole ranking key.
 stats: { total, avg_gap, personalized }
 
 ## report -> output/report-*.md|json

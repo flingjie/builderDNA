@@ -76,11 +76,11 @@
     {
       "id": 7,
       "prompt": "用户依次提出这些请求：(a) 只在 X 上学习 agent 相关的高质量推文；(b) 找今天值得回复/讨论的推文；(c) 只从 Reddit 挖一个产品的痛点；(d) 只在 GitHub 上发现/评估一个 repo；(e) 跨 X/Reddit/GitHub 验证一个想法、跑它的生命周期。",
-      "expected_output": "Claude routes each single-source request to its specialist skill before doing any work: (a) X-only learning to twitter-learning, (b) reply/engagement to twitter-discussion, (c) Reddit-only pain discovery to reddit-opportunity, (d) GitHub-only discovery to repo-trend, and only (e) cross-source synthesis/lifecycle to concept-radar (this skill). Single-source requests do not enter the concept-radar lifecycle.",
+      "expected_output": "Claude routes each single-source request to its specialist skill before doing any work: (a) X-only learning to twitter-learning, (b) reply/engagement is OUT OF SCOPE (no skill — Claude states it plainly and does not route it), (c) Reddit-only pain discovery to reddit-opportunity, (d) GitHub-only discovery to repo-trend, and only (e) cross-source synthesis/lifecycle to concept-radar (this skill). Single-source requests do not enter the concept-radar lifecycle.",
       "files": [],
       "assertions": [
         "route-x-learning-to-twitter-learning",
-        "route-engagement-to-twitter-discussion",
+        "route-engagement-out-of-scope",
         "route-reddit-only-to-reddit-opportunity",
         "route-github-only-to-repo-trend",
         "route-cross-source-to-concept-radar"

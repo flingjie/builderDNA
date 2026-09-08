@@ -18,6 +18,22 @@ description: >
 
 You run BuilderDNA's self-iteration diagnostics — validating past predictions, detecting value drift, and pruning stale hypotheses.
 
+## 这个 Skill 做什么 / 不做什么
+
+| 做 | 不做 |
+|----|------|
+| 对比历史预测与后续事实，检测漂移 | 改变事实数据或算法输出 |
+| 校准预测、参数与数据质量 | 提出可审查的参数变更（那是 optimize 的事）|
+| 区分数据问题 / 模型问题 / 参数问题 | 重新分析趋势/机会（那是 builderdna / concept-radar 的事）|
+
+## 路由 (Routing)
+
+| 请求 | 路由 |
+|------|------|
+| 检查历史预测与参数 | **`observability`**（本 skill）|
+| 基于诊断改进确定性分析能力 | `optimize` |
+| 分析趋势/机会 | `builderdna` |
+
 ## When to Use
 
 - User explicitly asks to check predictions, validate assumptions, or verify past analysis
@@ -45,16 +61,16 @@ Results are written to `output/observability_check_<domain>.json`. Read this fil
 
 ### 1. Mismatch Detection (`--mismatches`)
 
-Compares observed behavior patterns against values stated in `state/user_dna.json`. Flags when actual command usage diverges from stated preferences.
+Compares observed behavior patterns against the interest profile in `state/builder_interest_profile.json`. Flags when actual command usage diverges from stated preferences.
 
 **Output**: list of mismatches, each with:
 - `dimension`: which value dimension shows a gap (environment, activity, output, reward)
-- `stated`: what user_dna.json says
+- `stated`: what the interest profile says
 - `observed`: what behavior data shows
 - `strength`: how significant the gap is
 
 **What to do with a mismatch**:
-- If `strength` is high: ask the user — "我注意到你之前的偏好是 [stated]，但最近的行为更像是 [observed]。要不要更新你的 User DNA，还是这只是暂时的情况？"
+- If `strength` is high: ask the user — "我注意到你之前的偏好是 [stated]，但最近的行为更像是 [observed]。要不要更新你的兴趣画像，还是这只是暂时的情况？"
 - If low: note it and move on.
 
 ### 2. Snapshot Comparison (`--snapshots`)

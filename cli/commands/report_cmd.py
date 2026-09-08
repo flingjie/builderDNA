@@ -38,11 +38,13 @@ def _render_md(data: dict, output_path: Path, verbose: bool = False) -> str:
     trends = payload.get("trends", [])
     if trends:
         lines.append("## Trends\n")
-        lines.append("| Topic | Stage | Velocity | Evidence | Classification |")
-        lines.append("|-------|-------|----------|----------|----------------|")
+        lines.append("| Topic | Stage | Velocity | Evidence | Confidence | Classification |")
+        lines.append("|-------|-------|----------|----------|------------|----------------|")
         for t in trends:
+            conf = t.get('confidence', 0)
+            conf_str = f"{conf:.2f}" + (" ⚠" if conf < 0.3 else "")
             reason = t.get('classification_reason', '') if verbose else ''
-            lines.append(f"| {t.get('topic', '')} | {t.get('stage', '')} | {t.get('growth_velocity', 0):.1f} | {t.get('evidence_count', 0)} | {reason} |")
+            lines.append(f"| {t.get('topic', '')} | {t.get('stage', '')} | {t.get('growth_velocity', 0):.1f} | {t.get('evidence_count', 0)} | {conf_str} | {reason} |")
         lines.append("")
 
         # Verbose: detailed trend breakdown
@@ -81,7 +83,19 @@ def _render_md(data: dict, output_path: Path, verbose: bool = False) -> str:
             lines.append(f"### {i}. {o.get('title', '')}")
             lines.append(f"- **Gap Score:** {o.get('gap_score', 0):.1f}")
             lines.append(f"- Demand: {o.get('demand_score', 0):.1f} / Competition: {o.get('competition_score', 0):.1f}")
+            conf = o.get('confidence', 0.5)
+            conf_str = f"{conf:.2f}" + (" ⚠ low confidence" if conf < 0.5 else "")
+            lines.append(f"- Confidence: {conf_str}")
             lines.append(f"- Action: {o.get('recommended_action', '')}")
+            counter = o.get('counter_evidence', [])
+            if counter:
+                lines.append(f"- ⚠ 反证: {'; '.join(counter)}")
+            if o.get('why_now'):
+                lines.append(f"- Why now: {o.get('why_now', '')}")
+            if o.get('invalidation_condition'):
+                lines.append(f"- 何时放弃: {o.get('invalidation_condition', '')}")
+            if o.get('minimal_validation_action'):
+                lines.append(f"- 最小验证: {o.get('minimal_validation_action', '')}")
             signals = o.get("signals", [])
             if signals:
                 lines.append(f"- Signals: {'; '.join(signals[:3])}")
@@ -100,6 +114,32 @@ def _render_md(data: dict, output_path: Path, verbose: bool = False) -> str:
                                f"(multiplier: {o.get('alignment_multiplier', 0):.2f})")
                     lines.append(f"- Alignment: {o.get('alignment_reason', '')}")
 
+            lines.append("")
+
+    # Diagnostics — always surface data / model / parameter problems (P8).
+    diagnostics = data.get("diagnostics", {})
+    if diagnostics:
+        dq = diagnostics.get("data_quality", {})
+        conf_items = diagnostics.get("confidence", {}).get("low_confidence_items", [])
+        ps = diagnostics.get("parameter_sensitivity", [])
+        if dq.get("coverage_gaps") or dq.get("api_issues") or dq.get("sample_size_warning"):
+            lines.append("## Diagnostics — Data Quality\n")
+            for g in dq.get("coverage_gaps", []):
+                lines.append(f"- coverage gap: {g}")
+            for a in dq.get("api_issues", []):
+                lines.append(f"- api issue: {a}")
+            if dq.get("sample_size_warning"):
+                lines.append(f"- {dq.get('sample_size_warning')}")
+            lines.append("")
+        if conf_items:
+            lines.append("## Diagnostics — Low Confidence\n")
+            for c in conf_items:
+                lines.append(f"- {c.get('item', '?')} (confidence {c.get('confidence', '?')}): {c.get('reason', '')}")
+            lines.append("")
+        if ps:
+            lines.append("## Diagnostics — Parameter Sensitivity\n")
+            for p in ps:
+                lines.append(f"- {p.get('parameter', '?')}: {p.get('current_value', '?')} → {p.get('suggested_value', '?')} ({p.get('expected_effect', '')})")
             lines.append("")
 
     content = "\n".join(lines)

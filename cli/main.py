@@ -13,6 +13,7 @@ from cli.commands.observability_cmd import observability
 from cli.commands.concept import concept
 from cli.commands.radar import radar_app
 from cli.commands.radar_cycle_cmd import radar_cycle
+from cli.commands.dna import dna
 
 
 app = typer.Typer(
@@ -52,6 +53,7 @@ app.command(name="opportunity")(opportunity)
 app.command(name="report")(report)
 app.command(name="config")(config)
 app.command(name="observability")(observability)
+app.command(name="dna")(dna)
 app.add_typer(concept, name="concept")
 app.add_typer(radar_app, name="radar")
 app.add_typer(radar_cycle, name="radar-cycle")

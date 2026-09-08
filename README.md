@@ -1,23 +1,41 @@
 # BuilderDNA
 
-分析 GitHub 开发者，提取技术 DNA，发现产品机会。
+**Technology Intelligence Sandbox Toolkit** —— 分析开发者、仓库和社区信号，理解技术变化，发现痛点，验证值得学习或构建的方向。
+
+核心闭环：
+
+```text
+采集外部信号
+→ 识别趋势与痛点
+→ 形成可证伪假设
+→ 跨源验证
+→ 决定 Watch / Verify / Build / Drop
+→ 用后续事实校准判断
+```
+
+北极星指标：**有多少技术判断经后续证据验证，并真正改变了学习或构建决策。**
 
 ## 架构
 
-BuilderDNA 是 7 个独立沙盒 CLI 命令的组合工具箱。每个命令：**结构化 JSON 输入 → 确定性计算 → 结构化 JSON 输出**。Claude Code 负责语义推理和编排。
+BuilderDNA 是一组可组合的 CLI 沙盒命令。每个命令：**结构化 JSON 输入 → 确定性计算 → 结构化 JSON 输出**。Claude Code 负责语义推理和编排，读取 JSON 输出。无 LLM（除本地 Ollama 嵌入）、无 Web 服务、无通用 Agent Runtime。
 
 ```
-Claude Code（编排 + 解读）── 读取 state/hypotheses.json，决定跑什么
+Claude Code（编排 + 语义判断）── 读取 state/*.json，决定跑什么
     │
     ▼
-7 个沙盒 CLI 命令（独立、JSON in/out）
-  collect → trend → pain → opportunity → report → config → observability
+确定性沙盒 CLI（独立、JSON in/out）
+  采集:   collect            —— GitHub 信号（repos + issues）
+  分析:   trend / pain       —— 趋势速度 · 痛点聚类
+  机会:   opportunity        —— 规则引擎生成机会卡片
+  验证:   concept / radar / radar-cycle —— 跨源概念生命周期
+  校准:   observability      —— 预测 vs 后续事实
+  工具:   report / config    —— 渲染 · 配置
     │
     ▼
-全局记忆 — SQLite + output/*.json + state/*.json
+持久化 — SQLite（signals）+ output/*.json + state/*.json
 ```
 
-命令之间通过 JSON 文件传递数据：`collect` 产出 `signals.json` → `trend` 和 `pain` 消费它 → `opportunity` 消费两者 → `report` 渲染任意结果。
+命令之间通过 JSON 文件传递数据：`collect` 产出 `signals.json` → `trend`/`pain` 消费 → `opportunity` 消费两者 → `report` 渲染任意结果。跨源验证走 `concept`/`radar`/`radar-cycle`。
 
 ## 快速开始
 
@@ -47,83 +65,80 @@ PYTHONPATH=. uv run builderdna pain agent --data output/signals.json
 # 机会发现 — 规则引擎，gap_score = demand / competition
 PYTHONPATH=. uv run builderdna opportunity --trends output/trends.json --pains output/pain_clusters.json
 
+# 概念验证 — 跨源生命周期（capture / scan / verify / build / source-audit）
+PYTHONPATH=. uv run builderdna concept capture --help
+PYTHONPATH=. uv run builderdna radar scan agent-reliability
+PYTHONPATH=. uv run builderdna radar-cycle start agent-reliability
+
+# 校准 — 对比历史预测与后续事实
+PYTHONPATH=. uv run builderdna observability --all --domain agent
+
 # 渲染报告 — 任意 SandboxResult → Markdown 或 JSON
 PYTHONPATH=. uv run builderdna report --data output/opportunities.json --format md
 
 # 运行测试
-uv run pytest tests/ -v   # 268 tests
+uv run pytest tests/ -v
 ```
 
 ## 项目结构
 
 ```
 BuilderDNA/
-├── cli/main.py                # Typer 入口，7 个命令
-├── cli/commands/              # collect.py, trend.py, pain.py, opportunity.py, report_cmd.py, observability_cmd.py, config_cmd.py
+├── cli/main.py                # Typer 入口
+├── cli/commands/              # collect / trend / pain / opportunity / report / config / observability / concept / radar / radar-cycle
 ├── config.py                  # 配置系统（YAML + ${ENV} 变量替换）
 ├── config.yaml                # accounts, domains, vendors, embedding
 │
 ├── collector/github/          # GitHub API 客户端（httpx, cache, rate limiter）
 ├── collector/normalizer.py    # 原始 API 响应 → Signal 统一模型
 │
-├── intelligence/trend/        # 趋势计算（velocity, clustering）
+├── intelligence/trend/        # 趋势计算（velocity, stage）
 ├── intelligence/pain/         # 痛点挖掘（HDBSCAN + embeddings）
 ├── intelligence/opportunity/  # 机会评分（规则引擎）
 │
+├── concepts/                  # 概念证据、适配器、评分、持久化
+├── radar_cycles/              # 可恢复的雷达周期状态机（checkpoint / engine / config）
+│
 ├── signals/
-│   ├── models.py              # Signal（统一事件模型）
+│   ├── models.py              # Signal（统一不可变事件模型）
 │   └── store.py               # SQLite 持久化
 │
 ├── models/payload.py          # 所有命令的输出 schema（Claude Code 读取的契约）
 ├── schema.md                  # 人类可读的 schema 参考
+├── docs/product-contract.md   # 产品边界：核心对象、非目标、Skill 路由
 │
 ├── state/
 │   ├── hypotheses.json        # 跨对话的探索状态追踪
-│   ├── user_weights.json      # 用户偏好权重
-│   ├── user_dna.json          # 用户认知模型
-│   ├── reflections.jsonl      # 复盘事件日志
+│   ├── user_weights.json      # 用户偏好权重（只影响排序）
+│   ├── builder_interest_profile.json  # 用户兴趣画像（只影响优先级）
+│   ├── reflections.jsonl      # 技术复盘事件日志
 │   └── watches.json           # 已保存的 repo 搜索（repo-trend skill）
 │
 ├── output/                    # JSON + Markdown 结果
-├── .claude/skills/            # Claude Code 的 skills
-│   ├── builderdna/            #   7 命令编排 + 假设树管理
-│   ├── concept-radar/         #   跨源概念雷达：弱信号 → 验证 → 构建/否决
-│   ├── repo-trend/            #   趋势 repo 发现 + 3 阶评估
-│   ├── repo-awesome/          #   Awesome List 挖掘 + 策展评分
-│   ├── reflect/               #   多轮对抗式复盘
-│   └── distill/               #   阶段性合成蒸馏
-└── tests/                     # 268 个测试
+├── .claude/skills/            # Claude Code 的 skills（见下）
+└── tests/                     # 测试套件
 ```
 
-新增 `concept-radar` skill：跨源合成 + `Inbox → Watch → Verify → Build/Drop` 概念生命周期。单源请求仍走专家 skill（`twitter-learning` / `twitter-discussion` / `reddit-opportunity` / `repo-trend`）。
+## Skills
 
-## 配置
+技术情报与构建决策的工具集，按职责路由（详见 `docs/product-contract.md`）：
 
-```yaml
-# config.yaml
-accounts:
-  - hwchase17                     # 分析的 GitHub 账号
+| 职责 | Skill |
+|------|-------|
+| 编排 Python sandbox（collect/trend/pain/opportunity） | `builderdna` |
+| 跨源概念验证 + Build/Drop 决策 | `concept-radar` |
+| 可恢复的确定性雷达周期 | `concept-radar-loop` |
+| GitHub 仓库发现与趋势评估 | `repo-trend` |
+| Awesome List 策展发现 | `repo-awesome` |
+| X 技术信号学习 | `twitter-learning` |
+| Reddit 痛点与机会发现 | `reddit-opportunity` |
+| 预测校准与诊断 | `observability` |
+| 确定性分析能力优化 | `optimize` |
+| 技术判断复盘 / 合成 / 校验 / 记录 | `reflect` / `distill` / `digest` / `note` |
+| 用户兴趣画像（BuilderInterestProfile） | `value-discovery` |
+| 工具执行轨迹分析 | `trace-classify` |
 
-domains:
-  agent:                          # 域名（topic 集合）
-    topics:
-      - mcp
-      - langchain
-      - agent-framework
-      - multi-agent
-
-github:
-  token: ${GITHUB_TOKEN}          # 从 .env 加载
-  max_concurrent: 5
-
-embedding:
-  model: bge-m3:latest            # pain 命令使用
-  base_url: ${EMBEDDING_BASE_URL:-http://localhost:11434/v1}
-
-vendors:
-  domestic: [deepseek-ai, QwenLM] # 国内厂商追踪
-  overseas: [anthropics, langchain-ai]
-```
+**X 只负责学习信号；Reddit 只负责痛点和机会信号。** 本项目不生成社交回复、不做获客、不维护关系。
 
 ## 设计原则
 
@@ -132,6 +147,8 @@ vendors:
 | 沙盒独立 | 每个命令可单独运行，不需要全局状态 |
 | JSON 契约 | 所有输出通过 `models/payload.py` 定义，Claude Code 可直接读取 |
 | 确定性计算 | 聚类、评分不依赖 LLM，全部是规则和统计算法 |
+| 不可变事件 | 追加事件不可变，更正通过 supersedes/replace 引用表达 |
+| 证据可追溯 | 每个趋势/痛点/机会/DNA 判断都可回溯到原始证据与置信度 |
 | 无服务层 | 纯 CLI 工具，无 FastAPI/Web 层 |
 | 管道可组合 | 命令通过文件连接，顺序灵活 |
 

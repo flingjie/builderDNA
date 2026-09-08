@@ -75,6 +75,8 @@ def trend(
         for topic in s.payload.get("topics", []):
             topic_signals.setdefault(topic, []).append(s)
 
+    total_domain_repos = len({s.target_repo for s in repo_signals})
+
     # Build trend output — enrich store results with acceleration, stage, top_repos
     trends = []
     for t in trend_rows:
@@ -111,6 +113,14 @@ def trend(
             )
             for r in sorted_repos
         ]
+
+        # Sample coverage + single-source guard (P6): a single hot repo must
+        # not mark a topic emerging/accelerating.
+        t.distinct_repos = len(topic_repos)
+        t.sample_coverage = round(len(topic_repos) / max(1, total_domain_repos), 3)
+        if t.distinct_repos < 2 and t.stage in ("accelerating", "emerging"):
+            t.stage = "mainstream"
+            t.classification_reason += f"（单源：仅 {t.distinct_repos} 个 repo，降级为 mainstream）"
 
         trends.append(t)
 

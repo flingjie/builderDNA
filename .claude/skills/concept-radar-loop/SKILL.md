@@ -22,6 +22,13 @@ or checkpoints: the Python CLI owns every state transition, every hard gate, and
 every idempotency rule. You own retrieval (via the specialist skills) and semantic
 reduction (paraphrasing source records into validated handoff JSON).
 
+**Semantics vs execution:** the lifecycle, modes, hard gates, boundaries, and
+invariants are defined in `concept-radar` — this skill only defines the
+*execution protocol* for driving one full cycle. You never write maturity, stage,
+or gate results directly; the Python engine computes those. Build only produces
+a bounded smallest experiment, never a full product plan; outcome reflow must
+support keep / revise / drop, never default to self-confirmation.
+
 Every command below runs as `PYTHONPATH=. uv run builderdna <command> …` (the
 `PYTHONPATH=.` prefix is the project convention from `CLAUDE.md`; plain
 `uv run builderdna …` also resolves).

@@ -48,3 +48,27 @@ class TestSignal:
                 timestamp=datetime.now(timezone.utc),
             )
             assert s.type == t
+
+    def test_supersedes_defaults_to_none(self):
+        s = Signal(
+            id="sig",
+            source="github",
+            type="signal",
+            actor="a",
+            target_repo="a/b",
+            timestamp=datetime.now(timezone.utc),
+        )
+        assert s.supersedes is None
+
+    def test_supersedes_references_prior_record(self):
+        """Corrections append a superseding record rather than editing history."""
+        s = Signal(
+            id="sig-new",
+            source="github",
+            type="signal",
+            actor="a",
+            target_repo="a/b",
+            timestamp=datetime.now(timezone.utc),
+            supersedes="sig-old",
+        )
+        assert s.supersedes == "sig-old"

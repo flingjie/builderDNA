@@ -553,7 +553,7 @@ When the user runs `/distill`, digest gap records in `state/digest_gaps.jsonl` a
 - Mastery records → positive signal: what the user truly understands well
 - Insight moments from digest sessions → raw material for self-model updates
 
-Analysis results are written to `state/user_dna.json` under `cognitive_patterns` (if the user confirms the proposed diffs). Digest data is read-only by distill — never marked as processed.
+Analysis results are written to `state/digest_gaps.jsonl` (the digest blind-spot log). The `cognitive_patterns` synthesis (from distill) is a *technical-understanding* concern, separate from the interest profile in `state/builder_interest_profile.json` — it never writes personality, values, or beliefs into the interest profile. Digest data is read-only by distill — never marked as processed.
 
 ---
 

@@ -11,6 +11,7 @@ from observability import OutputLevel, vprint, record_command
 from observability.behavior import detect_mismatches, save_mismatch_report
 from observability.snapshot import compare_snapshots
 from observability.hypothesis import HypothesisManager
+from observability.metrics import compute_metrics
 
 
 def observability(
@@ -18,6 +19,7 @@ def observability(
     check_mismatches: bool = typer.Option(False, "--mismatches", help="Run behavior mismatch detection"),
     check_snapshots: bool = typer.Option(False, "--snapshots", help="Compare prediction snapshots against new data"),
     prune_hypotheses: bool = typer.Option(False, "--prune", help="Check all hypotheses for pruning eligibility"),
+    check_metrics: bool = typer.Option(False, "--metrics", help="Compute the seven self-calibration metrics"),
     all_checks: bool = typer.Option(False, "--all", help="Run all checks"),
 ) -> None:
     """Run self-iteration diagnostics to detect drifts and validate predictions."""
@@ -25,10 +27,10 @@ def observability(
     results: dict = {"domain": domain, "checks": {}}
 
     if all_checks:
-        check_mismatches = check_snapshots = prune_hypotheses = True
+        check_mismatches = check_snapshots = prune_hypotheses = check_metrics = True
 
-    if not any([check_mismatches, check_snapshots, prune_hypotheses]):
-        vprint("[yellow]Specify one or more checks: --mismatches, --snapshots, --prune, or --all[/yellow]",
+    if not any([check_mismatches, check_snapshots, prune_hypotheses, check_metrics]):
+        vprint("[yellow]Specify one or more checks: --mismatches, --snapshots, --prune, --metrics, or --all[/yellow]",
                level=OutputLevel.NORMAL)
         return
 
@@ -67,6 +69,14 @@ def observability(
         prunable = [r for r in pruning_results if r.get("severity") == "high"]
         vprint(f"  {len(pruning_results)} checked, {len(prunable)} eligible for pruning.", level=OutputLevel.NORMAL)
 
+    if check_metrics:
+        vprint("[bold]Computing self-calibration metrics...[/bold]", level=OutputLevel.NORMAL)
+        metrics = compute_metrics()
+        results["checks"]["metrics"] = metrics
+        for name, m in metrics.items():
+            val = f"{m['value']}" if m["value"] is not None else "n/a"
+            vprint(f"  {name:32s} {val:>8s}  ({m['note']})", level=OutputLevel.NORMAL)
+
     elapsed = _time.time() - t0
     results["elapsed_ms"] = round(elapsed * 1000)
 
@@ -81,4 +91,5 @@ def observability(
         "mismatches": check_mismatches,
         "snapshots": check_snapshots,
         "prune": prune_hypotheses,
+        "metrics": check_metrics,
     }, elapsed_seconds=round(elapsed, 3))

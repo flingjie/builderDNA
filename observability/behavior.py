@@ -28,7 +28,8 @@ from observability.output import OutputLevel, vprint
 
 BEHAVIOR_LOG_PATH = "state/behavior_log.jsonl"
 MISMATCH_REPORT_PATH = "state/mismatch_report.json"
-USER_DNA_PATH = "state/user_dna.json"
+PROFILE_PATH = "state/builder_interest_profile.json"
+USER_DNA_PATH = "state/user_dna.json"  # legacy path (pre-P4), kept as a fallback
 CONFIG_PATH = "config.yaml"
 
 
@@ -228,7 +229,16 @@ def record_output_retention(output_path: str, referenced_by: str = "") -> None:
 # ── Mismatch detection ───────────────────────────────────────────
 
 def _load_user_dna_values() -> dict | None:
-    """Load User DNA values for mismatch comparison. Returns None if no DNA."""
+    """Load profile/values for mismatch comparison. Returns None if none found.
+
+    Prefers the converged BuilderInterestProfile; falls back to the legacy
+    ``user_dna.json`` (4-dimension values) so pre-migration state keeps working.
+    """
+    from models.builder_interest_profile import load_profile
+
+    profile = load_profile(PROFILE_PATH)
+    if profile is not None:
+        return profile.to_values().model_dump()
     dna = _read_json(USER_DNA_PATH)
     if not dna or not dna.get("values"):
         return None

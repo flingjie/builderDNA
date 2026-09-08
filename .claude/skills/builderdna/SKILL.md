@@ -8,8 +8,10 @@ description: >
   "find opportunities in Z", "tech DNA", "builder insights", "trend radar",
   "what should I build", "developer landscape", "tech stack analysis",
   "competitive intelligence for X", or references BuilderDNA/builderdna directly.
-  The skill wraps 7 composable CLI commands (collect → trend → pain → opportunity → report → config → observability)
+  The skill wraps the core sandbox CLI commands (collect → trend → pain → opportunity → report)
   so the user never needs to remember flags — you translate intent into the right command chain.
+  It does NOT replace the specialist skills (repo-trend, repo-awesome, twitter-learning,
+  reddit-opportunity) or concept-radar (cross-source lifecycle).
   Reads state/hypotheses.json to track exploration across conversations.
   Uses goal-driven short-circuit pipeline to select the optimal execution path.
   After every run, present findings clearly and ask if they want to refine.
@@ -29,12 +31,36 @@ Claude Code handles all semantic reasoning and orchestration.
 Claude Code (you) — reads hypotheses.json, maps intent → commands via short-circuit pipeline
       │
       ▼
-7 sandbox CLI commands (each independent, JSON-in, JSON-out)
-  collect → trend → pain → opportunity → report → config → observability
+core sandbox CLI commands (each independent, JSON-in, JSON-out)
+  collect → trend → pain → opportunity → report
       │
       ▼
 Global memory — SQLite + output/*.json + state/*.json + claude-mem
 ```
+
+## 这个 Skill 做什么 / 不做什么
+
+| 做 | 不做 |
+|----|------|
+| 编排 Python sandbox（collect → trend → pain → opportunity → report）| 替代专家 Skill 做单源深挖（repo-trend / repo-awesome / twitter-learning / reddit-opportunity）|
+| 分析 GitHub 开发者/组织技术 DNA，管理假设树 | 跨源验证概念、管理生命周期（那是 concept-radar 的事）|
+| 展示趋势/机会/痛点结果，更新假设状态 | 生成社交回复、获客、维护关系（超出本项目范围）|
+
+## 路由 (Routing)
+
+| 请求 | 路由 |
+|------|------|
+| 分析 GitHub 开发者技术 DNA / 趋势 / 机会 | **`builderdna`**（本 skill）|
+| 只发现/评估 GitHub repo | `repo-trend` |
+| 从 Awesome List 策展发现 | `repo-awesome` |
+| 只从 X 学习技术信号 | `twitter-learning` |
+| 只从 Reddit 发现痛点 | `reddit-opportunity` |
+| 跨源验证概念 / 生命周期 | `concept-radar` |
+| 运行完整可恢复生命周期 | `concept-radar-loop` |
+| 检查历史预测与参数 | `observability` |
+
+`builderdna` **只编排 Python sandbox，不替代专家 Skill 的深度分析**。单源请求交给专家
+Skill；跨源验证交给 `concept-radar`。
 
 The pipeline is driven by a single state file and one principle:
 
@@ -140,35 +166,37 @@ Read: hyp_001 "Agent Memory needs unified State Engine" is EXPLORING, confidence
 Read `state/user_weights.json` at session start. Apply `scoring_bias` when interpreting opportunities.
 Record feedback in `feedback_log` after each session.
 
-## User DNA (Value Discovery Integration)
+## BuilderInterestProfile (Value Discovery Integration)
 
-BuilderDNA now integrates with the `value-discovery` Skill for personalized analysis.
+BuilderDNA integrates with the `value-discovery` Skill for personalized **ranking only**.
+The profile reorders/reweights recommendations — it never changes evidence strength,
+trend stage, pain severity, or Build gates.
 
 **On every session start:**
-1. Check if `state/user_dna.json` exists and has non-empty values (check `values.environment.ranking` has entries).
+1. Check if `state/builder_interest_profile.json` exists and has non-empty fields (check `domains` has entries).
 2. **If missing or empty:** This is a first-time user. BEFORE running `collect`, trigger the `value-discovery` Skill:
    - Say: "在开始分析之前，我想先了解你的偏好——这样分析结果会更贴合你。我们花5-8分钟快速聊一下？"
    - If user agrees → invoke `value-discovery` skill, then continue with collect.
-   - If user declines → proceed without personalization (no `--user-dna` flag).
+   - If user declines → proceed without personalization (no `--profile` flag).
 3. **If exists:** Ask: "我之前已经了解过你的偏好，要不要更新一下？" 
    - If yes → invoke `value-discovery` skill for an incremental update.
-   - If no → use existing DNA.
+   - If no → use the existing profile.
 
-**When User DNA is available, pass it to commands:**
+**When the profile is available, pass it to commands:**
 ```bash
 # Collect with personalization
-PYTHONPATH=. uv run builderdna collect <domain> --window N --user-dna state/user_dna.json --output output/signals.json
+PYTHONPATH=. uv run builderdna collect <domain> --window N --profile state/builder_interest_profile.json --output output/signals.json
 
 # Opportunity with personalized scoring
-PYTHONPATH=. uv run builderdna opportunity --trends output/trends.json --pains output/pain_clusters.json --user-dna state/user_dna.json
+PYTHONPATH=. uv run builderdna opportunity --trends output/trends.json --pains output/pain_clusters.json --profile state/builder_interest_profile.json
 ```
 
 **When presenting results:**
-- If personalized: mention "已根据你的价值偏好做了个性化排序" and highlight the `alignment_reason` on top opportunities.
+- If personalized: mention "已根据你的兴趣画像做了个性化排序" and highlight the `alignment_reason` on top opportunities.
 - Show both `gap_score` (客观市场机会) and `personalized_score` (对你的匹配度) side by side.
 - If a high-gap opportunity has low personalization, flag it: "这个市场机会很大，但和你的偏好不太匹配——要不要了解一下？"
 
-The `--user-dna` flag is optional on both `collect` and `opportunity` — omitting it gives objective/unpersonalized results (backward compatible).
+The `--profile` flag is optional on both `collect` and `opportunity` — omitting it gives objective/unpersonalized results (backward compatible).
 
 ## Observability — Self-Iteration Check
 
@@ -180,7 +208,7 @@ PYTHONPATH=. uv run builderdna observability --all --domain <domain>
 ```
 
 This runs three checks:
-1. **Mismatch detection** — compares current behavior patterns against User DNA, flags potential value drift
+1. **Mismatch detection** — compares current behavior patterns against the interest profile, flags potential value drift
 2. **Snapshot comparison** — validates past prediction snapshots against today's data
 3. **Hypothesis pruning** — checks for stale hypotheses that should be reviewed or retired
 
@@ -188,7 +216,7 @@ This runs three checks:
 
 ## Schema Reference
 
-`schema.md` documents exact JSON schemas for all 7 command outputs. Read it when you need field names or types.
+`schema.md` documents exact JSON schemas for the sandbox command outputs. Read it when you need field names or types.
 
 ## Builder's Lens — 深度项目分析
 
@@ -198,6 +226,24 @@ This is a **qualitative, Claude-driven analysis** — no sandbox command covers 
 
 **When to use**: after trending discovery or deep-dive, when the user sees a standout project and wants to understand *how* it was built, not just *what* it does.
 
+## DeveloperDNA — 技术实践分析
+
+When the user wants "developer DNA", "分析这个开发者的技术 DNA", or "what's their engineering style", run the deterministic DNA computation (then do semantic induction yourself):
+
+```bash
+PYTHONPATH=. uv run builderdna dna --data output/signals.json --developer <login> --output output/developer_dna.json
+```
+
+This produces 8 evidence-backed dimensions. **Rules you must follow:**
+
+- Every conclusion cites a repo/issue fact; the JSON carries `evidence[].ref` for each dimension.
+- Dimensions the signals can't support (build_patterns, iteration_style, testing_reliability_signals) are `unknown` — **state that plainly; do not fill the gap with a story**.
+- Never infer ability from stars/followers/a single README.
+- Distinguish `observed` (read from a fact) from `inferred` (derived from facts) when you present findings.
+- No relationship judgments ("worth connecting with", etc.) — only technical practices.
+
+Present an evidence chain (dimension → evidence refs → confidence) and flag the unknowns explicitly. Semantic induction ("this developer ships small, composable tools and iterates fast") is YOUR job — but it must be grounded in the `observed`/`inferred` dimensions, never the `unknown` ones.
+
 ## Reference Files
 
 Read these when needed:
@@ -205,7 +251,7 @@ Read these when needed:
 | File | When to Read | Content |
 |------|-------------|---------|
 | `references/builder-lens.md` | Before builder's perspective analysis | 10-dimension methodology for analyzing project success patterns |
-| `schema.md` | Before reading command outputs | JSON schemas for all 7 commands |
+| `schema.md` | Before reading command outputs | JSON schemas for the sandbox commands |
 | `state/hypotheses.json` | Session start | Exploration state tree |
 | `docs/adr/` | Architecture understanding | All architecture decision records |
 | `docs/adr/ADR-006-simplify-goap-to-short-circuit.md` | Understanding the pipeline | Goal-driven short-circuit design rationale |

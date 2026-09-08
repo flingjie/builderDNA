@@ -9,9 +9,9 @@ description: >
   or asks to capture, scan, verify, review, build, or source-audit a concept.
   Owns cross-source synthesis and the Inbox → Watch → Verify → Build/Drop
   lifecycle. Single-source requests route to the specialist skills instead:
-  X-only learning → twitter-learning, X reply/engagement → twitter-discussion,
-  Reddit-only pain discovery → reddit-opportunity, GitHub-only discovery →
-  repo-trend. Deterministic schemas, persistence, scoring, and gates live in the
+  X-only learning → twitter-learning, Reddit-only pain discovery →
+  reddit-opportunity, GitHub-only discovery → repo-trend. X reply/engagement
+  and customer outreach are out of scope for this project. Deterministic schemas, persistence, scoring, and gates live in the
   Python CLI; this skill orchestrates retrieval and semantic judgment through
   validated JSON contracts.
 ---
@@ -44,10 +44,12 @@ but never determines truth.
 | 请求 | 路由 |
 |------|------|
 | 只学 X / 建 X 知识库 | `twitter-learning` |
-| 找值得回复/讨论的推文、设计回复 | `twitter-discussion` |
 | 只挖 Reddit 痛点/付费意愿 | `reddit-opportunity` |
 | 只发现/评估 GitHub repo | `repo-trend` |
 | 跨源弱信号、假设+证据、验证想法、生命周期 | **`concept-radar`**（本 skill）|
+
+X 回复/互动（找值得回复的推文、设计回复）与获客**超出本项目范围**——没有对应
+Skill，直接说明不在范围内，不要路由到任何 Skill。
 
 `twitter-learning` 的**被选中发现**可以进入跨源验证（feed 进 `concept-radar`），
 但方向不可逆：`concept-radar` 不反向把单源学习任务派回 `twitter-learning`。
@@ -83,6 +85,16 @@ Inbox ──► Watch ──► Verify ──► Build ──► Drop（或持�
 - **Build 硬门槛**：两种源类型 + 两条独立证据链 + 已审阅的反证 + 有界最小实验，四者缺一不可。
 
 完整契约见 `references/schema.md`。
+
+## 语义 vs 执行 (Semantics vs Execution)
+
+本 skill 定义**语义**：生命周期、模式、硬门槛、边界与不变量。
+
+可恢复的确定性执行协议（`start → import → decide → finalize` 循环）由
+`concept-radar-loop` 定义——它驱动 `builderdna radar-cycle` 状态机，按每个
+`next_action` 加载对应专家 skill。需要跑一轮完整生命周期时路由到
+`concept-radar-loop`；本 skill 负责语义判断与单概念验证（capture/scan/verify/
+review/build/source-audit），不负责循环编排，也不反向接管单源搜索。
 
 ## Reference Files
 

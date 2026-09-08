@@ -7,10 +7,10 @@ description: >
   "reddit opportunity", "discover product ideas from a subreddit", "需求发现",
   "从 Reddit 找商机", or asks to monitor/analyze a subreddit for recurring complaints.
   Monitors a subreddit's public RSS feed (no API key, no scraper), builds and updates a
-  7-section Subreddit Profile (the shared community profile both reddit skills maintain),
-  finds recurring problems, judges willingness to pay, and generates a product concept.
+  7-section Subreddit Profile (the community profile), finds recurring problems, judges
+  willingness to pay, and generates a product concept.
   Supports a single subreddit or a versioned feed preset, including the Agent startup
-  opportunity radar. Shares state with reddit-outreach. RSS returns posts only — no
+  opportunity radar. RSS returns posts only — no
   comments, no scores; analysis works on post bodies. After every run, present a ranked
   list of problems and ask whether to deep-dive.
 ---
@@ -21,6 +21,22 @@ You discover product opportunities from a Reddit community when the user has **n
 You monitor a subreddit's public RSS feed, maintain a 7-section Subreddit Profile, find recurring
 problems people describe, judge whether they'd pay to solve them, and generate a product concept.
 You are the orchestrator — the only Python you run is the shared `scripts/reddit_rss.py` helper.
+
+## 这个 Skill 做什么 / 不做什么
+
+| 做 | 不做 |
+|----|------|
+| 从 Reddit 发现重复痛点与付费意愿，产出产品概念 | 回复帖子、私信、获客（超出本项目范围）|
+| 维护社区画像，聚合跨区段痛点 | 从 X 学习技术信号（那是 twitter-learning 的事）|
+| 把发现导入 concept radar 作为证据 | 跨源验证概念（那是 concept-radar 的事）|
+
+## 路由 (Routing)
+
+| 请求 | 路由 |
+|------|------|
+| 只从 Reddit 发现痛点/机会 | **`reddit-opportunity`**（本 skill）|
+| 只从 X 学习技术信号 | `twitter-learning` |
+| 跨源验证概念 | `concept-radar` |
 
 ## Architecture
 
@@ -133,7 +149,7 @@ Keep a run-local scan summary with `subreddit`, `segment`, `language`, `status`,
 ## 3. Build / update the Subreddit Profile
 
 Read `state/subreddit_profiles/{sub}.md` (create if missing). Merge new signals into the 7 sections.
-This profile is the shared asset both reddit skills maintain — update it, don't overwrite unrelated
+This profile is the community profile this skill maintains — update it, don't overwrite unrelated
 sections.
 
 In preset mode, update a subreddit's profile only from that feed's eligible new posts. Never merge

@@ -46,7 +46,7 @@ Group contiguous tool calls into logical steps. **For builderdna**, use this tax
 
 | Step | Detection rule |
 |------|---------------|
-| `bootstrap` | `Read` calls on `state/hypotheses.json`, `state/user_weights.json`, `state/user_dna.json` at session start |
+| `bootstrap` | `Read` calls on `state/hypotheses.json`, `state/user_weights.json`, `state/builder_interest_profile.json` at session start |
 | `goal_determination` | Period between bootstrap and first CLI command (often no tool calls — mark as pure reasoning) |
 | `collect` | `Bash` containing `builderdna collect` |
 | `trend` | `Bash` containing `builderdna trend` |
