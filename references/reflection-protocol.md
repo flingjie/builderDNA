@@ -445,7 +445,7 @@ Each line is a JSON object:
   "session_id": "optional conversation identifier",
   "source": "one-line summary of what the conversation was about",
   
-  "value_lens": {
+  "decision_lens": {
     "segments": [{"label": "...", "topic": "...", "emotional_tone": "...", "signal_strength": "high", "rationale": "..."}],
     "focus_segments": ["..."],
     "candidate_decisions": [
@@ -460,7 +460,7 @@ Each line is a JSON object:
     "summary": "..."
   },
   
-  "ability_lens": {
+  "assumption_lens": {
     "segments": [{"label": "...", "activity": "...", "cognitive_demand": "...", "signal_strength": "high", "rationale": "..."}],
     "focus_segments": ["..."],
     "identified_assumptions": [
@@ -673,7 +673,7 @@ If the user declines, wait until the next `/reflect` completes before suggesting
 **Purpose**: semantic search across historical reflections (NOT primary storage).
 
 **What gets embedded**:
-- `observation_add` per reflection event with: id, timestamp, value_lens.summary, ability_lens.summary, pattern_lens.summary, emotional_spikes, tags
+- `observation_add` per reflection event with: id, timestamp, decision_lens.summary, assumption_lens.summary, pattern_lens.summary, emotional_spikes, tags
 - Metadata: `{type: "reflection", reflection_id: "uuid", quality_score: float}`
 
 **Primary storage**: `state/reflections.jsonl` — full fidelity. This is the source of truth.

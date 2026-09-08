@@ -135,11 +135,11 @@ For each selected record, ask 2 questions:
 The user's answer becomes the `amplification` field. Also invite them to add value and domain tags:
 
 > "加个标签？（可选）"
-> "价值观标签: autonomy, collaboration, stability, competition, creation, exploration, optimization, execution, devtools, end_user, infrastructure, knowledge, growth, mastery, recognition, wealth"
+> "兴趣标签: autonomy, collaboration, stability, competition, creation, exploration, optimization, execution, devtools, end_user, infrastructure, knowledge, growth, mastery, recognition, wealth"
 > "领域标签（自由填）: coding, design, writing, meeting, ..."
 
 **Tag rules (from Tag Catalog in `references/reflection-protocol.md`):**
-- **Value tags** — closed set of 16 keys from the Tag Catalog. Used in the interest profile. Suggest from this list.
+- **Interest tags** — closed set of 16 keys from the Tag Catalog. Used in the interest profile. Suggest from this list.
 - **Domain tags** — free-form. Use the user's existing vocabulary from past records.
 - **Energy tags** — `energizing|draining|neutral`. Ask "这件事让你充能还是消耗？"
 - **Validation:** Before saving, check value_tags against the 16 allowed keys. If user types a non-standard tag (e.g., `impact`), suggest the closest match (e.g., `recognition` or `mastery`). Don't silently drop — tell the user and ask.

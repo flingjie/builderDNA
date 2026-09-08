@@ -1,8 +1,8 @@
 ---
 name: value-discovery
 description: >
-  ALWAYS use this skill when the user wants to discover their own values, beliefs,
-  and decision patterns — or when another skill (like builderdna) triggers it for
+  ALWAYS use this skill when the user wants to discover their technical interests
+  and build preferences — or when another skill (like builderdna) triggers it for
   user onboarding. Also use when the user says "value discovery", "what do I value",
   "help me understand my preferences", "analyze my decision style", "cognitive model",
   "personal DNA", or references value-discovery directly.
@@ -12,7 +12,7 @@ description: >
   state/builder_interest_profile.json. The profile only reorders and reweights
   recommendations — it never changes evidence strength, trend stage, pain severity,
   hypothesis maturity, or Build gates.
-  Important: if the user asks about understanding their own values, decision patterns,
+  Important: if the user asks about understanding their own interests, decision patterns,
   or preferences — use this skill. Don't try to extract cognitive models without it.
 ---
 
@@ -32,7 +32,7 @@ This is NOT a personality test. You are building an **interest profile** that se
 
 The converged profile has six fields. Each list item carries `source` (user_confirmed / inferred), `confirmed`, and `updated_at`:
 
-| Field | Meaning | Example values |
+| Field | Meaning | Example interests |
 |-------|---------|----------------|
 | `domains` | technical domains to learn or build in | `agent`, `devtools`, `infrastructure` |
 | `technical_adjacencies` | adjacent technologies worth watching | `mcp`, `wasm`, `vector-db` |
@@ -48,44 +48,44 @@ influence the current session's ranking. Persist only what the user confirmed.
 
 ### Phase 1: Open (5-7 minutes)
 
-Start with ONE open question. Do NOT ask about values directly.
+Start with ONE open question about their technical work. Do NOT ask "你的兴趣是什么？" or any direct variant.
 
 **Opening question (use this exact wording):**
 
-> "聊聊你最近让你觉得特别有价值感的一件事——可以是项目、决策、或者学到的东西。不用总结，就当讲故事。"
+> "聊聊你最近在技术上投入最多的一件事——可以是项目、研究、工具、或者学到的东西。不用总结，就当讲故事。"
 
-Why this works: narratives expose natural language patterns (causal sentences, identity statements, comparison phrases) without triggering social-desirability filtering.
+Why this works: narratives about technical work expose their actual choices — what they built, what they abandoned, what they reached for — without triggering self-report bias about what they *think* they should care about.
 
 ### Phase 2: Meta Model Questioning (3-5 follow-ups)
 
 Listen for these signal types in the user's response. When you detect one, ask the corresponding follow-up:
 
-| Signal | Trigger Condition | Follow-up |
-|--------|-------------------|-----------|
-| **Causal Belief** | "因为"、"所以"、"只有...才"、"必须"、"应该"、"不能" | "你说'[quote belief]'——能展开一下吗？你觉得有没有反例？" |
-| **Identity Statement** | "我是/不是...的人"、"我一直..."、"我从来不..." | "这代表你更看重什么？如果用一两个词概括？" |
-| **Comparison** | "比...更"、"不如"、"宁可" | "如果这两个只能选一个，你选哪个？为什么？" |
-| **Vague Word** | 用户用模糊词描述**自己/自己的价值/偏好**："有价值"、"好的"、"有意义"、"重要的" | "你怎么定义'[fuzzy word]'？什么才算'[fuzzy word]'？" |
-| **Emotion Marker** | "爽"、"烦"、"受不了"、"特别喜欢" | "这个情绪背后——是什么被满足（或被侵犯）了？" |
-| **Judgment Claim** | 用户对**外部对象**做评价（项目、工具、决策、他人选择）："这个没/不行/不靠谱"、"X才是/不算..."、"说到底X就是Y" | "你怎么判断的？你的判断标准是什么？" |
-| **Belief Articulation** | 用户清晰陈述了一条信念（**前置条件**：已有≥2条信念经agent判断在对话中浮现） | "你说'[quote belief]'——这个信念本身，帮你看到了什么？又可能让你忽略了什么？" |
+| Signal | Trigger Condition | Follow-up | Maps to field |
+|--------|-------------------|-----------|---------------|
+| **Causal Claim** | "因为"、"所以"、"只有...才"、"必须"、"不能" | "你说'[quote]'——能展开一下吗？你觉得有没有反例？" | `build_constraints` / `problem_preferences` |
+| **Technical Identity** | "我是做 X 的"、"我从来不用 Y"、"我一直在搞 Z" | "这代表你更倾向哪类技术？用一两个词概括？" | `domains` |
+| **Trade-off Comparison** | "比...更"、"不如"、"宁可" | "如果这两个只能选一个，你选哪个？为什么？" | `problem_preferences` / `build_constraints` |
+| **Fuzzy Tech Word** | 用户用模糊词描述**自己/自己的技术偏好**："好用"、"优雅"、"强大"、"有意义"、"靠谱" | "你怎么定义'[fuzzy word]'？什么才算'[fuzzy word]'？" | `build_constraints` |
+| **Emotion Marker** | "爽"、"烦"、"受不了"、"特别喜欢" | "这个情绪背后——是什么被满足（或被侵犯）了？" | `problem_preferences` |
+| **Tool/Approach Judgment** | 用户对**外部对象**做评价（工具、框架、架构、技术选型）："这个不行/不靠谱"、"X 才是对的"、"说到底 X 就是 Y" | "你怎么判断的？你的判断标准是什么？" | `build_constraints` / `technical_adjacencies` |
+| **Assumption Articulation** | 用户清晰陈述了一条技术假设（**前置条件**：已有≥2条假设经 agent 判断在对话中浮现） | "你说'[quote]'——这个假设帮你看到了什么？又可能让你忽略了什么？" | `learning_goals` / `risk_tolerance` |
 
-**Judgment Claim vs Vague Word 区分规则：**
-- Judgment Claim：用户评价**外部对象**（项目、工具、决策、他人选择）→ 追问判断标准（criteria）
-- Vague Word：用户用模糊词描述**自己/自己的价值/偏好** → 追问概念定义（belief）
+**Tool/Approach Judgment vs Fuzzy Tech Word 区分规则：**
+- Tool/Approach Judgment：用户评价**外部对象**（工具、框架、架构、他人选型）→ 追问判断标准（build_constraints）
+- Fuzzy Tech Word：用户用模糊词描述**自己/自己的技术偏好** → 追问概念定义（build_constraints）
 - 触发条件本身即排他——不需要靠优先级区分
 
-**Belief Articulation 前置条件说明：**
-- "信念已浮现" = Phase 2 中任意信号被 agent 判定背后有信念，即计入 ≥2 的计数
-- 不限于 Causal Belief 和 Identity Statement——任何信号如果 agent 判断隐藏了一个信念，都算
+**Assumption Articulation 前置条件说明：**
+- "假设已浮现" = Phase 2 中任意信号被 agent 判定背后有技术假设，即计入 ≥2 的计数
+- 不限于 Causal Claim 和 Technical Identity——任何信号如果 agent 判断隐藏了一个技术假设，都算
 - 用好奇而非质疑的语气——这个模式是帮助反思，不是挑战
 
 **信号优先级（同一回复触发多个信号时）：**
 ```
-Belief Articulation（前置条件满足时）
-  > Judgment Claim
+Assumption Articulation（前置条件满足时）
+  > Tool/Approach Judgment
     > Emotion Marker
-      > Causal Belief / Identity / Comparison / Vague Word（选离价值观最近的）
+      > Causal Claim / Technical Identity / Trade-off Comparison / Fuzzy Tech Word（选离技术偏好最近的）
 ```
 一次只问一个问题。
 
@@ -94,25 +94,27 @@ Belief Articulation（前置条件满足时）
 
 **Critical rules for Phase 2:**
 1. Ask ONE question at a time. Wait for the answer before following up.
-2. Never ask "你的价值观是什么？" or any direct variant.
+2. Never ask "你的兴趣是什么？" or any direct variant.
 3. Each follow-up must reference the user's own words — quote them back.
 4. If a follow-up reveals a deeper signal, follow THAT thread first (depth before breadth).
-5. **Belief Articulation: only after ≥2 beliefs surfaced.** Using it too early feels like a challenge, not curiosity.
+5. **Assumption Articulation: only after ≥2 assumptions surfaced.** Using it too early feels like a challenge, not curiosity.
 
-### Phase 3: Dimension Coverage Check
+### Phase 3: Field Coverage Check
 
-After 2-3 signals are extracted, check which value dimensions are still uncovered. The 4 dimensions are:
+After 2-3 signals are extracted, check which of the six profile fields are still uncovered:
 
-| Dimension | Meaning | Example Value Keys |
-|-----------|---------|-------------------|
-| **环境 (Environment)** | Work conditions | 自主 (autonomy), 稳定 (stability), 协作 (collaboration), 竞争 (competition) |
-| **活动 (Activity)** | Type of work | 创造 (creation), 探索 (exploration), 优化 (optimization), 执行 (execution) |
-| **产出 (Output)** | Who/what the work serves | 开发者工具 (devtools), 终端用户 (end_user), 基础设施 (infrastructure), 知识 (knowledge) |
-| **回报 (Reward)** | What you get back | 成长 (growth), 掌控 (mastery), 认可 (recognition), 财富 (wealth) |
+| Field | Meaning | Example interests |
+|-------|---------|----------------|
+| **domains** | 技术领域（学/构建什么） | agent, devtools, infrastructure |
+| **technical_adjacencies** | 相邻技术（值得关注） | mcp, wasm, vector-db |
+| **problem_preferences** | 想解决哪类问题 | growth, mastery, revenue |
+| **build_constraints** | 团队规模/复杂度/阶段限制 | solo, early_stage, stable |
+| **learning_goals** | build / explore / deepen / ship | build, deepen |
+| **risk_tolerance** | low / medium / high | medium |
 
-For uncovered dimensions, ask ONE bridging question:
+For uncovered fields, ask ONE bridging question:
 
-> "你刚才主要聊的是[已覆盖维度]，我还想了解一下——在[未覆盖维度]方面，什么对你比较重要？"
+> "你刚才主要聊的是[已覆盖字段]，我还想了解一下——在[未覆盖字段]方面，你的偏好是什么？"
 
 #### Auxiliary Tools (use only when stuck)
 
@@ -120,23 +122,23 @@ These are optional tools — use them ONLY when the user is clearly having troub
 
 **Tool A: Chunk Up** (SoM: Chunking Up)
 
-When to use: the user gives narrow, concrete answers that don't reveal values. They talk about *what* they did but not *why* it mattered.
+When to use: the user gives narrow, concrete answers that don't reveal interests. They talk about *what* they did but not *why* it mattered.
 
 > "我们换一个角度——不说具体项目，往上看一层：你做这件事，最终在追求什么？那个东西比'[他们提到的具体事物]'更大的是什么？"
 
-Why it works: raising abstraction forces values to surface. Values are always at a higher chunk level than actions.
+Why it works: raising abstraction forces interests to surface. Values are always at a higher chunk level than actions.
 
 **退出条件：** 如果用户说 "我也不知道"，不继续 Chunk Up。退回到 Phase 3 维度桥接。用一次无效就换路。
 
 **Tool B: Chunk Down** (SoM: Chunking Down)
 
-When to use: the user gives abstract value words but you can't pin them to anything concrete. They say "我在乎成长" but you can't tell what "成长" means to them.
+When to use: the user gives abstract preference words but you can't pin them to anything concrete. They say "我在乎成长" but you can't tell what "成长" means to them.
 
-> "你说的'[abstract value]'——最近有没有一个具体时刻，让你觉得'对，就是这种感觉'？是什么样的场景？"
+> "你说的'[abstract preference]'——最近有没有一个具体时刻，让你觉得'对，就是这种感觉'？是什么样的场景？"
 
-Why it works: values anchored in specific memories are richer and more reliable than stated labels.
+Why it works: interests anchored in specific memories are richer and more reliable than stated labels.
 
-**退出条件：** 如果用户给的场景和之前的抽象值对不上（比如 "我在乎自由" → 描述了一个遵守规则帮团队的场景），这本身就是信号——说明抽象词的定义不准。不要进 Phase 4 Conflict Detection，而是退回做概念澄清：用 Vague Word 模式追问 "'[抽象值]'对你来说更准确是什么意思？" 如果场景和值本身就匹配，回到 Phase 2 继续收集剩余维度的信号。
+**退出条件：** 如果用户给的场景和之前的抽象偏好对不上（比如 "我在乎自由" → 描述了一个遵守规则帮团队的场景），这本身就是信号——说明抽象词的定义不准。不要进 Phase 4 Conflict Detection，而是退回做概念澄清：用 Fuzzy Tech Word 模式追问 "'[抽象偏好]'对你来说更准确是什么意思？" 如果场景和值本身就匹配，回到 Phase 2 继续收集剩余维度的信号。
 
 **Tool C: Analogy Bridge** (SoM: Analogy/Metaphor)
 
@@ -152,44 +154,46 @@ The analogy must map to their actual choice tension, not a generic metaphor. Pic
 
 ### Phase 4: Conflict Detection
 
-If two values appear to conflict (e.g., "freedom" vs "maximize income"), present a trade-off scenario:
+If two preferences appear to conflict (e.g., "深度专精" vs "广度探索", or "快速交付" vs "长期稳定"), present a trade-off scenario:
 
-> "我发现你同时看重[A]和[B]。如果它们冲突了——比如[concrete scenario]——你怎么选？"
+> "我发现你同时倾向[A]和[B]。如果它们冲突了——比如[concrete technical scenario]——你怎么选？"
 
-Use their response to infer relative weights.
+Use their response to infer which field the conflict resolves into (e.g. `risk_tolerance`, `build_constraints`).
 
-### Phase 5: Ranking Confirmation
+### Phase 5: Profile Confirmation
 
-When you have signals across all 4 dimensions (or after 5-6 follow-ups, whichever comes first), present your extraction:
+When you have signals across the six fields (or after 5-6 follow-ups, whichever comes first), present your extraction:
 
-> "根据我们的对话，我初步整理出你的价值排序。你看看准不准——"
+> "根据我们的对话，我初步整理出你的技术兴趣画像。你看看准不准——"
 >
-> **环境**: [ranking with scores]
-> **活动**: [ranking with scores]
-> **产出**: [ranking with scores]
-> **回报**: [ranking with scores]
+> **domains**: [list]
+> **technical_adjacencies**: [list]
+> **problem_preferences**: [list]
+> **build_constraints**: [list]
+> **learning_goals**: [list]
+> **risk_tolerance**: [low/medium/high]
 >
-> "有没有要调整的？分数从 1-10，10 最重要。"
+> "有没有要调整的？"
 
-Also present any extracted Beliefs and Criteria:
+Also present any inferred items that need explicit confirmation (mark them `source: inferred`, `confirmed: false`):
 
-> "我还注意到你可能有这些信念——这些是我推断的，请确认："
-> - "[belief statement]" (confidence: X%)
+> "我还注意到你可能有这些偏好——这些是我推断的，请确认："
+> - "[inferred item]" (confidence: X%)
 > - ...
 
-**If Belief Articulation was used in Phase 2**, add to the belief presentation:
+**If Assumption Articulation was used in Phase 2**, add to the confirmation:
 
-> "另外，我们聊到 '[belief]' 的时候，你说这个信念可能让你忽略了 [X]。你觉得这个盲区对你做决策影响大吗？"
+> "另外，我们聊到 '[assumption]' 的时候，你说这个假设可能让你忽略了 [X]。你觉得这个盲区对你做技术决策影响大吗？"
 
 This turns the articulation result into a calibration checkpoint, not just a passing question.
 
-Let the user correct or adjust. The ranking confirmation IS the data — don't override it with your inferences.
+Let the user correct or adjust. The confirmation IS the data — don't override it with your inferences. Only items the user confirms are persisted with `confirmed: true`.
 
 ### Termination Conditions
 
 End the interview when ANY of:
-1. All 4 dimensions have at least 1 ranked value with a score
-2. At least 2 beliefs or criteria extracted AND user confirms the summary
+1. All six fields have at least 1 confirmed item (or risk_tolerance is set)
+2. At least 2 preferences/assumptions extracted AND user confirms the summary
 3. User has answered 6+ follow-up questions (prevent fatigue)
 4. User explicitly signals they want to stop
 
@@ -245,15 +249,15 @@ When triggered BY builderdna (not by the user directly):
 |-----------|----------|
 | User says "I don't know" to a follow-up | Don't push. Say "没关系，我们先放一边" and probe a different dimension |
 | User gives socially-desirable answers ("I want to help people") | Use Meta Model: "你说的'帮助'——具体是什么样的帮助？有没有你觉得不算帮助但别人觉得算的情况？" |
-| User's values are contradictory | Flag it gently: "我注意到[X]和[Y]可能不太一致——你怎么看？" Don't resolve it for them. |
+| User's interests are contradictory | Flag it gently: "我注意到[X]和[Y]可能不太一致——你怎么看？" Don't resolve it for them. |
 | User wants to skip the interview | Accept it. Write a minimal profile (only what was expressed). Better partial data than no data. |
 | Existing builder_interest_profile.json already has data | Ask: "我之前已经了解过你的偏好，要不要更新一下？" Show current profile, let them choose what to update. |
-| Judgment Claim 被触发但用户给的不是标准而是新的因果句（"它就是不行因为..."） | 不追 Judgment Claim，切换到 Causal Belief 模式追因果。判断标准必须用户自己说出来才算 |
-| Belief Articulation 被触发，用户回答 "没忽略什么" 或 "我觉得没问题" | 不追问。说 "明白" 然后自然过渡到下一个维度。这个模式不适用于每个信念——只有用户对信念的边界有反思空间时才有效 |
+| Tool/Approach Judgment 被触发但用户给的不是标准而是新的因果句（"它就是不行因为..."） | 不追 Tool/Approach Judgment，切换到 Causal Claim 模式追因果。判断标准必须用户自己说出来才算 |
+| Assumption Articulation 被触发，用户回答 "没忽略什么" 或 "我觉得没问题" | 不追问。说 "明白" 然后自然过渡到下一个维度。这个模式不适用于每个假设——只有用户对假设的边界有反思空间时才有效 |
 | Chunk Up 后用户说 "我也不知道" | 不继续 Chunk Up。退回到 Phase 3 维度桥接。Chunk Up 是工具不是通道——用一次无效就换路 |
-| Chunk Down 后用户给的场景和之前的抽象值对不上 | 这就是信号——矛盾本身就是提取点。退回做概念澄清：用 Vague Word 模式追问 "'[抽象值]'对你来说更准确是什么意思？"（不是 Phase 4，因为这不是两个价值冲突，而是概念边界不清晰） |
+| Chunk Down 后用户给的场景和之前的抽象偏好对不上 | 这就是信号——矛盾本身就是提取点。退回做概念澄清：用 Fuzzy Tech Word 模式追问 "'[抽象偏好]'对你来说更准确是什么意思？"（不是 Phase 4，因为这不是两个偏好冲突，而是概念边界不清晰） |
 | Analogy 的类比被用户拒绝（"都不像"） | 放弃 Analogy。说 "没关系，让我们换个角度" 然后退回 Phase 3 维度桥接。不要换一个类比再试——连续两次类比会让用户觉得你在玩文字游戏 |
-| 同一个回复触发多个信号（比如既是 Judgment Claim 又是 Emotion Marker） | 按信号优先级表选择。如果底层的 4 个信号并列触发，选离价值观最近的那个。没把握时用兜底规则："你能说得更具体吗？" |
+| 同一个回复触发多个信号（比如既是 Tool/Approach Judgment 又是 Emotion Marker） | 按信号优先级表选择。如果底层的 4 个信号并列触发，选离技术偏好最近的那个。没把握时用兜底规则："你能说得更具体吗？" |
 | Agent 无法确定该选哪个信号 | 宁可问兜底元问题："你能说得更具体吗？" 这比选错信号、问偏方向要好 |
 
 ## Key Files

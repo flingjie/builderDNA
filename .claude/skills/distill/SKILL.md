@@ -79,7 +79,7 @@ Search claude-mem for related reflections across ALL time (not just unprocessed)
 
 ```
 mcp__plugin_claude-mem_mcp-search__search({
-  query: "<synthesize: value_lens.summary + pattern_lens.summary from unprocessed reflections>",
+  query: "<synthesize: decision_lens.summary + pattern_lens.summary from unprocessed reflections>",
   type: "reflection"
 })
 ```
@@ -118,26 +118,26 @@ Analyze the reflections through the Tension + Resolution lens:
 
 Based on ALL unprocessed reflections (not just the ones that individually proposed diffs), compute a consolidated set of proposed changes:
 
-**Values:**
-- If the same value key shifted in multiple reflections → stronger signal → propose with higher confidence
-- If values shifted in opposite directions across reflections → flag as unresolved tension, don't propose a single diff
+**Decisions:**
+- If the same decision criterion shifted in multiple reflections → stronger signal → propose with higher confidence
+- If decisions shifted in opposite directions across reflections → flag as unresolved tension, don't propose a single update
 - **Weight by emotional intensity**: high-intensity shifts get more weight (per v4: intensity IS evidence, not noise)
-- If `attraction_signals` converge on the same topic across reflections → propose strengthening the linked value
+- If `attraction_signals` converge on the same topic across reflections → propose strengthening the linked interest
 
-**Beliefs:**
-- New beliefs that appear in multiple reflections → propose adding
-- Existing beliefs contradicted by recent evidence → propose modifying or removing
-- Check against builder_interest_profile.json: if a belief already exists with high confidence, require stronger evidence to modify
+**Assumptions:**
+- New assumptions that appear in multiple reflections → propose adding
+- Existing assumptions contradicted by recent evidence → propose modifying or removing
+- Check against builder_interest_profile.json: if an assumption already exists with high confidence, require stronger evidence to modify
 
-**Criteria:**
+**Decision rules (criteria):**
 - New decision rules that appear consistently → propose adding
 - Old rules that the user violated repeatedly → propose modifying
 
-**Preferences:**
-- Stable shifts in work_style, complexity, team_size, stage_preference → propose updating
+**Build constraints:**
+- Stable shifts in team size, complexity, or stage preference → propose updating `build_constraints`
 
 **Action experiment outcomes** (new in v4):
-- If the same `action_experiment` was tried across multiple reflections with positive outcomes → propose converting to a criterion or belief
+- If the same `action_experiment` was tried across multiple reflections with positive outcomes → propose converting to a decision rule or assumption
 - Experiments consistently skipped or failed → may indicate the insight was misattributed
 
 ### Step 3.5: Analyze Digest Cognitive Patterns

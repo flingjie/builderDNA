@@ -260,7 +260,7 @@ After user confirms/rejects all diffs:
 5. **Index in claude-mem** — use `mcp__plugin_claude-mem_mcp-search__observation_add`:
    ```json
    {
-     "content": "Reflection: [value_lens.summary] | [ability_lens.summary] | [pattern_lens.summary]",
+     "content": "Reflection: [decision_lens.summary] | [assumption_lens.summary] | [pattern_lens.summary]",
      "kind": "reflection",
      "metadata": {
        "type": "reflection",
