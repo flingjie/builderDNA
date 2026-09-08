@@ -323,17 +323,17 @@ class BuildGateResult:
 def _counterevidence_reviewed(
     card: ConceptCard, records: Sequence[ConceptEvidence]
 ) -> tuple[bool, str]:
-    """Whether any counterevidence on record has been reviewed/resolved.
+    """Whether counterevidence on record has been reviewed/resolved.
 
-    ``MaturityStage.CONTESTED`` is the model's explicit "counterevidence present
-    and unresolved" state, so it is the one maturity value that fails this
-    requirement. No counterevidence on record passes vacuously (nothing to
-    review); counterevidence combined with any non-contested maturity is treated
-    as reviewed.
+    Falsification before build: a concept must have *actively reviewed*
+    counterevidence to pass. That means at least one ``COUNTER`` record is on
+    file and resolved (maturity is anything but ``CONTESTED``). Zero
+    counterevidence fails — "no counterexamples found" must be the *result of a
+    search*, not the absence of one.
     """
     counter = [e for e in records if e.role == EvidenceRole.COUNTER]
     if not counter:
-        return True, "no counterevidence on record"
+        return False, "no counterevidence on record — search for and review counterexamples before building"
     if card.maturity != MaturityStage.CONTESTED:
         return True, (
             f"counterevidence present and resolved "

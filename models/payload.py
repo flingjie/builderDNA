@@ -341,3 +341,18 @@ class DeveloperDNA(BaseModel):
     computed_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     source_repos: list[str] = Field(default_factory=list, description="Repos this analysis drew evidence from")
     source_issues: int = Field(default=0, description="Number of issues this analysis drew evidence from")
+
+
+class RepoActivity(BaseModel):
+    """Bounded activity summary for one repo, used by the DeveloperDNA computation.
+
+    Produced by ``collector/github/activity.fetch_repo_activity`` — a limited,
+    bounded evidence collection (PRs, releases, commits, CI/test presence).
+    """
+    repo: str = Field(description="Repository full name")
+    open_prs: int = Field(default=0, description="Open pull requests")
+    merged_prs: int = Field(default=0, description="Merged pull requests")
+    recent_commits: int = Field(default=0, description="Recent commits (bounded fetch)")
+    releases: int = Field(default=0, description="Number of releases")
+    has_ci: bool = Field(default=False, description="Whether a CI workflow config is present")
+    has_tests: bool = Field(default=False, description="Whether a test directory is present")

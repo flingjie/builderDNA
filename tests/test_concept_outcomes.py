@@ -101,6 +101,12 @@ def build_ready_card(store: ConceptStore) -> None:
         directness=Directness.DIRECT, strength=EvidenceStrength.MODERATE,
         independence_key="reddit-b",
     ))
+    store.add_evidence(ConceptEvidence(
+        id="e3", concept_id="agent-reliability", source_type=SourceType.REDDIT,
+        source_url="https://reddit.com/r/counter", role=EvidenceRole.COUNTER,
+        directness=Directness.DIRECT, strength=EvidenceStrength.WEAK,
+        independence_key="counter-c",
+    ))
 
 
 # ── move -> build requires the prediction fields ──

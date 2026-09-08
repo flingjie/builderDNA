@@ -2,6 +2,16 @@
 
 Shared protocol specification for the `/reflect` and `/distill` skills. **Single source of truth** — both skills reference this file for schemas, lens definitions, adversary rules, and storage conventions.
 
+> **Convergence note (P4):** the `/reflect` and `/distill` skills now focus on
+> *technical judgment and cognition* only. Any reference in this protocol to
+> `state/user_dna.json`, a "self-model", `values`/`beliefs`/`criteria` diffs, or
+> a "Value Lens" is **superseded**. Those are no longer maintained: interests
+> live in `state/builder_interest_profile.json` (6 fields, ranking-only), and
+> cognitive blind-spots live in `state/digest_gaps.jsonl`. The lens/agent names
+> are interpreted as Decision/Assumption/Pattern (technical) rather than
+> Value/Ability (personality). See the `reflect`/`distill` SKILL.md files for
+> the current runtime orchestration.
+
 ---
 
 ## Architecture Overview

@@ -290,10 +290,22 @@ class TestBuildGate:
         assert gate.missing == ()
         assert isinstance(gate, BuildGateResult)
 
-    def test_no_counterevidence_passes_review_requirement_vacuously(self):
+    def test_missing_counterevidence_blocks_build(self):
+        """Falsification before build: no COUNTER record on file fails the gate."""
         evidence = [
             make_evidence(id="e1", source_type=SourceType.GITHUB, role=EvidenceRole.IMPLEMENTATION, independence_key="a"),
             make_evidence(id="e2", source_type=SourceType.REDDIT, role=EvidenceRole.PROBLEM, independence_key="b"),
+        ]
+        card = make_card(maturity=MaturityStage.VERIFIED, smallest_experiment=make_experiment())
+        gate = evaluate_build_gate(card, evidence)
+        assert not gate.passed
+        assert any("reviewed counterevidence" in m for m in gate.missing)
+
+    def test_resolved_counterevidence_allows_build(self):
+        evidence = [
+            make_evidence(id="e1", source_type=SourceType.GITHUB, role=EvidenceRole.IMPLEMENTATION, independence_key="a"),
+            make_evidence(id="e2", source_type=SourceType.REDDIT, role=EvidenceRole.PROBLEM, independence_key="b"),
+            make_evidence(id="e3", source_type=SourceType.GITHUB, role=EvidenceRole.COUNTER, independence_key="c"),
         ]
         card = make_card(maturity=MaturityStage.VERIFIED, smallest_experiment=make_experiment())
         assert evaluate_build_gate(card, evidence).passed
@@ -430,6 +442,12 @@ class TestUnifiedScore:
                 source_type=SourceType.REDDIT,
                 role=EvidenceRole.PROBLEM,
                 independence_key="b",
+            ),
+            make_evidence(
+                id="e3",
+                source_type=SourceType.GITHUB,
+                role=EvidenceRole.COUNTER,
+                independence_key="c",
             ),
         ]
         card = make_card(

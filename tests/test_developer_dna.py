@@ -55,6 +55,30 @@ class TestComputeDeveloperDNA:
             assert d.status == "unknown"
             assert d.evidence == []
 
+    def test_activity_populates_commit_backed_dimensions(self):
+        activity = [
+            {"repo": "dev/mcp-tool", "merged_prs": 8, "open_prs": 2, "recent_commits": 40,
+             "releases": 3, "has_ci": True, "has_tests": True},
+        ]
+        dna = compute_developer_dna("dev", _repos(), _issues(), activity=activity)
+        bp = next(d for d in dna.dimensions if d.dimension == "build_patterns")
+        it = next(d for d in dna.dimensions if d.dimension == "iteration_style")
+        tr = next(d for d in dna.dimensions if d.dimension == "testing_reliability_signals")
+
+        assert bp.status != "unknown"
+        assert "PR" in bp.summary
+        assert it.status != "unknown"
+        assert tr.status == "observed"  # CI/test presence is a direct fact
+        assert any("CI" in s for s in tr.summary.split("；"))
+
+    def test_sparse_activity_stays_unknown_where_no_data(self):
+        # Activity present but no PR/commit signal → those stay unknown (honest).
+        activity = [{"repo": "dev/x", "merged_prs": 0, "open_prs": 0, "recent_commits": 0,
+                     "releases": 0, "has_ci": False, "has_tests": False}]
+        dna = compute_developer_dna("dev", _repos(), _issues(), activity=activity)
+        bp = next(d for d in dna.dimensions if d.dimension == "build_patterns")
+        assert bp.status == "unknown"
+
     def test_empty_input_produces_unknowns_not_stories(self):
         dna = compute_developer_dna("nobody", [], [])
         for d in dna.dimensions:

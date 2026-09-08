@@ -167,7 +167,8 @@ def _gate_missing_details(card, evidence) -> dict[str, str]:
             f"at least two independent supporting chains (have {len(chains)})"
         ),
         GATE_COUNTEREVIDENCE_REVIEWED: (
-            "counterevidence present but unresolved (maturity is 'contested')"
+            "counterevidence reviewed — at least one resolved COUNTER record "
+            "(no counterevidence on record fails)"
         ),
         GATE_SMALLEST_EXPERIMENT_PRESENT: "a bounded smallest experiment is defined",
         GATE_EXPERIMENT_THRESHOLDS_AND_BUDGET: (

@@ -376,6 +376,11 @@ class TestVerify:
             id="r1", concept_id="c-pass", source_type=SourceType.REDDIT,
             role=EvidenceRole.PROBLEM, independence_key="chain-b",
         ))
+        store.add_evidence(make_evidence(
+            id="c1", concept_id="c-pass", source_type=SourceType.GITHUB,
+            role=EvidenceRole.COUNTER, independence_key="chain-counter",
+            strength=EvidenceStrength.WEAK,
+        ))
         out_json = tmp_path / "verify.json"
         result = run_radar(
             "verify", "c-pass",
@@ -479,6 +484,11 @@ class TestVerifyHandoff:
         store.add_evidence(make_evidence(
             id="r1", concept_id="c-pass", source_type=SourceType.REDDIT,
             role=EvidenceRole.PROBLEM, independence_key="chain-b",
+        ))
+        store.add_evidence(make_evidence(
+            id="c1", concept_id="c-pass", source_type=SourceType.REDDIT,
+            role=EvidenceRole.COUNTER, independence_key="chain-counter",
+            strength=EvidenceStrength.WEAK,
         ))
         handoff = _write_handoff(tmp_path)
         out_json = tmp_path / "verify.json"
@@ -670,6 +680,11 @@ def _add_eligible_card(store, concept_id, *, github_key, reddit_key):
     store.add_evidence(make_evidence(
         id=f"{concept_id}-r", concept_id=concept_id, source_type=SourceType.REDDIT,
         role=EvidenceRole.PROBLEM, independence_key=reddit_key,
+    ))
+    store.add_evidence(make_evidence(
+        id=f"{concept_id}-c", concept_id=concept_id, source_type=SourceType.REDDIT,
+        role=EvidenceRole.COUNTER, independence_key=f"{concept_id}-counter",
+        strength=EvidenceStrength.WEAK,
     ))
 
 

@@ -235,6 +235,18 @@ def seed_build_eligible_card(
             independence_key="chain-b",
         )
     )
+    store.add_evidence(
+        ConceptEvidence(
+            id=f"e-{concept_id}-counter",
+            concept_id=concept_id,
+            source_type=SourceType.REDDIT,
+            source_url="https://reddit.com/r/x/counter",
+            role=EvidenceRole.COUNTER,
+            directness=Directness.DIRECT,
+            strength=EvidenceStrength.WEAK,
+            independence_key="chain-counter",
+        )
+    )
 
 
 def drive_full_weekly(app, runner, state_dir, config_dirs, *, resume_between=False):
@@ -594,6 +606,7 @@ def test_high_alignment_and_hype_cannot_override_a_failed_gate():
         ),
     )
     # Two independent chains but a single source type -> two_source_types fails.
+    # (Counterevidence is present and resolved, so the counter gate itself passes.)
     evidence = [
         ConceptEvidence(
             id="e1", concept_id="high-alignment", source_type=SourceType.GITHUB,
@@ -606,6 +619,12 @@ def test_high_alignment_and_hype_cannot_override_a_failed_gate():
             source_url="https://github.com/a/c", role=EvidenceRole.PROBLEM,
             directness=Directness.DIRECT, strength=EvidenceStrength.STRONG,
             independence_key="chain-b",
+        ),
+        ConceptEvidence(
+            id="e3", concept_id="high-alignment", source_type=SourceType.GITHUB,
+            source_url="https://github.com/a/counter", role=EvidenceRole.COUNTER,
+            directness=Directness.DIRECT, strength=EvidenceStrength.WEAK,
+            independence_key="chain-counter",
         ),
     ]
 

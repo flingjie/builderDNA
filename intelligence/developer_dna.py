@@ -74,14 +74,18 @@ def compute_developer_dna(
     developer: str,
     repos: list[dict] | None = None,
     issues: list[dict] | None = None,
+    activity: list[dict] | None = None,
 ) -> DeveloperDNA:
-    """Compute an evidence-backed DeveloperDNA from repo + issue signals.
+    """Compute an evidence-backed DeveloperDNA from repo + issue + activity signals.
 
     Args:
         developer: login to attribute the analysis to.
         repos: list of repo dicts (full_name, language, topics, stars, forks,
             velocity, created_at).
         issues: list of issue dicts (repo, issue_number, title, labels).
+        activity: list of RepoActivity dicts (repo, open_prs, merged_prs,
+            recent_commits, releases, has_ci, has_tests). When present, the
+            commit/PR/CI-backed dimensions are populated; otherwise ``unknown``.
     """
     repos = list(repos or [])
     issues = list(issues or [])
@@ -172,12 +176,10 @@ def compute_developer_dna(
     else:
         dims.append(_dim("idea_to_shipping_evidence", "unknown", 0.0, "无仓库数据", []))
 
-    # ── Dimensions requiring commit/PR/release data: honest unknowns ──────
-    # These need evidence the current collect signals do not carry. Per the
-    # plan's rule, they are marked unknown rather than fabricated.
-    dims.append(_dim("build_patterns", "unknown", 0.0, "需要 commit/PR 数据（当前信号未采集）", []))
-    dims.append(_dim("iteration_style", "unknown", 0.0, "需要 commit/PR 频率数据（当前信号未采集）", []))
-    dims.append(_dim("testing_reliability_signals", "unknown", 0.0, "需要 CI/测试数据（当前信号未采集）", []))
+    # ── Dimensions requiring commit/PR/release data ──────────────────────
+    # Populated from the limited activity collection when present; otherwise
+    # honestly unknown (per the plan's "missing data → unknown" rule).
+    dims.extend(_compute_activity_dimensions(activity or []))
 
     return DeveloperDNA(
         developer=developer,
@@ -185,6 +187,73 @@ def compute_developer_dna(
         source_repos=[r.get("full_name", "") for r in repos],
         source_issues=len(issues),
     )
+
+
+def _compute_activity_dimensions(activity: list[dict]) -> list[DNADimension]:
+    """Compute build_patterns / iteration_style / testing_reliability_signals.
+
+    Each is evidence-cited from the bounded ``RepoActivity`` facts. With no
+    activity data, all three are ``unknown``.
+    """
+    activity = list(activity)
+    total_prs = sum(int(a.get("merged_prs", 0)) + int(a.get("open_prs", 0)) for a in activity)
+    merged_prs = sum(int(a.get("merged_prs", 0)) for a in activity)
+    commits = sum(int(a.get("recent_commits", 0)) for a in activity)
+    releases = sum(int(a.get("releases", 0)) for a in activity)
+    ci = any(a.get("has_ci", False) for a in activity)
+    tests = any(a.get("has_tests", False) for a in activity)
+
+    pr_evidence = [
+        DNAEvidence(ref=f"repo:{a.get('repo', '')}", kind="repo", note=f"merged_prs={a.get('merged_prs', 0)}, open_prs={a.get('open_prs', 0)}")
+        for a in activity if int(a.get("merged_prs", 0)) + int(a.get("open_prs", 0)) > 0
+    ][:5]
+
+    if not activity:
+        return [
+            _dim("build_patterns", "unknown", 0.0, "需要 commit/PR 数据（当前信号未采集）", []),
+            _dim("iteration_style", "unknown", 0.0, "需要 commit/PR 频率数据（当前信号未采集）", []),
+            _dim("testing_reliability_signals", "unknown", 0.0, "需要 CI/测试数据（当前信号未采集）", []),
+        ]
+
+    dims: list[DNADimension] = []
+
+    # build_patterns — inferred from PR volume (small reviewable changes vs few large).
+    if total_prs >= 5:
+        dims.append(_dim("build_patterns", "inferred", 0.6, f"频繁 PR（合计 {total_prs}，含 {merged_prs} merged）→ 小而可审查的变更", pr_evidence))
+    elif total_prs > 0:
+        dims.append(_dim("build_patterns", "inferred", 0.4, f"少量 PR（合计 {total_prs}）→ 变更较大或提交较集中", pr_evidence))
+    else:
+        dims.append(_dim("build_patterns", "unknown", 0.0, "无 PR 数据", []))
+
+    # iteration_style — inferred from commit + release cadence.
+    if commits >= 20:
+        dims.append(_dim("iteration_style", "inferred", 0.6, f"快速迭代（近期 {commits} commits，{releases} releases）", [
+            DNAEvidence(ref=f"repo:{a.get('repo', '')}", kind="repo", note=f"recent_commits={a.get('recent_commits', 0)}, releases={a.get('releases', 0)}")
+            for a in activity if int(a.get("recent_commits", 0)) > 0
+        ][:5]))
+    elif commits > 0 or releases > 0:
+        dims.append(_dim("iteration_style", "inferred", 0.4, f"温和迭代（{commits} commits，{releases} releases）", [
+            DNAEvidence(ref=f"repo:{a.get('repo', '')}", kind="repo", note=f"recent_commits={a.get('recent_commits', 0)}, releases={a.get('releases', 0)}")
+            for a in activity if int(a.get("recent_commits", 0)) > 0 or int(a.get("releases", 0)) > 0
+        ][:5]))
+    else:
+        dims.append(_dim("iteration_style", "unknown", 0.0, "无 commit/release 数据", []))
+
+    # testing_reliability_signals — observed from CI/test presence.
+    signals = []
+    if ci:
+        signals.append("CI workflow 存在")
+    if tests:
+        signals.append("test 目录存在")
+    if signals:
+        dims.append(_dim("testing_reliability_signals", "observed", 0.7, "；".join(signals), [
+            DNAEvidence(ref=f"repo:{a.get('repo', '')}", kind="repo", note=f"has_ci={a.get('has_ci', False)}, has_tests={a.get('has_tests', False)}")
+            for a in activity if a.get("has_ci") or a.get("has_tests")
+        ][:5]))
+    else:
+        dims.append(_dim("testing_reliability_signals", "inferred", 0.3, "未检出 CI/test 信号", []))
+
+    return dims
 
 
 def _recent_created(repos: list[dict]) -> int:

@@ -2,20 +2,23 @@
 name: distill
 description: >
   Use when the user wants to synthesize accumulated reflections and digest gap
-  reports into a growth report and propose self-model updates. Triggers: "/distill",
+  reports into a growth report on their technical cognition. Triggers: "/distill",
   "synthesize my reflections", "growth report", "what have I learned recently",
   "aggregate insights", "蒸馏", "阶段性复盘".
   Can also be auto-suggested after /reflect when the cumulative impact score
   crosses the threshold. Gathers all unprocessed reflections, reads digest_gaps.jsonl
   for cognitive blind-spot patterns, performs semantic search via claude-mem, produces
-  a Tension + Resolution narrative, and proposes user_dna.json diffs (including
-  cognitive_patterns). Writes a markdown report to state/distill_reports/ and
-  presents a conversational summary for user confirmation.
+  a Tension + Resolution narrative, and proposes technical-cognition updates (to
+  state/reflections.jsonl + digest_gaps.jsonl, never into the interest profile).
+  Writes a markdown report to state/distill_reports/ and presents a conversational
+  summary for user confirmation.
 ---
 
 # Distill Skill
 
-You are a Distill Agent. Your goal is to synthesize accumulated reflections into a coherent growth narrative, identify cross-event patterns, and propose self-model updates — all gated by user confirmation.
+You are a Distill Agent. Your goal is to synthesize accumulated reflections into a coherent **technical-cognition** growth narrative — identifying cross-event patterns in how the user learns, verifies, and builds — and propose updates to `state/reflections.jsonl` + `state/digest_gaps.jsonl`, all gated by user confirmation.
+
+> **Convergence note (P4):** distill synthesizes *technical cognition* only. It does **not** maintain a personality/values self-model. Never write `values`/`beliefs`/`criteria`/`cognitive_patterns` into `state/builder_interest_profile.json` — that file holds only the 6-field interest profile. Cognitive blind-spots are `state/digest_gaps.jsonl`.
 
 **Protocol reference**: `references/reflection-protocol.md` — the single source of truth for the distill report template, DNA diff format, and auto-suggest threshold.
 
@@ -35,7 +38,7 @@ Invoke this skill when:
 2. **Identify unprocessed reflections** — all entries where `distilled_at` is null.
 3. **Check protocol versions** — apply backward compatibility rules from `references/reflection-protocol.md`. Mixed-version batches are normal. Handle missing fields gracefully. Note to self: "[N] 条 v1/v2 旧版记录，分析时将缺少 energy_signature, abstraction_layers, action_experiments 等字段。"
 4. **Read `state/records.jsonl`** (if exists) — RAL daily records from the same time range provide context between reflections.
-5. **Read `state/user_dna.json`** — current self-model for comparison.
+5. **Read `state/builder_interest_profile.json`** (if exists) — interest profile for context (read-only).
 6. **Read `state/digest_gaps.jsonl`** (if exists) — Feynman verification gap reports from the `/digest` skill. Digest data is analyzed independently (not mixed with behavioral reflections). All records are read — no filtering or marking. Digest is read-only here.
 7. **Read `references/reflection-protocol.md`** — for the distill report template.
 8. **Read radar decision outcomes (optional)** — `state/concepts.jsonl`, `state/concept_evidence.jsonl`, and `state/radar_reviews.jsonl` (plus any `output/radar/*.json` run payloads), if present. Read-only calibration evidence from the `concept-radar` skill — see "Calibration Evidence" below. If absent, skip; radar evidence is optional.
@@ -201,7 +204,9 @@ This section MUST end with an open question. Never claim causality.
 
 ### Step 3.6: Compute Proposed Cognitive Pattern Diffs
 
-Based on digest analysis, propose updates to `state/user_dna.json` under a new `cognitive_patterns` field:
+Based on digest analysis, propose cognitive blind-spot patterns to be written to
+`state/digest_gaps.jsonl` (technical-cognition tracking — **not** the interest
+profile in `state/builder_interest_profile.json`):
 
 ```json
 {
@@ -285,7 +290,7 @@ Wait for user response. Process each diff:
 
 After confirmation:
 
-1. **Apply accepted diffs to user_dna.json** — Read current file, merge changes (including `cognitive_patterns` if proposed and accepted), write back.
+1. **Record accepted cognitive-pattern updates to `state/digest_gaps.jsonl`** — append, never rewrite. Do **not** write into `state/builder_interest_profile.json` (the interest profile is not a distill target).
 2. **Mark reflections as distilled** — Update each processed reflection in `state/reflections.jsonl`: set `distilled_at` to current timestamp and `distill_batch_id` to this distill run's ID. (Digest records are NOT marked — they are read-only.)
 
 3. **Index distill report in claude-mem** (if claude-mem MCP tools are available):

@@ -271,6 +271,12 @@ class TestMove:
             directness=Directness.DIRECT, strength=EvidenceStrength.MODERATE,
             independence_key="reddit-b",
         ))
+        s.add_evidence(ConceptEvidence(
+            id="e3", concept_id="agent-reliability", source_type=SourceType.REDDIT,
+            source_url="https://reddit.com/r/counter", role=EvidenceRole.COUNTER,
+            directness=Directness.DIRECT, strength=EvidenceStrength.WEAK,
+            independence_key="counter-c",
+        ))
         experiment = json.dumps({
             "hypothesis": "h", "target": "t", "artifact": "a",
             "success_threshold": "s", "failure_threshold": "f",

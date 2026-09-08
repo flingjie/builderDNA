@@ -345,6 +345,12 @@ def seed_build_eligible_card(tmp_path):
         role=EvidenceRole.PROBLEM, directness=Directness.DIRECT,
         strength=EvidenceStrength.MODERATE, independence_key="chain-b",
     ))
+    store.add_evidence(ConceptEvidence(
+        id="e3", concept_id="agent-goal-drift-detector",
+        source_type=SourceType.REDDIT, source_url="https://reddit.com/r/x/counter",
+        role=EvidenceRole.COUNTER, directness=Directness.DIRECT,
+        strength=EvidenceStrength.WEAK, independence_key="chain-counter",
+    ))
 
 
 def seed_verify_card_without_experiment(tmp_path):
@@ -369,6 +375,12 @@ def seed_verify_card_without_experiment(tmp_path):
         source_type=SourceType.REDDIT, source_url="https://reddit.com/r/x/1",
         role=EvidenceRole.PROBLEM, directness=Directness.DIRECT,
         strength=EvidenceStrength.MODERATE, independence_key="chain-b",
+    ))
+    store.add_evidence(ConceptEvidence(
+        id="e3", concept_id="agent-timeout-guard",
+        source_type=SourceType.REDDIT, source_url="https://reddit.com/r/x/counter",
+        role=EvidenceRole.COUNTER, directness=Directness.DIRECT,
+        strength=EvidenceStrength.WEAK, independence_key="chain-counter",
     ))
 
 

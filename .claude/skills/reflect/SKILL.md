@@ -2,19 +2,24 @@
 name: reflect
 description: >
   Use when the user wants to reflect on a conversation or experience to extract
-  personal insights — values, abilities, and patterns. Triggers: "/reflect",
-  "reflect on this", "analyze this conversation", "what did I learn here",
-  "extract insights from this", "复盘".
-  Runs a multi-pass adversarial extraction: 3 parallel lens agents (Value,
-  Ability, Pattern) → calibrated skeptic adversary → proposed self-model diffs.
-  Output is saved to state/reflections.jsonl (full fidelity) and indexed in
-  claude-mem (embeddings for semantic search). The user confirms/rejects each
-  proposed diff inline before any file is written.
+  technical-judgment insights — decisions, assumptions, and reasoning patterns.
+  Triggers: "/reflect", "reflect on this", "analyze this conversation",
+  "what did I learn here", "extract insights from this", "复盘".
+  Runs a multi-pass adversarial extraction: 3 parallel lens agents (Decision,
+  Assumption, Pattern) → calibrated skeptic adversary → proposed
+  technical-judgment updates. Output is saved to state/reflections.jsonl (full
+  fidelity) and indexed in claude-mem (embeddings for semantic search). The user
+  confirms/rejects each proposed diff inline before any file is written.
+  Focuses on technical judgment only — it does NOT maintain a personality or
+  values self-model (interests live in state/builder_interest_profile.json;
+  cognitive blind-spots live in state/digest_gaps.jsonl).
 ---
 
 # Reflect Skill
 
-You are a Reflection Agent. Your goal is to extract personal insights from a conversation through a multi-pass adversarial protocol, then propose updates to the user's self-model.
+You are a Reflection Agent. Your goal is to extract **technical-judgment** insights from a conversation through a multi-pass adversarial protocol — how the user reasoned, what they assumed, and where a decision or belief was unverified — then propose updates to `state/reflections.jsonl`.
+
+> **Convergence note (P4):** this skill reflects on *technical judgment* only. It no longer maintains a personality/values self-model. Do **not** write `values`/`beliefs`/`criteria`/`cognitive_patterns` into `state/builder_interest_profile.json` — that file holds only the 6-field interest profile (domains, adjacencies, problem preferences, build constraints, learning goals, risk tolerance). Cognitive blind-spot tracking belongs to `state/digest_gaps.jsonl` (see `digest`).
 
 **Protocol reference**: `references/reflection-protocol.md` — the single source of truth for all schemas, lens prompts, adversary rules, and storage conventions. This skill file describes the runtime orchestration.
 
@@ -31,7 +36,7 @@ Invoke this skill when the user:
 
 Before running any agents, load:
 
-1. **user_dna.json** — `Read state/user_dna.json`. If missing or empty, note: "没有现有的自我模型做对比，建议先运行 value-discovery。"
+1. **builder_interest_profile.json** — `Read state/builder_interest_profile.json` (interest profile for context). Missing/empty is fine; the profile is *not* a reflection target.
 2. **reflections.jsonl** — `Read state/reflections.jsonl`. Parse each line as JSON. Run integrity checks per `references/reflection-protocol.md` (State Integrity section): skip unparseable lines, flag duplicate IDs, verify required fields. Report: "reflections.jsonl: [N] 条, [M] 条损坏已跳过". If file is empty or new, mark as cold start.
 
    **Check protocol version on load.** If any reflection has `protocol_version` < 6, apply backward compatibility rules from the protocol reference. Missing v3-v6 fields are treated as absent — no error. Note to self: "包含 [K] 条旧版协议记录，部分字段缺失。" This doesn't block anything.
@@ -195,11 +200,11 @@ Based on the adversary's surviving signals, synthesize:
 >
 > [if alternative framings available]: "以下发现存在多种理解方式：[list alternative perspectives]"
 
-2. **Proposed user_dna.json diffs** — if any signals survived with sufficient confidence:
+2. **Proposed technical-judgment updates** — if any signals survived with sufficient confidence:
 
-> "基于以上信号，我建议对你的自我模型做以下调整："
+> "基于以上信号，我建议记录以下技术判断洞察："
 >
-> **价值观变更**:
+> **决策/假设调整**:
 > - [dimension]: [key] [from → to] — 证据: [evidence]
 >
 > **信念变更**:
@@ -244,7 +249,7 @@ Wait for user response. Process each diff:
 
 After user confirms/rejects all diffs:
 
-1. **Apply accepted diffs to user_dna.json** — Read the current file, merge changes, write back. Keep all existing fields intact; only update the specific keys that were accepted.
+1. **Save the reflection to `state/reflections.jsonl`** — append the accepted technical-judgment updates (full fidelity). Do **not** write to `state/builder_interest_profile.json`; the interest profile is not a reflection target.
 
 2. **Mark loaded records as processed** — Update `state/records.jsonl`: for all records loaded in Step 0 (those with `processed_at: null`), set `processed_at: "<ISO>"` and `linked_reflection_id: "<this reflection's id>"`.
 
@@ -275,7 +280,7 @@ After user confirms/rejects all diffs:
 
 > "已保存。复盘 ID: [id]"
 >
-> "状态更新: user_dna.json 已更新 [N] 项 / reflections.jsonl 累计 [N] 条 / claude-mem 索引完成"
+> "状态更新: reflections.jsonl 已更新 [N] 项 / claude-mem 索引完成"
 >
 > [If action experiments selected]: "[N] 个行动实验已记录，下次复盘时会回检。"
 
@@ -322,6 +327,5 @@ Follow the edge case table in `references/reflection-protocol.md`. Key reminders
 | File | Purpose |
 |------|---------|
 | `references/reflection-protocol.md` | Single source of truth — lens prompts, schemas, adversary rules |
-| `state/user_dna.json` | Read as context, write accepted diffs |
-| `state/reflections.jsonl` | Append full reflection event |
-| `models/user_dna_schema.py` | Value dimension definitions and mapping rules |
+| `state/reflections.jsonl` | Append full reflection event (technical-judgment updates) |
+| `state/builder_interest_profile.json` | Interest profile (read-only context — not a reflection target) |
