@@ -57,12 +57,12 @@ Move the generic JSONL helpers out of `concepts/store.py` into `state/jsonl.py`,
 **Interfaces:**
 - Produces (imported by Task 3's `InvestigationStore` and by `concepts/store.py`):
   - `read_jsonl(path: Path, model_cls: type[T]) -> ReadResult[T]`
-  - `check_corruption(path: Path, result: ReadResult) -> None`
+  - `corruption_detected(result: ReadResult) -> bool`
   - `atomic_write(path: Path, records: list) -> None`
   - `append_line(path: Path, record) -> None`
-  - `verify_tail_parses(path: Path, model_cls: type[T]) -> None`
+  - `tail_parses(path: Path, model_cls: type[T]) -> bool`
   - `record_view(record) -> dict` (returns `model_dump(mode="json")` minus `captured_at`/`recorded_at`)
-  - Types: `JsonlStoreError`, `CorruptionError(JsonlStoreError)`, `ReadResult(Generic[T])`, `CorruptLine`
+  - Types: `ReadResult(Generic[T])`, `CorruptLine`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -73,16 +73,14 @@ Create `tests/test_jsonl_store.py`:
 import json
 from pathlib import Path
 
-import pytest
 from pydantic import BaseModel
 
 from state.jsonl import (
-    CorruptionError,
-    ReadResult,
     atomic_write,
-    check_corruption,
+    corruption_detected,
     read_jsonl,
     record_view,
+    tail_parses,
 )
 
 
@@ -123,12 +121,33 @@ def test_read_jsonl_missing_file_returns_empty(tmp_path):
     assert result.total_lines == 0
 
 
-def test_check_corruption_refuses_when_majority_corrupt(tmp_path):
+def test_corruption_detected_majority_corrupt(tmp_path):
     path = tmp_path / "rows.jsonl"
     write_lines(path, ["garbage", "also-garbage", json.dumps({"id": "a", "value": "1"})])
     result = read_jsonl(path, Row)
-    with pytest.raises(CorruptionError):
-        check_corruption(path, result)
+    assert corruption_detected(result) is True
+
+
+def test_corruption_detected_clean(tmp_path):
+    path = tmp_path / "rows.jsonl"
+    write_lines(path, [json.dumps({"id": "a", "value": "1"})])
+    result = read_jsonl(path, Row)
+    assert corruption_detected(result) is False
+
+
+def test_tail_parses_detects_malformed_tail(tmp_path):
+    path = tmp_path / "rows.jsonl"
+    write_lines(path, [json.dumps({"id": "a", "value": "1"}), "not-json"])
+    assert tail_parses(path, Row) is False
+
+
+def test_tail_parses_empty_or_valid(tmp_path):
+    path = tmp_path / "rows.jsonl"
+    write_lines(path, [json.dumps({"id": "a", "value": "1"})])
+    assert tail_parses(path, Row) is True
+    empty = tmp_path / "empty.jsonl"
+    empty.write_text("", encoding="utf-8")
+    assert tail_parses(empty, Row) is True
 
 
 def test_atomic_write_round_trips(tmp_path):
@@ -191,14 +210,6 @@ from typing import Generic, TypeVar
 T = TypeVar("T")
 
 
-class JsonlStoreError(Exception):
-    """Base error for JSONL store operations."""
-
-
-class CorruptionError(JsonlStoreError):
-    """Refusing to write: more than half of the existing file is corrupt."""
-
-
 @dataclass(frozen=True)
 class CorruptLine:
     """One line that could not be read as a valid record."""
@@ -249,14 +260,9 @@ def read_jsonl(path: Path, model_cls: type[T]) -> ReadResult[T]:
     return ReadResult(records=list(by_id.values()), corrupt=corrupt, total_lines=total)
 
 
-def check_corruption(path: Path, result: ReadResult) -> None:
-    """Refuse to write when more than half of the existing lines are corrupt."""
-    if result.total_lines > 0 and len(result.corrupt) * 2 > result.total_lines:
-        raise CorruptionError(
-            f"refusing to write {path}: {len(result.corrupt)} of "
-            f"{result.total_lines} non-empty lines are corrupt (more than half); "
-            f"fix or restore the file before writing again"
-        )
+def corruption_detected(result: ReadResult) -> bool:
+    """True when more than half of the existing lines are corrupt."""
+    return result.total_lines > 0 and len(result.corrupt) * 2 > result.total_lines
 
 
 def atomic_write(path: Path, records: list) -> None:
@@ -288,8 +294,8 @@ def append_line(path: Path, record: T) -> None:
         os.fsync(fh.fileno())
 
 
-def verify_tail_parses(path: Path, model_cls: type[T]) -> None:
-    """Confirm the last non-empty line of ``path`` parses as ``model_cls``."""
+def tail_parses(path: Path, model_cls: type[T]) -> bool:
+    """True when the last non-empty line parses as ``model_cls`` (or the file is empty)."""
     last: str | None = None
     with path.open("r", encoding="utf-8") as fh:
         for line in fh:
@@ -297,17 +303,15 @@ def verify_tail_parses(path: Path, model_cls: type[T]) -> None:
             if stripped:
                 last = stripped
     if last is None:
-        return
+        return True
     try:
         data = json.loads(last)
         if not isinstance(data, dict):
-            raise ValueError("record is not a JSON object")
+            return False
         model_cls.model_validate(data)
-    except Exception as exc:
-        raise CorruptionError(
-            f"append verification failed for {path}: last line does not parse "
-            f"as {model_cls.__name__}: {exc}"
-        )
+        return True
+    except Exception:
+        return False
 
 
 def record_view(record: T) -> dict:
@@ -321,36 +325,46 @@ def record_view(record: T) -> dict:
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `PYTHONPATH=. uv run pytest tests/test_jsonl_store.py -v`
-Expected: PASS (5 passed)
+Expected: PASS (8 passed)
 
 - [ ] **Step 5: Refactor `concepts/store.py` to delegate to `state/jsonl.py`**
 
-Replace the private module-level functions in `concepts/store.py` (`_read_jsonl`, `_check_corruption`, `_atomic_write`, `_append_line`, `_record_view`, `_verify_tail_parses`, `_WRITE_TIMESTAMP_FIELDS`, `ReadResult`, `CorruptLine`) with imports and thin delegations. Keep the public `ConceptStore` class and its error hierarchy (`ConceptStoreError`, `CorruptionError`, `DuplicateRecordError`, `ConflictError`) intact.
+Keep the public `ConceptStore` class and its error hierarchy (`ConceptStoreError`, `CorruptionError`, `DuplicateRecordError`, `ConflictError`) **unchanged**. Delete the private module-level mechanics (`_read_jsonl`, `_atomic_write`, `_append_line`, `_verify_tail_parses`, `_record_view`, `_WRITE_TIMESTAMP_FIELDS`, `ReadResult`, `CorruptLine`) and replace `_check_corruption`/`_verify_tail_parses` with thin wrappers over the shared predicates, raising the concept `CorruptionError`.
 
 In `concepts/store.py`:
 
 ```python
 from state.jsonl import (
-    CorruptionError as JsonlCorruptionError,
+    CorruptLine,
     ReadResult,
     atomic_write,
     append_line,
-    check_corruption as _check_corruption,
+    corruption_detected,
     read_jsonl,
     record_view as _record_view,
-    verify_tail_parses,
+    tail_parses,
 )
 
 
-class CorruptionError(JsonlCorruptionError, ConceptStoreError):
-    """Refusing to write: more than half of the existing file is corrupt."""
+def _check_corruption(path: Path, result: ReadResult) -> None:
+    """Refuse to write when more than half of the existing lines are corrupt."""
+    if corruption_detected(result):
+        raise CorruptionError(
+            f"refusing to write {path}: {len(result.corrupt)} of "
+            f"{result.total_lines} non-empty lines are corrupt (more than half); "
+            f"fix or restore the file before writing again"
+        )
 
 
-# CorruptLine is re-exported for callers that already imported it from here.
-from state.jsonl import CorruptLine
+def _verify_tail_parses(path: Path, model_cls) -> None:
+    """Confirm the last non-empty line parses; raise ``CorruptionError`` otherwise."""
+    if not tail_parses(path, model_cls):
+        raise CorruptionError(
+            f"append verification failed for {path}: last line does not parse as {model_cls.__name__}"
+        )
 ```
 
-Then delete the old module-level definitions and update the `_read`/`_append_record` methods to call the shared functions. The body of `_append_record` stays (it encodes the concept-specific idempotency *policy* and `ConflictError` hints), but its mechanics calls change:
+Then update `ConceptStore`'s method bodies to call the shared functions. The body of `_append_record` stays (it encodes the concept-specific idempotency *policy* and `ConflictError` hints); only its mechanics calls change:
 
 ```python
 def _read(self, path, model_cls):
@@ -363,10 +377,10 @@ result = self._read(path, model_cls)
 _check_corruption(path, result)
 # ... existing idempotent/conflict logic using _record_view(existing) == _record_view(record) ...
 append_line(path, record)
-verify_tail_parses(path, model_cls)
+_verify_tail_parses(path, model_cls)
 ```
 
-Note: `ConceptStore.upsert_concept` already uses `_atomic_write`; rename its call to `atomic_write`.
+Note: `ConceptStore.upsert_concept` already uses `_atomic_write`; rename its call to `atomic_write`. The old `_append_line` call becomes `append_line`; `_record_view` stays via the alias.
 
 - [ ] **Step 6: Run the existing concept store tests**
 
@@ -657,7 +671,7 @@ git commit -m "feat(investigations): add control-plane domain models"
 - Test: `tests/test_investigation/test_store.py`
 
 **Interfaces:**
-- Consumes: `state.jsonl` (read_jsonl, check_corruption, atomic_write, append_line, verify_tail_parses, record_view); `investigations.models`.
+- Consumes: `state.jsonl` (read_jsonl, corruption_detected, atomic_write, append_line, tail_parses, record_view); `investigations.models`.
 - Produces (imported by service/CLI/actions):
   - `InvestigationStore(state_dir: str | Path = "state")` → files under `<state_dir>/investigations/`
   - `list_investigations() -> list[Investigation]`
@@ -814,10 +828,10 @@ from state.jsonl import (
     CorruptLine,
     atomic_write,
     append_line,
-    check_corruption,
+    corruption_detected,
     read_jsonl,
     record_view,
-    verify_tail_parses,
+    tail_parses,
 )
 from investigations.models import (
     ActionRecord,
@@ -839,6 +853,23 @@ class InvestigationConflictError(InvestigationStoreError):
 
 def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _check_corruption(path: Path, result) -> None:
+    """Refuse to write when more than half of the existing lines are corrupt."""
+    if corruption_detected(result):
+        raise InvestigationStoreError(
+            f"refusing to write {path}: {len(result.corrupt)} of "
+            f"{result.total_lines} non-empty lines are corrupt (more than half)"
+        )
+
+
+def _verify_tail(path: Path, model_cls) -> None:
+    """Confirm the last non-empty line parses; raise otherwise."""
+    if not tail_parses(path, model_cls):
+        raise InvestigationStoreError(
+            f"append verification failed for {path}: last line does not parse as {model_cls.__name__}"
+        )
 
 
 class InvestigationStore:
@@ -881,7 +912,7 @@ class InvestigationStore:
     def upsert_investigation(self, inv: Investigation) -> Investigation:
         with self._lock:
             result = self._read(self.investigations_path, Investigation)
-            check_corruption(self.investigations_path, result)
+            _check_corruption(self.investigations_path, result)
             by_id = {i.id: i for i in result.records}
             existing = by_id.get(inv.id)
             created_at = existing.created_at if existing is not None else inv.created_at
@@ -896,7 +927,7 @@ class InvestigationStore:
 
     def _append_record(self, path: Path, model_cls: type[T], record: T, kind: str) -> T:
         result = self._read(path, model_cls)
-        check_corruption(path, result)
+        _check_corruption(path, result)
         by_id = {r.id: r for r in result.records}
         existing = by_id.get(record.id)
         if existing is not None:
@@ -906,7 +937,7 @@ class InvestigationStore:
                 f"{kind} ID {record.id!r} already exists with a different payload"
             )
         append_line(path, record)
-        verify_tail_parses(path, model_cls)
+        _verify_tail(path, model_cls)
         return record
 
     def add_action(self, record: ActionRecord) -> ActionRecord:
@@ -1979,7 +2010,11 @@ from investigations.service import (
     InvestigationServiceError,
     InvestigationValidationError,
 )
-from investigations.store import InvestigationConflictError, InvestigationStore
+from investigations.store import (
+    InvestigationConflictError,
+    InvestigationStore,
+    InvestigationStoreError,
+)
 from observability import RunTelemetry
 
 SCHEMA_VERSION = "builderdna.investigate.v1"
@@ -2017,6 +2052,9 @@ def _finalize(command: str, func) -> None:
     except InvestigationServiceError as exc:
         print(json.dumps(_error(command, str(exc), exc.exit_code), indent=2, ensure_ascii=False))
         raise typer.Exit(exc.exit_code)
+    except InvestigationStoreError as exc:
+        print(json.dumps(_error(command, str(exc), 1), indent=2, ensure_ascii=False))
+        raise typer.Exit(1)
     except ValueError as exc:
         print(json.dumps(_error(command, str(exc), 1), indent=2, ensure_ascii=False))
         raise typer.Exit(1)
