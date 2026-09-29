@@ -14,6 +14,7 @@ from cli.commands.concept import concept
 from cli.commands.radar import radar_app
 from cli.commands.radar_cycle_cmd import radar_cycle
 from cli.commands.dna import dna
+from cli.commands.investigate import investigate
 
 
 app = typer.Typer(
@@ -57,6 +58,7 @@ app.command(name="dna")(dna)
 app.add_typer(concept, name="concept")
 app.add_typer(radar_app, name="radar")
 app.add_typer(radar_cycle, name="radar-cycle")
+app.add_typer(investigate, name="investigate")
 
 if __name__ == "__main__":
     app()
