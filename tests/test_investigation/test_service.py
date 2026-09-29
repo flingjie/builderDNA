@@ -120,3 +120,103 @@ def test_finish_sets_completed_and_checkpoint(service):
     assert out["investigation"]["status"] == "completed"
     assert out["investigation"]["end_reason"] == "low information gain"
     assert out["investigation"]["checkpoint"]  # last action id
+
+
+def test_run_action_raises_on_paused_investigation(service):
+    """Fix 1: PAUSED investigations cannot execute data actions."""
+    service.init("agent reliability", subreddit="AI_Agents")
+    service.run_action(ActionRequest(investigation_id="inv_1", expected_revision=0,
+                                     action="ask_user", reason="escalate to user"))
+    # investigation is now PAUSED; run_action should reject
+    req = ActionRequest(investigation_id="inv_1", expected_revision=1,
+                        action="search_discussions", params={"subreddit": "AI_Agents"})
+    with pytest.raises(InvestigationValidationError):
+        service.run_action(req)
+
+
+def test_propose_raises_on_paused_investigation(service):
+    """Fix 1: PAUSED investigations cannot propose candidates."""
+    service.init("agent reliability", subreddit="AI_Agents")
+    service.run_action(ActionRequest(investigation_id="inv_1", expected_revision=0,
+                                     action="ask_user", reason="escalate to user"))
+    # investigation is now PAUSED; propose should reject
+    candidate = PainClusterCandidate(
+        id="pc_1", investigation_id="inv_1", problem_statement="test",
+        minimal_validation_action="test",
+        evidence_ids=[],
+    )
+    with pytest.raises(InvestigationValidationError):
+        service.propose("inv_1", candidate)
+
+
+def test_finish_allows_paused_investigation(service):
+    """Fix 1: PAUSED investigations can still be finished."""
+    service.init("agent reliability", subreddit="AI_Agents")
+    service.run_action(ActionRequest(investigation_id="inv_1", expected_revision=0,
+                                     action="ask_user", reason="escalate to user"))
+    # investigation is PAUSED; finish should work
+    out = service.finish("inv_1", "user escalation completed")
+    assert out["investigation"]["status"] == "completed"
+    assert out["investigation"]["end_reason"] == "user escalation completed"
+
+
+def test_finish_rejects_completed_investigation(service):
+    """Fix 1: COMPLETED investigations cannot be finished again."""
+    service.init("agent reliability", subreddit="AI_Agents")
+    service.finish("inv_1", "already complete")
+    with pytest.raises(InvestigationValidationError):
+        service.finish("inv_1", "second finish attempt")
+
+
+def test_finish_rejects_failed_investigation(service):
+    """Fix 1: FAILED investigations cannot be finished."""
+    service.init("agent reliability", subreddit="AI_Agents")
+    inv = service.store.get_investigation("inv_1")
+    inv.status = "failed"
+    service.store.upsert_investigation(inv)
+    with pytest.raises(InvestigationValidationError):
+        service.finish("inv_1", "attempt to finish failed inv")
+
+
+def test_evidence_round_budget_exhaustion(service):
+    """Fix 2: Fourth evidence round exceeds budget -> budget_exhausted status."""
+    service.init("agent reliability", subreddit="AI_Agents")
+    # Max evidence rounds is 3; three searches with fresh posts should succeed
+    # Track the next post id so each search gets new posts (avoiding dedup)
+    next_id = [1]
+
+    def fresh_fetcher(subreddit, sort, limit):
+        result = [
+            {
+                "id": f"round_{next_id[0]}_post_{i}",
+                "title": f"issue round {next_id[0]}, post {i}",
+                "author": "user1",
+                "permalink": f"https://www.reddit.com/r/SaaS/comments/round_{next_id[0]}_post_{i}",
+                "published": f"2026-09-0{next_id[0]}T10:00:00Z",
+                "selftext": f"Problem in round {next_id[0]}.",
+                "category": "",
+            }
+            for i in range(2)
+        ]
+        next_id[0] += 1
+        return result
+
+    service.fetcher = fresh_fetcher
+
+    # Three searches with fresh posts should each consume 1 evidence_round
+    for i in range(3):
+        req = ActionRequest(investigation_id="inv_1", expected_revision=i,
+                            action="search_discussions", params={"subreddit": "AI_Agents"},
+                            reason=f"round {i+1}")
+        resp = service.run_action(req)
+        assert resp["status"] == "completed", f"round {i+1} status was {resp['status']}"
+        assert resp["remaining_budget"]["evidence_rounds"] == 2 - i
+
+    # Fourth search should return budget_exhausted (evidence round budget is exhausted)
+    req = ActionRequest(investigation_id="inv_1", expected_revision=3,
+                        action="search_discussions", params={"subreddit": "AI_Agents"},
+                        reason="fourth round - exceeds budget")
+    resp = service.run_action(req)
+    assert resp["status"] == "budget_exhausted"
+    assert resp["observation"]["summary"] == "evidence round budget exhausted: at most 3 round(s) per investigation"
+    assert resp["allowed_next_actions"] == ["finish"]

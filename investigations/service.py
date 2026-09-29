@@ -29,8 +29,14 @@ from investigations.store import InvestigationStore
 class InvestigationServiceError(Exception):
     exit_code = 1
 
+    def __init__(self, message: str):
+        super().__init__(message)
+        self.message = message
+
 
 class InvestigationValidationError(InvestigationServiceError):
+    """Invalid input or disallowed state — maps to exit code 2."""
+
     exit_code = 2
 
 
@@ -71,12 +77,24 @@ class InvestigationService:
     # ── helpers ──
 
     def _require_open(self, investigation_id: str) -> Investigation:
+        """Only OPEN investigations may execute data actions (run_action, propose)."""
+        inv = self.store.get_investigation(investigation_id)
+        if inv is None:
+            raise InvestigationValidationError(f"investigation {investigation_id!r} not found")
+        if inv.status != InvestigationStatus.OPEN:
+            raise InvestigationValidationError(
+                f"investigation {investigation_id!r} is {inv.status.value}; only resume may proceed"
+            )
+        return inv
+
+    def _require_active(self, investigation_id: str) -> Investigation:
+        """OPEN or PAUSED investigations may be finished (active = not completed/failed)."""
         inv = self.store.get_investigation(investigation_id)
         if inv is None:
             raise InvestigationValidationError(f"investigation {investigation_id!r} not found")
         if inv.status in (InvestigationStatus.COMPLETED, InvestigationStatus.FAILED):
             raise InvestigationValidationError(
-                f"investigation {investigation_id!r} is {inv.status.value}; no further actions"
+                f"investigation {investigation_id!r} is {inv.status.value}; cannot be finished"
             )
         return inv
 
@@ -96,6 +114,9 @@ class InvestigationService:
             "actions": max(0, inv.budget.max_actions - inv.budget.actions_used),
             "actions_used": inv.budget.actions_used,
             "max_actions": inv.budget.max_actions,
+            "evidence_rounds": max(0, inv.budget.max_evidence_rounds - inv.budget.evidence_rounds_used),
+            "evidence_rounds_used": inv.budget.evidence_rounds_used,
+            "max_evidence_rounds": inv.budget.max_evidence_rounds,
         }
 
     # ── run_action ──
@@ -128,6 +149,16 @@ class InvestigationService:
                 "status": ActionStatus.BUDGET_EXHAUSTED.value,
                 "revision": inv.revision,
                 "observation": {"summary": "action budget exhausted"},
+                "remaining_budget": self._budget_dict(inv),
+                "allowed_next_actions": ["finish"],
+            }
+
+        # Evidence round budget: fourth round exceeds budget → end with budget_exhausted
+        if request.action == "search_discussions" and inv.budget.evidence_rounds_used >= inv.budget.max_evidence_rounds:
+            return {
+                "status": ActionStatus.BUDGET_EXHAUSTED.value,
+                "revision": inv.revision,
+                "observation": {"summary": f"evidence round budget exhausted: at most {inv.budget.max_evidence_rounds} round(s) per investigation"},
                 "remaining_budget": self._budget_dict(inv),
                 "allowed_next_actions": ["finish"],
             }
@@ -245,7 +276,7 @@ class InvestigationService:
     # ── finish / resume / status ──
 
     def finish(self, investigation_id: str, reason: str) -> dict:
-        inv = self._require_open(investigation_id)
+        inv = self._require_active(investigation_id)
         updated = inv.model_copy(update={"status": InvestigationStatus.COMPLETED, "end_reason": reason})
         self.store.upsert_investigation(updated)
         return {"investigation": updated.model_dump(mode="json")}

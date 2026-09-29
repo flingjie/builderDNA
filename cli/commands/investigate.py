@@ -97,22 +97,26 @@ def run_cmd(
     state_dir: str = typer.Option("state", "--state-dir", help="Investigation store directory"),
 ) -> None:
     """Validate and run one action, returning the observation envelope."""
-    from investigations.contract import ActionRequest
 
-    try:
-        params_dict = json.loads(params)
-    except json.JSONDecodeError as exc:
-        raise InvestigationValidationError(f"invalid --params JSON: {exc}")
-    request = ActionRequest(
-        investigation_id=investigation_id,
-        expected_revision=expected_revision,
-        action=action,
-        params=params_dict,
-        reason=reason,
-        uncertainty_to_reduce=uncertainty_to_reduce,
-    )
-    service = _make_service(state_dir)
-    _finalize("investigate.run", lambda: service.run_action(request))
+    def run() -> dict:
+        from investigations.contract import ActionRequest
+
+        try:
+            params_dict = json.loads(params)
+        except json.JSONDecodeError as exc:
+            raise InvestigationValidationError(f"invalid --params JSON: {exc}")
+        request = ActionRequest(
+            investigation_id=investigation_id,
+            expected_revision=expected_revision,
+            action=action,
+            params=params_dict,
+            reason=reason,
+            uncertainty_to_reduce=uncertainty_to_reduce,
+        )
+        service = _make_service(state_dir)
+        return service.run_action(request)
+
+    _finalize("investigate.run", run)
 
 
 @investigate.command("status")
@@ -132,20 +136,24 @@ def propose_cmd(
     state_dir: str = typer.Option("state", "--state-dir", help="Investigation store directory"),
 ) -> None:
     """Validate and persist a PainClusterCandidate (every fact must trace to evidence)."""
-    path = Path(candidate)
-    if not path.exists():
-        raise InvestigationValidationError(f"candidate file not found: {candidate}")
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
-        raise InvestigationValidationError(f"invalid candidate JSON: {exc}")
-    data["investigation_id"] = investigation_id
-    try:
-        model = PainClusterCandidate(**data)
-    except Exception as exc:
-        raise InvestigationValidationError(f"invalid candidate: {exc}")
-    service = _make_service(state_dir)
-    _finalize("investigate.propose", lambda: service.propose(investigation_id, model))
+
+    def propose() -> dict:
+        path = Path(candidate)
+        if not path.exists():
+            raise InvestigationValidationError(f"candidate file not found: {candidate}")
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise InvestigationValidationError(f"invalid candidate JSON: {exc}")
+        data["investigation_id"] = investigation_id
+        try:
+            model = PainClusterCandidate(**data)
+        except Exception as exc:
+            raise InvestigationValidationError(f"invalid candidate: {exc}")
+        service = _make_service(state_dir)
+        return service.propose(investigation_id, model)
+
+    _finalize("investigate.propose", propose)
 
 
 @investigate.command("finish")
