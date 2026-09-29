@@ -9,6 +9,8 @@ output/*
 predictions/
 state/*
 !state/.gitkeep
+!state/__init__.py
+!state/jsonl.py
 !state/traces/
 !state/distill_reports/.gitkeep
 # twitter-learning runtime state (daily knowledge asset, dedup, reports — not versioned)

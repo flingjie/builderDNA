@@ -1,0 +1,1 @@
+"""Shared state persistence mechanisms."""
