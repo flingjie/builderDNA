@@ -83,7 +83,7 @@ class InvestigationService:
     def _next_actions(self, inv: Investigation) -> list[str]:
         candidates = self.store.list_candidates(inv.id)
         return allowed_next_actions(
-            "completed",
+            inv.status.value,
             actions_used=inv.budget.actions_used,
             max_actions=inv.budget.max_actions,
             has_candidate=bool(candidates),
