@@ -43,18 +43,22 @@ Design rules enforced here:
 
 from __future__ import annotations
 
-import json
-import os
-import tempfile
 import threading
-from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Generic, TypeVar
+
+from state.jsonl import (
+    CorruptLine,
+    ReadResult,
+    atomic_write,
+    append_line,
+    corruption_detected,
+    read_jsonl,
+    record_view as _record_view,
+    tail_parses,
+)
 
 from models.concept import ConceptCard, ConceptEvidence, RadarReview
-
-T = TypeVar("T")
 
 
 # ── Errors ──
@@ -81,66 +85,9 @@ class ConflictError(DuplicateRecordError):
     """
 
 
-@dataclass(frozen=True)
-class CorruptLine:
-    """One line that could not be read as a valid record."""
-
-    path: Path
-    line_no: int
-    raw: str
-    error: str
-
-
-@dataclass
-class ReadResult(Generic[T]):
-    """Outcome of a robust read: valid records plus collected corrupt lines."""
-
-    records: list[T] = field(default_factory=list)
-    corrupt: list[CorruptLine] = field(default_factory=list)
-    total_lines: int = 0
-
-
-# ── Low-level read / write helpers ──
-
-def _read_jsonl(path: Path, model_cls: type[T]) -> ReadResult[T]:
-    """Read every non-empty line as ``model_cls``, skipping and collecting corrupt lines.
-
-    Blank lines are ignored entirely (not counted, not corrupt). Valid records are
-    de-duplicated by ``id`` with *last wins*; ordering is by first appearance.
-    """
-    if not path.exists():
-        return ReadResult()
-    by_id: dict[str, T] = {}
-    corrupt: list[CorruptLine] = []
-    total = 0
-    with path.open("r", encoding="utf-8") as fh:
-        for line_no, line in enumerate(fh, start=1):
-            stripped = line.strip()
-            if not stripped:
-                continue
-            total += 1
-            try:
-                data = json.loads(stripped)
-                if not isinstance(data, dict):
-                    raise ValueError("record is not a JSON object")
-                record = model_cls.model_validate(data)
-            except Exception as exc:  # JSON decode or model validation failure
-                corrupt.append(
-                    CorruptLine(
-                        path=path,
-                        line_no=line_no,
-                        raw=stripped,
-                        error=str(exc),
-                    )
-                )
-                continue
-            by_id[record.id] = record  # last wins
-    return ReadResult(records=list(by_id.values()), corrupt=corrupt, total_lines=total)
-
-
 def _check_corruption(path: Path, result: ReadResult) -> None:
     """Refuse to write when more than half of the existing lines are corrupt."""
-    if result.total_lines > 0 and len(result.corrupt) * 2 > result.total_lines:
+    if corruption_detected(result):
         raise CorruptionError(
             f"refusing to write {path}: {len(result.corrupt)} of "
             f"{result.total_lines} non-empty lines are corrupt (more than half); "
@@ -148,85 +95,11 @@ def _check_corruption(path: Path, result: ReadResult) -> None:
         )
 
 
-def _atomic_write(path: Path, records: list) -> None:
-    """Write ``records`` as JSONL via a same-directory temp file + atomic rename."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp_name = tempfile.mkstemp(
-        dir=str(path.parent), prefix=path.name + ".", suffix=".tmp"
-    )
-    tmp_path = Path(tmp_name)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            for record in records:
-                fh.write(record.model_dump_json() + "\n")
-            fh.flush()
-            os.fsync(fh.fileno())
-        os.replace(tmp_path, path)
-    except BaseException:
-        try:
-            tmp_path.unlink()
-        except OSError:
-            pass
-        raise
-
-
-def _append_line(path: Path, record: T) -> None:
-    """Append one JSONL line without rewriting the file (O(1) per append).
-
-    Evidence/review files are append-only, so a full-file rewrite is unnecessary
-    work (O(n^2) across a batch). The caller holds the store lock and verifies the
-    tail afterward; a crash mid-line is handled by the corruption guard on read.
-    """
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as fh:
-        fh.write(record.model_dump_json() + "\n")
-        fh.flush()
-        os.fsync(fh.fileno())
-
-
-# Write-only timestamp fields that do not change a record's logical identity.
-# A replayed record whose only difference is *when* it was captured/recorded is
-# the same logical record, so these are dropped before idempotency comparison.
-_WRITE_TIMESTAMP_FIELDS = frozenset({"captured_at", "recorded_at"})
-
-
-def _record_view(record: T) -> dict:
-    """Deterministic comparison view of a record for idempotency checks.
-
-    Serializes via ``model_dump(mode="json")`` (enums and datetimes become their
-    JSON string forms) and removes the write-only timestamp fields so two
-    logically identical records compare equal even when ``captured_at`` /
-    ``recorded_at`` differ.
-    """
-    data = record.model_dump(mode="json")
-    for field in _WRITE_TIMESTAMP_FIELDS:
-        data.pop(field, None)
-    return data
-
-
-def _verify_tail_parses(path: Path, model_cls: type[T]) -> None:
-    """Confirm the last non-empty line of ``path`` parses as ``model_cls``.
-
-    Runs after an append to guarantee the write did not leave a malformed tail.
-    A failure here raises ``CorruptionError`` rather than being silently ignored.
-    """
-    last: str | None = None
-    with path.open("r", encoding="utf-8") as fh:
-        for line in fh:
-            stripped = line.strip()
-            if stripped:
-                last = stripped
-    if last is None:
-        return
-    try:
-        data = json.loads(last)
-        if not isinstance(data, dict):
-            raise ValueError("record is not a JSON object")
-        model_cls.model_validate(data)
-    except Exception as exc:
+def _verify_tail_parses(path: Path, model_cls) -> None:
+    """Confirm the last non-empty line parses; raise ``CorruptionError`` otherwise."""
+    if not tail_parses(path, model_cls):
         raise CorruptionError(
-            f"append verification failed for {path}: last line does not parse "
-            f"as {model_cls.__name__}: {exc}"
+            f"append verification failed for {path}: last line does not parse as {model_cls.__name__}"
         )
 
 
@@ -249,7 +122,7 @@ class ConceptStore:
     # ── read plumbing ──
 
     def _read(self, path: Path, model_cls: type[T]) -> ReadResult[T]:
-        result = _read_jsonl(path, model_cls)
+        result = read_jsonl(path, model_cls)
         self._last_read[path] = result
         return result
 
@@ -293,7 +166,7 @@ class ConceptStore:
                 }
             )
             by_id[card.id] = updated
-            _atomic_write(self.concepts_path, list(by_id.values()))
+            atomic_write(self.concepts_path, list(by_id.values()))
             return updated
 
     # ── evidence (append-only) ──
@@ -330,7 +203,7 @@ class ConceptStore:
                 f"{kind} ID {record.id!r} already exists with a different payload; "
                 f"{hint}"
             )
-        _append_line(path, record)
+        append_line(path, record)
         _verify_tail_parses(path, model_cls)
         return record
 
