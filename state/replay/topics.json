@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "topics": [
+    {"topic": "onboarding automation", "subreddit": "SaaS", "category": "recurring_pain"},
+    {"topic": "agent workflow reliability", "subreddit": "AI_Agents", "category": "recurring_pain"},
+    {"topic": "self-hosted LLM inference cost", "subreddit": "LocalLLaMA", "category": "recurring_pain"},
+    {"topic": "single noisy complaint", "subreddit": "microSaaS", "category": "single_post_noise"},
+    {"topic": "cross-posted complaint", "subreddit": "SaaS", "category": "same_source_repost"},
+    {"topic": "already-solved problem", "subreddit": "n8n", "category": "already_solved"},
+    {"topic": "nonexistent niche", "subreddit": "startups", "category": "zero_results"},
+    {"topic": "rate-limited feed", "subreddit": "SaaS", "category": "source_failure"}
+  ]
+}
