@@ -238,6 +238,37 @@ This produces 8 evidence-backed dimensions. **Rules you must follow:**
 
 - Every conclusion cites a repo/issue fact; the JSON carries `evidence[].ref` for each dimension.
 - Dimensions the signals can't support (build_patterns, iteration_style, testing_reliability_signals) are `unknown` — **state that plainly; do not fill the gap with a story**.
+
+## Builder Problems — 问题与实践轨迹
+
+When the user wants to track *what specific builders are stuck on* and how that
+changes over time, use the `builders` command group instead of treating a
+one-time profile as the only state:
+
+```bash
+PYTHONPATH=. uv run builderdna builders capture alice \
+  --statement "修改 prompt 后难以确认旧问题是否修复" \
+  --user-segment "独立 Agent 开发者" \
+  --trigger-context "修改 prompt 或工具实现后" \
+  --job-to-be-done "确认历史失败案例是否修复" \
+  --current-workaround "手工重跑历史失败输入" \
+  --source-ref "https://..."
+
+PYTHONPATH=. uv run builderdna builders record <problem_id> \
+  --event-type attempt --summary "尝试脚本" --to-status confirmed
+
+PYTHONPATH=. uv run builderdna builders compare
+PYTHONPATH=. uv run builderdna builders opportunity
+```
+
+Rules:
+
+- One problem per person/project link, updated by appending trajectory events.
+- Never infer `resolved` just because a source stopped mentioning the problem.
+- Cross-person grouping is by normalized `job_to_be_done` + `trigger_context`,
+  not by shared keywords such as `eval`.
+- Present the comparison's `same_parts`, `different_parts`, `key_unknowns`,
+  `validation_targets`, and `minimal_deliverable` rather than asserting a build.
 - Never infer ability from stars/followers/a single README.
 - Distinguish `observed` (read from a fact) from `inferred` (derived from facts) when you present findings.
 - No relationship judgments ("worth connecting with", etc.) — only technical practices.

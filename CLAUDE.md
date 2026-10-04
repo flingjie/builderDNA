@@ -33,6 +33,11 @@ PYTHONPATH=. uv run builderdna config --show
 # Run self-iteration diagnostics (mismatch detection, snapshot comparison, hypothesis pruning)
 PYTHONPATH=. uv run builderdna observability --all --domain agent
 
+# Record and compare builder problems/trajectories
+PYTHONPATH=. uv run builderdna builders capture alice --statement "..." --job-to-be-done "..." --trigger-context "..."
+PYTHONPATH=. uv run builderdna builders compare
+PYTHONPATH=. uv run builderdna builders opportunity
+
 # Run all tests
 uv run pytest tests/ -v
 
@@ -47,7 +52,7 @@ uv run pytest tests/test_signal/test_models.py::TestSignal -v
 config.yaml ──▶ config.py (Config model, env var ${SUBSTITUTION})
      │
      ▼
-cli/main.py ── Typer app (collect/trend/pain/opportunity/report/config/observability + concept/radar/radar-cycle)
+cli/main.py ── Typer app (collect/trend/pain/opportunity/report/config/observability + concept/radar/radar-cycle + builders)
      │
      ├─ collect  ──▶ collector/github/ (httpx client, cache, rate limiter)
      │              ▶ collector/normalizer.py (raw API → Signal model)
@@ -61,6 +66,10 @@ cli/main.py ── Typer app (collect/trend/pain/opportunity/report/config/obser
      │
      ├─ opportunity ▶ intelligence/opportunity/ (rule engine, gap_score = demand/competition)
      │              ▶ output: models/payload.py → OpportunityCard
+     │
+     ├─ builders   ──▶ intelligence/builder_problems/ (problem snapshots + trajectory events)
+     │              ▶ models/builder_problem.py → BuilderProblem, ProblemEvent,
+     │                ProblemComparison, ProblemOpportunityCard
      │
      ├─ report   ──▶ cli/commands/report_cmd.py (rendering only)
      │
@@ -140,10 +149,12 @@ Evals exist for builderdna (`.claude/skills/builderdna/evals/`) via the skill-cr
 | `models/payload.py` | Output schemas for all data-producing commands — the contract Claude Code reads |
 | `models/builder_interest_profile.py` | Public user-interest profile (domains, adjacencies, prefs, constraints, goals, risk) + migration |
 | `models/user_dna_schema.py` | Internal scoring representation (Values) + domain/activity/reward mapping rule tables |
+| `models/builder_problem.py` | Builder problem snapshot, append-only trajectory event, cross-person comparison, verifiable opportunity card |
 | `schema.md` | Human-readable schema reference for all SandboxResult payloads (including diagnostics) |
 | `signals/models.py` | Unified Signal model — all data sources normalize to this |
 | `signals/store.py` | SQLite-backed persistence with velocity and topic trend queries |
 | `intelligence/developer_dna.py` | Deterministic DeveloperDNA feature computation (evidence-backed, observed/inferred/unknown) |
+| `intelligence/builder_problems/` | Builder problem store + deterministic comparison/opportunity service |
 | `observability/metrics.py` | Self-calibration metrics (prediction resolution, hypothesis drop, source failure, …) |
 | `observability/` | Telemetry, behavior tracking, prediction snapshots, hypothesis management, diagnostics |
 | `adapters/` | Embed BuilderDNA in agent frameworks: interface.py, cli.py, claude_code.py |

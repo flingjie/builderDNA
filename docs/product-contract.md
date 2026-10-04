@@ -45,9 +45,14 @@ TopicTrend      — 主题趋势
 PainCluster     — 痛点聚类
 OpportunityCard — 机会卡片
 DeveloperDNA    — 开发者技术实践分析（非关系管理档案）
+BuilderProblem  — 外部 builder 的问题记录与实践轨迹（非关系管理档案）
+ProblemEvent    — 不可变轨迹事件
+ProblemOpportunityCard — 由跨人问题比较得到的可验证机会卡
 ```
 
 `DeveloperDNA` 是对**外部开发者技术实践**的分析：问题域、构建模式、技术选型、迭代风格、维护行为、测试可靠性信号、开源协作、从想法到交付的证据。它**不是**关系管理档案，不生成「是否值得结交」类判断。
+
+`BuilderProblem` 记录**外部 builder 正在处理的具体问题及其变化**：问题陈述、触发场景、任务目标、现有绕过办法、主要成本、来源证据、`observed / confirmed / resolved` 状态。轨迹通过追加 `ProblemEvent` 保留，不覆盖旧信息。跨人比较只按“任务 + 障碍”分组，不按关键词聚类；比较达到足够相似后才输出 `ProblemOpportunityCard`。
 
 ### 3.2 概念验证模型
 
@@ -134,7 +139,7 @@ risk_tolerance
 
 | 职责 | 所有者 |
 |------|--------|
-| 技术情报（采集/趋势/痛点/机会/DeveloperDNA） | Python CLI + `builderdna` Skill |
+| 技术情报（采集/趋势/痛点/机会/DeveloperDNA/BuilderProblem） | Python CLI + `builderdna` Skill |
 | 概念验证（Inbox→Watch→Verify→Build/Drop） | `concept-radar` / `concept-radar-loop` |
 | 个性化排序（只影响优先级） | `BuilderInterestProfile` |
 | 自校准（预测 vs 后续事实） | `observability` / `optimize` |

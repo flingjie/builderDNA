@@ -119,3 +119,48 @@ The `config --show` command prints resolved configuration to stdout. Not a Sandb
 
 stats: not applicable (only elapsed_ms).
 diagnostics: not applicable — observability IS the diagnostics layer.
+
+## builders -> stdout (JSON-first command group)
+
+The `builders` command group records builder problems and practice trajectories.
+It does not emit `SandboxResult`; it emits the same versioned JSON envelope used
+by the `concept` / `radar` commands:
+
+```json
+{
+  "schema": "builderdna.builders.v1",
+  "command": "builders.capture",
+  "ok": true,
+  "action": "created",
+  "changed": ["statement"],
+  "data": {},
+  "computed_at": "<ISO8601>"
+}
+```
+
+Subcommands:
+
+- `builders capture PERSON_REF --statement ...` — create/update a problem snapshot.
+- `builders record PROBLEM_ID ...` — append one immutable trajectory event.
+- `builders list [--person-ref X] [--status observed|confirmed|resolved]`
+- `builders show PROBLEM_ID`
+- `builders compare` — group problems by normalized task + obstacle, not keyword.
+- `builders opportunity` — turn sufficiently similar problems into verifiable cards.
+
+Problem snapshot fields:
+
+```text
+problem_id, person_ref, project_ref, statement, context, current_workaround,
+user_segment, trigger_context, job_to_be_done, primary_cost, source_refs[],
+first_seen_at, last_seen_at, status, updated_at
+```
+
+Trajectory events are append-only (`event_id`, `problem_id`, `event_type`,
+`summary`, `detail`, `source_refs[]`, `from_status`, `to_status`,
+`current_workaround`, `recorded_at`). An update never rewrites old events; it
+appends a new event and updates only the current snapshot.
+
+Comparison output groups only problems whose normalized `job_to_be_done` and
+`trigger_context` match. Same keyword (`eval`) with different task/obstacle does
+not merge. Each comparison records similarities, differences, open questions,
+validation targets, and a minimal verifiable deliverable.

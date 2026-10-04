@@ -28,6 +28,7 @@ Claude Code（编排 + 语义判断）── 读取 state/*.json，决定跑什�
   分析:   trend / pain       —— 趋势速度 · 痛点聚类
   机会:   opportunity        —— 规则引擎生成机会卡片
   验证:   concept / radar / radar-cycle —— 跨源概念生命周期
+  人物问题: builders           —— 问题记录、实践轨迹、跨人比较、可验证机会卡
   校准:   observability      —— 预测 vs 后续事实
   工具:   report / config    —— 渲染 · 配置
     │
@@ -70,6 +71,11 @@ PYTHONPATH=. uv run builderdna concept capture --help
 PYTHONPATH=. uv run builderdna radar scan agent-reliability
 PYTHONPATH=. uv run builderdna radar-cycle start agent-reliability
 
+# Builder 问题与实践轨迹
+PYTHONPATH=. uv run builderdna builders capture alice --statement "修改 prompt 后难以确认旧问题是否修复" --job-to-be-done "确认历史失败案例是否修复" --trigger-context "修改 prompt 或工具实现后"
+PYTHONPATH=. uv run builderdna builders compare
+PYTHONPATH=. uv run builderdna builders opportunity
+
 # 校准 — 对比历史预测与后续事实
 PYTHONPATH=. uv run builderdna observability --all --domain agent
 
@@ -85,7 +91,7 @@ uv run pytest tests/ -v
 ```
 BuilderDNA/
 ├── cli/main.py                # Typer 入口
-├── cli/commands/              # collect / trend / pain / opportunity / report / config / observability / concept / radar / radar-cycle
+├── cli/commands/              # collect / trend / pain / opportunity / report / config / observability / concept / radar / radar-cycle / builders
 ├── config.py                  # 配置系统（YAML + ${ENV} 变量替换）
 ├── config.yaml                # accounts, domains, vendors, embedding
 │
@@ -95,6 +101,7 @@ BuilderDNA/
 ├── intelligence/trend/        # 趋势计算（velocity, stage）
 ├── intelligence/pain/         # 痛点挖掘（HDBSCAN + embeddings）
 ├── intelligence/opportunity/  # 机会评分（规则引擎）
+├── intelligence/builder_problems/ # Builder 问题快照、轨迹事件、跨人比较、机会卡
 │
 ├── concepts/                  # 概念证据、适配器、评分、持久化
 ├── radar_cycles/              # 可恢复的雷达周期状态机（checkpoint / engine / config）
@@ -111,6 +118,7 @@ BuilderDNA/
 │   ├── hypotheses.json        # 跨对话的探索状态追踪
 │   ├── user_weights.json      # 用户偏好权重（只影响排序）
 │   ├── builder_interest_profile.json  # 用户兴趣画像（只影响优先级）
+│   ├── builders/              # builders.jsonl 问题快照 + events.jsonl 轨迹事件
 │   ├── reflections.jsonl      # 技术复盘事件日志
 │   └── watches.json           # 已保存的 repo 搜索（repo-trend skill）
 │
