@@ -48,15 +48,40 @@ def normalize_problem(text: str) -> str:
     return _normalize_text(text)
 
 
+_CJK_RE = re.compile(r"[㐀-䶿一-鿿]")
+
+
 def _normalize_text(text: str) -> str:
     text = text.lower()
-    text = re.sub(r"[^a-z0-9\s]", " ", text)
+    text = re.sub(r"[^a-z0-9㐀-䶿一-鿿\s]", " ", text)
     return " ".join(text.split())
 
 
+def _char_ngrams(s: str, n: int = 2) -> list[str]:
+    """Character n-grams for a CJK run (Chinese has no spaces between words)."""
+    s = s.replace(" ", "")
+    if not s:
+        return []
+    if len(s) == 1:
+        return [s]
+    return [s[i:i + n] for i in range(len(s) - n + 1)]
+
+
 def tokenize(text: str) -> frozenset[str]:
-    """A normalized set of word tokens for Jaccard overlap."""
-    return frozenset(_normalize_text(text).split())
+    """A normalized set of tokens for Jaccard overlap.
+
+    Latin runs are whitespace-split into words; CJK runs are split into
+    character bigrams, so Chinese text produces overlapping tokens instead
+    of one undivided run.
+    """
+    norm = _normalize_text(text)
+    tokens: list[str] = []
+    for run in norm.split():
+        if _CJK_RE.search(run):
+            tokens.extend(_char_ngrams(run))
+        else:
+            tokens.append(run)
+    return frozenset(tokens)
 
 
 def jaccard(a: frozenset[str], b: frozenset[str]) -> float:

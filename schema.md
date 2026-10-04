@@ -58,13 +58,24 @@ payload.trends[]: { topic, stage (accelerating|emerging|mainstream|declining), c
 - `distinct_repos` — distinct repos behind the topic; `<2` = single-source. A single hot repo is downgraded to `mainstream`, never `emerging`/`accelerating`.
 stats: { total_trends }
 
-## pain -> output/pain_clusters.json
+## pain -> output/pain_candidates.json
+
+payload.groups[]: { group_id, issues[{issue_key, repo, issue_number, title, body, url, labels[], comments, participants, reactions, created_at, error_codes[], components[]}], shared_features{error_codes[], components[], labels[]}, mean_similarity }
+payload.noise[]: { …same shape as a group's issue… }
+
+- `issue_key` — stable `"<repo>#<issue_number>"` reference used by the Agent confirmation step.
+- `noise[]` — issues not assigned to any candidate group (available for fallback review).
+- Candidate groups are lexical recall only — text similarity does not prove the same pain point.
+stats: { groups, issues_analyzed, noise_count, removed_duplicates, backend }
+
+## pain-finalize -> output/pain_clusters.json
 
 payload.clusters[]: { cluster_id, title, severity, frequency, affected_repos[], independent_repo_count, time_span_days, existing_workarounds[], top_issues[{repo, issue_number, title, pain_score}] }
 
 - `independent_repo_count` — deduplicated affected repos (`<2` = single-source).
 - `time_span_days` — recurrence span in days (0 = unknown).
 - `existing_workarounds[]` — deterministic keyword hints from issue text (empty = unknown).
+- `pain-finalize` applies an optional Agent confirmation (`output/pain_confirmations.json`, `{"clusters":[{"title","issue_keys","rationale"}]}`); without it, each candidate group is promoted deterministically.
 stats: { clusters, issues_analyzed, noise_count }
 
 ## opportunity -> output/opportunities.json

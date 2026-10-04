@@ -19,7 +19,7 @@ github:
   rate_limit_margin: 50
 
 embedding:
-  model: nomic-embed-text:latest
+  model: bge-m3:latest
   base_url: ${EMBEDDING_BASE_URL:-http://localhost:11434/v1}
 
 domains:
@@ -38,6 +38,20 @@ domains:
       - agent-harness
       - ai-agent
       - llm-agent
+  agent-security-governance:
+    topics:
+      - agent-security
+      - agent-governance
+      - prompt-injection
+      - llm-security
+      - ai-safety
+      - ai-governance
+      - guardrails
+      - mcp-security
+      - sandboxing
+      - access-control
+      - policy-enforcement
+      - agent-observability
   devtools:
     topics:
       - sdk

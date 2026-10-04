@@ -1,6 +1,6 @@
 """Tests for PainCluster time-span computation (P6)."""
 
-from cli.commands.pain import _compute_time_span_days
+from intelligence.pain.summarize import _compute_time_span_days
 
 
 class TestComputeTimeSpanDays:

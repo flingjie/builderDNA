@@ -51,6 +51,7 @@ class ClaudeCodeAdapter(BuilderDNAAdapter):
         from cli.commands.collect import _run_collect
         from cli.commands.trend import trend
         from cli.commands.pain import pain
+        from cli.commands.pain_finalize import pain_finalize
         from cli.commands.opportunity import opportunity
 
         output_dir = kwargs.get("output_dir", "output")
@@ -59,6 +60,7 @@ class ClaudeCodeAdapter(BuilderDNAAdapter):
 
         signals_path = kwargs.get("signals_path", f"{output_dir}/signals.json")
         trends_path = kwargs.get("trends_path", f"{output_dir}/trends.json")
+        candidates_path = kwargs.get("candidates_path", f"{output_dir}/pain_candidates.json")
         pains_path = kwargs.get("pains_path", f"{output_dir}/pain_clusters.json")
         opps_path = kwargs.get("opps_path", f"{output_dir}/opportunities.json")
 
@@ -78,10 +80,19 @@ class ClaudeCodeAdapter(BuilderDNAAdapter):
             window=window,
         )
 
-        # Step 3: Pain
+        # Step 3: Pain — candidate grouping
         pain(
             domain=domain,
             data=signals_path,
+            backend="tfidf",
+            output=candidates_path,
+        )
+
+        # Step 3b: Finalize — deterministic promotion (no Agent confirmation)
+        pain_finalize(
+            domain=domain,
+            candidates=candidates_path,
+            confirmations=None,
             output=pains_path,
         )
 

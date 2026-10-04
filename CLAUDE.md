@@ -18,8 +18,11 @@ PYTHONPATH=. uv run builderdna collect agent --window 365 --output output/signal
 # Compute topic trends from collected signals
 PYTHONPATH=. uv run builderdna trend agent --data output/signals.json --output output/trends.json
 
-# Mine pain points from issue text (requires local Ollama for embeddings)
-PYTHONPATH=. uv run builderdna pain agent --data output/signals.json --output output/pain_clusters.json
+# Group issues into candidate pain groups (offline TF-IDF; --backend embedding for optional Ollama+HDBSCAN)
+PYTHONPATH=. uv run builderdna pain agent --data output/signals.json --backend tfidf --output output/pain_candidates.json
+
+# Finalize candidate groups into pain clusters (--confirmations applies the Agent's semantic grouping)
+PYTHONPATH=. uv run builderdna pain-finalize agent --candidates output/pain_candidates.json --confirmations output/pain_confirmations.json --output output/pain_clusters.json
 
 # Generate opportunity cards from trends + pain clusters (rule engine, no LLM)
 PYTHONPATH=. uv run builderdna opportunity --trends output/trends.json --pains output/pain_clusters.json
@@ -52,7 +55,7 @@ uv run pytest tests/test_signal/test_models.py::TestSignal -v
 config.yaml ──▶ config.py (Config model, env var ${SUBSTITUTION})
      │
      ▼
-cli/main.py ── Typer app (collect/trend/pain/opportunity/report/config/observability + concept/radar/radar-cycle + builders)
+cli/main.py ── Typer app (collect/trend/pain/pain-finalize/opportunity/report/config/observability + concept/radar/radar-cycle + builders)
      │
      ├─ collect  ──▶ collector/github/ (httpx client, cache, rate limiter)
      │              ▶ collector/normalizer.py (raw API → Signal model)
@@ -61,7 +64,11 @@ cli/main.py ── Typer app (collect/trend/pain/opportunity/report/config/obser
      ├─ trend    ──▶ intelligence/trend/ (velocity analysis)
      │              ▶ output: models/payload.py → TopicTrend, RepoSummary
      │
-     ├─ pain     ──▶ intelligence/pain/ (HDBSCAN + BGE-M3 embeddings via Ollama)
+     ├─ pain     ──▶ intelligence/pain/ (clean/dedupe → TF-IDF candidate grouping;
+     │          │    --backend embedding for optional Ollama+HDBSCAN)
+     │          │  ▶ output: models/payload.py → CandidateGroup, PainCandidate
+     │
+     ├─ pain-finalize ▶ intelligence/pain/summarize.py (validate refs → severity/frequency/reach)
      │              ▶ output: models/payload.py → PainCluster, IssueSummary
      │
      ├─ opportunity ▶ intelligence/opportunity/ (rule engine, gap_score = demand/competition)
@@ -104,7 +111,7 @@ Schema contract: schema.md and models/payload.py — Claude Code reads these.
 
 ## Key Design Decisions
 
-- **LLM-free pipeline (with one exception)**: After refactoring, all cloud LLM calls were removed. Trend and opportunity use deterministic algorithms (velocity, rule engine). Pain uses local Ollama embeddings (BGE-M3) — the only ML dependency, running entirely offline.
+- **LLM-free pipeline (with one exception)**: After refactoring, all cloud LLM calls were removed. Trend and opportunity use deterministic algorithms (velocity, rule engine). Pain uses offline TF-IDF candidate grouping by default (semantic confirmation done by Claude Code in the skill loop); an optional `--backend embedding` path uses local Ollama embeddings (BGE-M3) — the only ML dependency, opt-in and fully offline.
 - **No web layer**: FastAPI was removed. This is a CLI toolkit, not a service.
 - **Two-loop architecture**: Inner loop = deterministic sandbox commands run locally. Outer loop = Claude Code reads JSON outputs and does semantic reasoning.
 - **Config via YAML + env**: `config.yaml` supports `${VAR}` and `${VAR:-default}` substitution. `.env` is auto-loaded at `config.py` import time.
@@ -118,7 +125,7 @@ Skills are deployed under `.claude/skills/` (`*-workspace/` dirs, when present, 
 
 | Skill | Purpose | Trigger |
 |-------|---------|---------|
-| `builderdna` | Orchestrate the Python sandbox commands (collect/trend/pain/opportunity), manage hypotheses | "analyze X's GitHub", "tech DNA", "find opportunities in Z" |
+| `builderdna` | Orchestrate the Python sandbox commands (collect/trend/pain/pain-finalize/opportunity), manage hypotheses | "analyze X's GitHub", "tech DNA", "find opportunities in Z" |
 | `concept-radar` | Cross-source concept lifecycle radar: turn weak signals into validated, falsifiable builds (Inbox → Watch → Verify → Build/Drop) | "validate an idea", "weak signals to validated builds", "hypothesis and evidence", "should I build or drop this", "track this concept", "雷达" |
 | `concept-radar-loop` | Resumable, deterministic radar-cycle orchestrator (start → import → decide → finalize) | "run the concept radar loop", "继续跑概念雷达", "resume my radar run" |
 | `repo-trend` | Discover trending repos via GitHub API search, 3-tier eval | "find trending X repos", "evaluate this repo", "check my watches" |
@@ -154,6 +161,7 @@ Evals exist for builderdna (`.claude/skills/builderdna/evals/`) via the skill-cr
 | `signals/models.py` | Unified Signal model — all data sources normalize to this |
 | `signals/store.py` | SQLite-backed persistence with velocity and topic trend queries |
 | `intelligence/developer_dna.py` | Deterministic DeveloperDNA feature computation (evidence-backed, observed/inferred/unknown) |
+| `intelligence/pain/` | Pain pipeline: clean.py (dedup/fingerprint), candidates.py (TF-IDF grouping), cluster.py (optional HDBSCAN), summarize.py (final cluster stats) |
 | `intelligence/builder_problems/` | Builder problem store + deterministic comparison/opportunity service |
 | `observability/metrics.py` | Self-calibration metrics (prediction resolution, hypothesis drop, source failure, …) |
 | `observability/` | Telemetry, behavior tracking, prediction snapshots, hypothesis management, diagnostics |

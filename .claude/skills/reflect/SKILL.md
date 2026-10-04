@@ -8,7 +8,8 @@ description: >
   Runs a multi-pass adversarial extraction: 3 parallel lens agents (Decision,
   Assumption, Pattern) → calibrated skeptic adversary → proposed
   technical-judgment updates. Output is saved to state/reflections.jsonl (full
-  fidelity) and indexed in claude-mem (embeddings for semantic search). The user
+  fidelity, the primary store); claude-mem indexing is an optional semantic-search
+  enhancement. The user
   confirms/rejects each proposed diff inline before any file is written.
   Focuses on technical judgment only — it does NOT maintain a personality or
   values self-model (interests live in state/builder_interest_profile.json;
@@ -257,7 +258,10 @@ After user confirms/rejects all diffs:
 
 4. **Write reflection event to `state/reflections.jsonl`** — use the full schema from `references/reflection-protocol.md`. Append as a single JSON line.
 
-5. **Index in claude-mem** — use `mcp__plugin_claude-mem_mcp-search__observation_add`:
+5. **Index in claude-mem (optional enhancement)** — `state/reflections.jsonl` is the
+   primary store; the claude-mem index is an optional semantic-search enhancement,
+   never required. If claude-mem MCP tools are available, use
+   `mcp__plugin_claude-mem_mcp-search__observation_add`:
    ```json
    {
      "content": "Reflection: [decision_lens.summary] | [assumption_lens.summary] | [pattern_lens.summary]",
@@ -280,7 +284,7 @@ After user confirms/rejects all diffs:
 
 > "已保存。复盘 ID: [id]"
 >
-> "状态更新: reflections.jsonl 已更新 [N] 项 / claude-mem 索引完成"
+> "状态更新: reflections.jsonl 已更新 [N] 项"（claude-mem 索引为可选，仅在完成时提及）
 >
 > [If action experiments selected]: "[N] 个行动实验已记录，下次复盘时会回检。"
 

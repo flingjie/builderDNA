@@ -7,7 +7,9 @@ description: >
   "aggregate insights", "蒸馏", "阶段性复盘".
   Can also be auto-suggested after /reflect when the cumulative impact score
   crosses the threshold. Gathers all unprocessed reflections, reads digest_gaps.jsonl
-  for cognitive blind-spot patterns, performs semantic search via claude-mem, produces
+  for cognitive blind-spot patterns, retrieves related reflections from JSONL
+  (keyword/tag matching; claude-mem is an optional semantic-search enhancement),
+  produces
   a Tension + Resolution narrative, and proposes technical-cognition updates (to
   state/reflections.jsonl + digest_gaps.jsonl, never into the interest profile).
   Writes a markdown report to state/distill_reports/ and presents a conversational
@@ -73,20 +75,26 @@ evidence strength, maturity, or source records**. Those corrections belong to th
 `concept-radar` skill. Proposed user-DNA changes still flow through the existing
 confirmation rules in Step 6 unchanged.
 
-### Step 1: Semantic Search (via claude-mem)
+### Step 1: Retrieve Related Reflections (JSONL-first)
 
-Search claude-mem for related reflections across ALL time (not just unprocessed):
+The primary store is `state/reflections.jsonl`. Retrieve related reflections across
+ALL time (not just unprocessed) by **structured keyword/tag matching** over JSONL
+fields — topic tags, timestamps, decision summaries, value keys, emotions, and
+ability labels:
 
-```
-mcp__plugin_claude-mem_mcp-search__search({
-  query: "<synthesize: decision_lens.summary + pattern_lens.summary from unprocessed reflections>",
-  type: "reflection"
-})
-```
+1. Read `state/reflections.jsonl` fully (you already parsed it in Step 0).
+2. Build a query from the unprocessed batch's `decision_lens.summary` +
+   `pattern_lens.summary`, then rank past reflections by overlapping tags,
+   keywords in decision summaries, and time proximity.
+3. Pull the top related reflections as cross-timeline context.
 
-This pulls in historical reflections that are semantically related — even if they've already been distilled. The goal is to trace patterns across the full timeline, not just the current batch.
+This traces patterns across the full timeline, not just the current batch.
 
-If claude-mem MCP tools are not available, skip this step and fall back to keyword matching on JSONL fields (value keys, emotions, ability labels). Note: "claude-mem 不可用，使用关键词匹配。"
+**Optional enhancement:** if claude-mem MCP tools are available, you may run a
+semantic search (`mcp__plugin_claude-mem_mcp-search__search`) to supplement the
+keyword retrieval with embedding-based recall. It is never required — the JSONL
+keyword path is the default and sufficient. If claude-mem is unavailable, skip
+silently and note: "claude-mem 不可用，使用 JSONL 关键词匹配。"
 
 ### Step 2: Analyze — Tension + Resolution Framework
 

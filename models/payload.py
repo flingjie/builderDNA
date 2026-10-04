@@ -239,6 +239,57 @@ class PainPayload(BaseModel):
     repos_analyzed: list[str] = Field(default_factory=list, description="List of repositories whose issues were analyzed")
 
 
+# ── pain command candidate grouping (two-stage pipeline) ──
+
+class PainCandidate(BaseModel):
+    """A single cleaned, deduplicated issue ready for candidate grouping.
+
+    Carries enough context (title/body/labels/error codes/components) for the
+    skill's Agent to judge whether user, scenario, and failure mechanism agree,
+    and enough engagement metadata for the finalize step to compute severity.
+    """
+    issue_key: str = Field(description="Stable reference '<repo>#<issue_number>' used by the Agent confirmation step")
+    repo: str = Field(description="Repository full name")
+    issue_number: int = Field(description="GitHub issue number")
+    title: str = Field(description="Issue title")
+    body: str = Field(default="", description="Issue body text")
+    url: str = Field(default="", description="Full GitHub issue URL")
+    labels: list[str] = Field(default_factory=list, description="GitHub issue labels")
+    comments: int = Field(default=0, description="Number of comments")
+    participants: int = Field(default=0, description="Number of unique participants")
+    reactions: int = Field(default=0, description="Total reaction count")
+    created_at: str = Field(default="", description="Issue creation date (ISO 8601)")
+    error_codes: list[str] = Field(default_factory=list, description="Extracted error codes / exception types / HTTP status")
+    components: list[str] = Field(default_factory=list, description="Extracted component names")
+
+
+class CandidateGroup(BaseModel):
+    """A candidate group of possibly-related issues (lexical recall only).
+
+    Text similarity does not prove the same pain point — the Agent confirmation
+    step must decide whether members share user, scenario, and failure mechanism.
+    """
+    group_id: int = Field(description="Candidate group ID")
+    issues: list[PainCandidate] = Field(description="Member issues (deduplicated, cleaned)")
+    shared_features: dict = Field(
+        default_factory=dict,
+        description="Features shared across members: error_codes, components, labels",
+    )
+    mean_similarity: float = Field(
+        default=0.0,
+        description="Mean pairwise cosine similarity across members (0-1)",
+    )
+
+
+class CandidateGroupsPayload(BaseModel):
+    """Payload for the pain command's candidate-grouping stage."""
+    groups: list[CandidateGroup] = Field(default_factory=list, description="Candidate groups, sorted by size descending")
+    noise: list[PainCandidate] = Field(default_factory=list, description="Issues not assigned to any candidate group (available for fallback review)")
+    issue_count: int = Field(default=0, description="Total issues analyzed (after dedup)")
+    noise_count: int = Field(default=0, description="Number of issues not assigned to any candidate group")
+    repos_analyzed: list[str] = Field(default_factory=list, description="List of repositories whose issues were analyzed")
+
+
 # ── opportunity command output ──
 
 class OpportunityCard(BaseModel):

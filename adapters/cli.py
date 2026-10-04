@@ -79,6 +79,7 @@ class CLIAdapter(BuilderDNAAdapter):
 
         signals_path = kwargs.get("signals_path", f"{output_dir}/signals.json")
         trends_path = kwargs.get("trends_path", f"{output_dir}/trends.json")
+        candidates_path = kwargs.get("candidates_path", f"{output_dir}/pain_candidates.json")
         pains_path = kwargs.get("pains_path", f"{output_dir}/pain_clusters.json")
         opps_path = kwargs.get("opps_path", f"{output_dir}/opportunities.json")
 
@@ -89,9 +90,13 @@ class CLIAdapter(BuilderDNAAdapter):
         # Step 2: Trend (no --config flag)
         self._run("trend", domain, "--data", signals_path, "--output", trends_path)
 
-        # Step 3: Pain (supports --config)
-        self._run("pain", domain, "--data", signals_path, "--output", pains_path,
-                  "--config", config_path)
+        # Step 3: Pain — candidate grouping (supports --config)
+        self._run("pain", domain, "--data", signals_path, "--backend", "tfidf",
+                  "--output", candidates_path, "--config", config_path)
+
+        # Step 3b: Finalize — deterministic promotion (no Agent confirmation)
+        self._run("pain-finalize", domain, "--candidates", candidates_path,
+                  "--output", pains_path)
 
         # Step 4: Opportunity (returns the final result)
         return self._run(

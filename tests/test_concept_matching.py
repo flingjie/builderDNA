@@ -22,7 +22,9 @@ from concepts.matching import (
     find_candidates,
     is_ambiguous,
     normalize_name,
+    normalize_problem,
     normalize_url,
+    tokenize,
 )
 
 
@@ -303,3 +305,39 @@ class TestClassifyMatch:
         signals = {r.signal for r in result.candidates[0].reasons}
         assert "name" in signals
         assert "problem" in signals
+
+
+# ── Chinese support ──
+
+class TestChineseNormalization:
+    def test_cjk_is_preserved(self):
+        assert normalize_name("Agent 超时 挂起") == "agent 超时 挂起"
+        assert normalize_problem("配置错误导致超时") == "配置错误导致超时"
+
+    def test_punctuation_stripped_but_cjk_kept(self):
+        assert normalize_name("超时！") == "超时"
+        assert normalize_name("MCP-Servers 超时") == "mcp servers 超时"
+
+
+class TestChineseTokenize:
+    def test_cjk_uses_character_bigrams(self):
+        tokens = tokenize("超时")
+        assert "超时" in tokens
+
+    def test_pure_latin_still_whitespace_split(self):
+        assert tokenize("agents hallucinate in production") == frozenset(
+            {"agents", "hallucinate", "in", "production"}
+        )
+
+    def test_mixed_cjk_and_latin(self):
+        tokens = tokenize("agent 超时")
+        assert "agent" in tokens
+        assert "超时" in tokens
+
+    def test_chinese_problem_overlap_scores_positive(self):
+        # Two Chinese problems sharing bigrams should produce a positive Jaccard score.
+        existing = [card(id="a", title="甲", problem="配置错误导致超时")]
+        candidate = card(id="b", title="乙", problem="配置错误导致超时挂起")
+        matches = find_candidates(candidate, existing)
+        assert len(matches) == 1
+        assert matches[0].problem_score > 0.0

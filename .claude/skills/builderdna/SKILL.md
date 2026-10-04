@@ -32,7 +32,7 @@ Claude Code (you) — reads hypotheses.json, maps intent → commands via short-
       │
       ▼
 core sandbox CLI commands (each independent, JSON-in, JSON-out)
-  collect → trend → pain → opportunity → report
+  collect → trend → pain → (Agent 确认) → pain-finalize → opportunity → report
       │
       ▼
 Global memory — SQLite + output/*.json + state/*.json + claude-mem
@@ -42,7 +42,7 @@ Global memory — SQLite + output/*.json + state/*.json + claude-mem
 
 | 做 | 不做 |
 |----|------|
-| 编排 Python sandbox（collect → trend → pain → opportunity → report）| 替代专家 Skill 做单源深挖（repo-trend / repo-awesome / twitter-learning / reddit-opportunity）|
+| 编排 Python sandbox（collect → trend → pain → pain-finalize → opportunity → report）| 替代专家 Skill 做单源深挖（repo-trend / repo-awesome / twitter-learning / reddit-opportunity）|
 | 分析 GitHub 开发者/组织技术 DNA，管理假设树 | 跨源验证概念、管理生命周期（那是 concept-radar 的事）|
 | 展示趋势/机会/痛点结果，更新假设状态 | 生成社交回复、获客、维护关系（超出本项目范围）|
 
@@ -87,12 +87,12 @@ If `hypothesis_validation`: identify which hypothesis node(s) are the target. If
 
 ### Step 2: Goal → Commands
 
-Each goal maps to a fixed ordered command sequence, respecting the dependency graph. Always execute `trend` before `pain` (8s vs 92s — cheap data informs the expensive decision).
+Each goal maps to a fixed ordered command sequence, respecting the dependency graph. Always execute `trend` before `pain` (cheap data informs the expensive decision).
 
 | Goal | Required | Optional (after short-circuit check) |
 |------|----------|--------------------------------------|
 | `trend_radar` | collect → trend → report | — |
-| `opportunity_discovery` | collect → trend → report | pain → opportunity (both, or neither) |
+| `opportunity_discovery` | collect → trend → report | pain → pain-finalize → opportunity (all three, or none) |
 | `hypothesis_validation` | collect → observability | trend (if you want supporting evidence) |
 
 **Command templates** (always prefix with `PYTHONPATH=.`):
@@ -101,13 +101,31 @@ Each goal maps to a fixed ordered command sequence, respecting the dependency gr
 |---------|----------|
 | collect | `PYTHONPATH=. uv run builderdna collect {domain} --window {window} --output output/signals.json` |
 | trend | `PYTHONPATH=. uv run builderdna trend {domain} --data output/signals.json --output output/trends.json` |
-| pain | `PYTHONPATH=. uv run builderdna pain {domain} --data output/signals.json --output output/pain_clusters.json` |
+| pain | `PYTHONPATH=. uv run builderdna pain {domain} --data output/signals.json --backend tfidf --output output/pain_candidates.json` |
+| pain-finalize | `PYTHONPATH=. uv run builderdna pain-finalize {domain} --candidates output/pain_candidates.json --confirmations output/pain_confirmations.json --output output/pain_clusters.json` |
 | opportunity | `PYTHONPATH=. uv run builderdna opportunity --trends output/trends.json --pains output/pain_clusters.json --output output/opportunities.json` |
 | report | `PYTHONPATH=. uv run builderdna report --data {data_file} --format md` |
 | config | `PYTHONPATH=. uv run builderdna config --show` |
 | observability | `PYTHONPATH=. uv run builderdna observability --all --domain {domain}` |
 
 Substitute `{domain}` with the target domain, `{window}` with 365 (default) or user-specified value.
+
+**Agent confirmation step** (between `pain` and `pain-finalize`): read
+`output/pain_candidates.json`, batch-judge whether each candidate group's members
+share the same user, scenario, and failure mechanism. Text similarity alone does
+not prove the same pain point — two "timeout" issues can be a config error vs. an
+execution-recovery failure. Split groups whose members differ, merge groups that
+describe the same mechanism, and give each final cluster a human title. Write the
+result to `output/pain_confirmations.json` as:
+
+```json
+{"clusters": [{"title": "...", "issue_keys": ["org/repo#1", "..."], "rationale": "..."}]}
+```
+
+`issue_keys` must be `"<repo>#<issue_number>"` references from the candidate
+payload (including any `noise` issues you want to rescue). If you skip
+confirmation (non-interactive / budget), omit `--confirmations` on
+`pain-finalize` to auto-promote each candidate group deterministically.
 
 ### Step 3: Short-Circuit Check (the only decision point)
 
@@ -292,10 +310,11 @@ Read these when needed:
 - **accounts**: in `config.yaml` — developers/orgs to analyze
 - **domains**: topic tags for each domain (expand to broaden search)
 - **vendors**: domestic/overseas orgs tracked for competitive intelligence
-- **embedding**: local Ollama config (pain command only)
+- **embedding**: local Ollama config — optional `pain --backend embedding` backend only (default is `tfidf`, offline)
+- **pain backend**: `tfidf` (default, offline TF-IDF candidate grouping) or `embedding` (optional Ollama+HDBSCAN)
 
 Edit `config.yaml` to change accounts or topics. Confirm with user before editing.
-`.env` needs: `GITHUB_TOKEN` and optionally `EMBEDDING_BASE_URL`.
+`.env` needs: `GITHUB_TOKEN`; `EMBEDDING_BASE_URL` is only needed for the optional `embedding` backend.
 
 ## Troubleshooting
 
@@ -303,7 +322,7 @@ Edit `config.yaml` to change accounts or topics. Confirm with user before editin
 |---------|-----|
 | `ModuleNotFoundError` | Prefix with `PYTHONPATH=.` |
 | Empty signals | Check `GITHUB_TOKEN` in `.env` |
-| No pain clusters | Verify embedding endpoint (`EMBEDDING_BASE_URL`) |
+| No pain clusters | Check `output/pain_candidates.json` was produced; re-run `pain-finalize` (confirmations optional) |
 | Rate limited | Wait or reduce window size |
 | Import from deleted module | Old code path — verify you're in the refactored worktree |
 | Pain keeps getting skipped | Trend gap_scores are low — try broadening domain topics in config.yaml first |

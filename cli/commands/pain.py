@@ -1,66 +1,34 @@
-"""pain — cluster issue signals via HDBSCAN, output pain clusters."""
+"""pain — clean, dedupe, and group issue signals into candidate pain groups.
+
+This is the first stage of the two-stage pain pipeline. It produces
+``CandidateGroupsPayload`` (lexical recall only — text similarity is a hint,
+not proof of the same pain point). The skill's Agent confirmation step and the
+``pain-finalize`` command turn these candidates into final ``PainCluster``s.
+
+Default backend is ``tfidf`` (offline, deterministic). ``embedding`` is an
+optional backend (local Ollama) that degrades to ``tfidf`` on failure instead
+of returning empty results.
+"""
+
 import json
-import math
-from datetime import datetime
 from pathlib import Path
 
 import typer
 
 from config import load_config
+from intelligence.pain.candidates import (
+    build_candidate_groups,
+    build_candidates,
+    shared_features,
+)
 from intelligence.pain.cluster import PainClusterer
-from intelligence.pain.severity import compute_severity
+from intelligence.pain.clean import dedupe_issues
 from models.payload import (
-    SandboxResult, PainPayload, PainCluster, IssueSummary,
-    Diagnostics, DataQualityDiag, ConfidenceDiag,
+    SandboxResult, CandidateGroup, CandidateGroupsPayload, Diagnostics,
 )
 from observability import RunTelemetry, OutputLevel, vprint, record_command, record_output_retention
-from observability.snapshot import save_pain_snapshot
 from observability.versions import algorithm_version
 from cli.commands.schema_validation import validate_collect_payload, validate_and_exit
-
-
-_WORKAROUND_KEYWORDS = (
-    "workaround", "hack", "temporary fix", "patch it", "bypass",
-    "绕过", "临时", "规避", "替代方案", "换一个", "先用",
-)
-
-
-def _extract_workarounds(issues: list[dict]) -> list[str]:
-    """Deterministic scan for workarounds the community already uses.
-
-    Best-effort keyword match over title+body; empty when none found. This is
-    a deterministic hint, not a semantic judgment.
-    """
-    found: list[str] = []
-    for iss in issues:
-        text = f"{iss.get('title', '')} {iss.get('body', '')}".lower()
-        for kw in _WORKAROUND_KEYWORDS:
-            idx = text.find(kw)
-            if idx >= 0:
-                snippet = text[max(0, idx - 20):idx + 40].strip()
-                if snippet not in found:
-                    found.append(snippet)
-                break
-    return found[:5]
-
-
-def _compute_time_span_days(issues: list[dict]) -> int:
-    """Days between the earliest and latest issue in a cluster (recurrence span).
-
-    Returns 0 when there are fewer than two dated issues (span unknown).
-    """
-    dates = []
-    for iss in issues:
-        ca = (iss.get("created_at") or "").strip()
-        if not ca:
-            continue
-        try:
-            dates.append(datetime.fromisoformat(ca.replace("Z", "+00:00")))
-        except (ValueError, TypeError):
-            continue
-    if len(dates) < 2:
-        return 0
-    return max(0, (max(dates) - min(dates)).days)
 
 
 def _get_embeddings(texts: list[str], model: str, base_url: str) -> list[list[float]]:
@@ -89,17 +57,49 @@ def _get_embeddings(texts: list[str], model: str, base_url: str) -> list[list[fl
     return embeddings
 
 
+def _embedding_groups(
+    issues: list[dict],
+    model: str,
+    base_url: str,
+) -> tuple[list[CandidateGroup], list]:
+    """Embedding backend: HDBSCAN over Ollama embeddings → candidate groups."""
+    texts = [f"{iss.get('title', '')}\n{iss.get('body', '')}"[:1000] for iss in issues]
+    embeddings = _get_embeddings(texts, model=model, base_url=base_url)
+    clusterer = PainClusterer(min_cluster_size=3)
+    clusters = clusterer.fit(embeddings)
+
+    candidates = build_candidates(issues)
+    groups: list[CandidateGroup] = []
+    for label, indices in clusters.items():
+        if len(indices) < 2:
+            continue
+        members = [candidates[i] for i in indices]
+        groups.append(CandidateGroup(
+            group_id=label,
+            issues=members,
+            shared_features=shared_features(members),
+            mean_similarity=0.0,
+        ))
+
+    assigned_idx = {i for indices in clusters.values() for i in indices}
+    noise = [candidates[i] for i in range(len(candidates)) if i not in assigned_idx]
+    return groups, noise
+
+
 def pain(
     domain: str = typer.Argument(..., help="Domain name"),
     data: str = typer.Option("output/signals.json", "--data", "-d", help="Input signals JSON"),
-    output: str = typer.Option("output/pain_clusters.json", "--output", "-o", help="Output JSON file"),
+    output: str = typer.Option("output/pain_candidates.json", "--output", "-o", help="Output JSON file"),
+    backend: str = typer.Option("tfidf", "--backend", "-b", help="Grouping backend: tfidf (default) or embedding"),
     config: str = typer.Option("config.yaml", "--config", "-c", help="Config file path"),
 ) -> None:
-    """Mine pain points from collected issue signals."""
+    """Group collected issue signals into candidate pain groups (lexical recall)."""
     tel = RunTelemetry()
     cfg = load_config(config)
-    embedding_model = cfg.embedding.model
-    embedding_base_url = cfg.embedding.base_url
+
+    if backend not in ("tfidf", "embedding"):
+        vprint(f"[red]Unknown backend: {backend}. Use 'tfidf' or 'embedding'.[/red]", level=OutputLevel.QUIET)
+        raise typer.Exit(1)
 
     data_path = Path(data)
     if not data_path.exists():
@@ -112,122 +112,66 @@ def pain(
 
     validate_and_exit(payload, "pain", validate_collect_payload(payload), vprint, OutputLevel)
 
+    diag = Diagnostics()
+
     if not issues:
-        diag = Diagnostics()
-        diag.data_quality.sample_size_warning = "No issues found in input data — cannot cluster. Consider re-running collect with different repos or a broader topic scope."
+        diag.data_quality.sample_size_warning = "No issues found in input data — cannot group. Consider re-running collect with different repos or a broader topic scope."
         result = SandboxResult(
             command="pain",
             domain=domain,
-            payload=PainPayload().model_dump(),
-            stats={"issue_count": 0, "repos_analyzed": [], "noise_count": 0, **tel.to_stats()},
+            payload=CandidateGroupsPayload().model_dump(),
+            stats={"groups": 0, "issues_analyzed": 0, "noise_count": 0,
+                   "backend": backend, **tel.to_stats()},
             diagnostics=diag,
         )
         output_path = Path(output)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(result.model_dump_json(indent=2))
-        vprint("[yellow]No issues to cluster[/yellow]", level=OutputLevel.NORMAL)
+        vprint("[yellow]No issues to group[/yellow]", level=OutputLevel.NORMAL)
         return
 
-    # Build texts for embedding
-    texts = [f"{iss.get('title', '')}\n{iss.get('body', '')}"[:1000] for iss in issues]
+    # Stage 1a: dedupe (URL, then repo#number).
+    issues, removed = dedupe_issues(issues)
 
-    # Get embeddings and cluster
-    try:
-        embeddings = _get_embeddings(texts, model=embedding_model, base_url=embedding_base_url)
-    except Exception as e:
-        vprint(f"[yellow]Embedding generation failed — no clustering could be performed. Output will be empty.[/yellow]",
-               level=OutputLevel.NORMAL)
-        embeddings = []
+    # Stage 1b: group via the selected backend.
+    if backend == "embedding":
+        try:
+            groups, noise = _embedding_groups(
+                issues, model=cfg.embedding.model, base_url=cfg.embedding.base_url
+            )
+        except Exception as e:
+            vprint(f"[yellow]Embedding backend failed ({e}) — falling back to tfidf.[/yellow]",
+                   level=OutputLevel.NORMAL)
+            groups, noise = build_candidate_groups(issues)
+    else:
+        groups, noise = build_candidate_groups(issues)
 
-    pain_clusters_list = []
-    noise_count = 0
-    if embeddings:
-        clusterer = PainClusterer(min_cluster_size=3)
-        clusters = clusterer.fit(embeddings)
-        # Count noise points: all indices that were NOT assigned to any cluster
-        all_assigned = set()
-        for indices in clusters.values():
-            all_assigned.update(indices)
-        noise_count = len(embeddings) - len(all_assigned)
-        for cluster_id, indices in clusters.items():
-            cluster_issues = [issues[i] for i in indices]
-            severities = [
-                compute_severity(
-                    iss.get("comments", 0),
-                    iss.get("participants", 0),
-                    (iss.get("title", "") + " " + iss.get("body", ""))[:500],
-                    iss.get("reactions", 0),
-                )
-                for iss in cluster_issues
-            ]
-            repos = list(set(iss.get("repo", "") for iss in cluster_issues))
-            top = sorted(cluster_issues, key=lambda x: x.get("reactions", 0) + x.get("comments", 0), reverse=True)[:3]
+    noise_count = len(noise)
 
-            pain_clusters_list.append(PainCluster(
-                cluster_id=cluster_id,
-                title=f"Pain Cluster {cluster_id}",
-                severity=round(sum(severities) / len(severities), 2),
-                frequency=len(cluster_issues),
-                affected_repos=repos,
-                independent_repo_count=len(repos),
-                time_span_days=_compute_time_span_days(cluster_issues),
-                existing_workarounds=_extract_workarounds(cluster_issues),
-                top_issues=[
-                    IssueSummary(
-                        repo=iss.get("repo", ""),
-                        issue_number=iss.get("issue_number", 0),
-                        title=iss.get("title", "")[:100],
-                        pain_score=compute_severity(
-                            iss.get("comments", 0),
-                            iss.get("participants", 0),
-                            (iss.get("title", "") + " " + iss.get("body", ""))[:500],
-                            iss.get("reactions", 0),
-                        ),
-                    )
-                    for iss in top
-                ],
-            ))
-
-    # ── Build diagnostics ──────────────────────────────────────────
-    diag = Diagnostics()
-
-    # data_quality: sample size
     if len(issues) < 10:
         diag.data_quality.sample_size_warning = (
-            f"Only {len(issues)} issues analyzed — clustering results may be unstable. "
+            f"Only {len(issues)} issues analyzed — grouping results may be unstable. "
             f"Consider collecting issues from more repos."
         )
     if noise_count > len(issues) * 0.5:
         diag.data_quality.noise_sources.append(
-            f"{noise_count}/{len(issues)} issues classified as noise — "
-            f"topics may be too diverse for meaningful clustering"
+            f"{noise_count}/{len(issues)} issues left ungrouped — "
+            f"topics may be too diverse for meaningful grouping"
         )
-
-    # confidence: weak clusters
-    for c in pain_clusters_list:
-        if c.frequency == 1:
-            diag.confidence.low_confidence_items.append({
-                "item": f"Cluster {c.cluster_id}: {c.title}",
-                "confidence": 0.1,
-                "reason": "single-issue cluster — not a real pain pattern; noise that barely exceeded threshold",
-            })
-        if c.severity < 0.3:
-            diag.confidence.low_confidence_items.append({
-                "item": f"Cluster {c.cluster_id}: {c.title}",
-                "confidence": round(c.severity, 2),
-                "reason": f"severity={c.severity:.2f} — issues in this cluster have low engagement, may not represent real pain",
-            })
 
     result = SandboxResult(
         command="pain",
         domain=domain,
-        payload=PainPayload(
-            clusters=pain_clusters_list,
+        payload=CandidateGroupsPayload(
+            groups=groups,
+            noise=noise,
             issue_count=len(issues),
+            noise_count=noise_count,
             repos_analyzed=list(set(iss.get("repo", "") for iss in issues)),
         ).model_dump(),
-        stats={"clusters": len(pain_clusters_list), "issues_analyzed": len(issues),
-               "noise_count": noise_count, "algorithm_version": algorithm_version("pain"),
+        stats={"groups": len(groups), "issues_analyzed": len(issues),
+               "noise_count": noise_count, "removed_duplicates": removed,
+               "backend": backend, "algorithm_version": algorithm_version("pain"),
                **tel.to_stats()},
         diagnostics=diag,
     )
@@ -235,22 +179,18 @@ def pain(
     output_path = Path(output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(result.model_dump_json(indent=2))
-    vprint(f"[green]{len(pain_clusters_list)} pain clusters → {output}[/green]", level=OutputLevel.NORMAL)
+    vprint(f"[green]{len(groups)} candidate groups → {output}[/green]", level=OutputLevel.NORMAL)
     noise_info = f" ({noise_count} noise)" if noise_count else ""
     vprint(f"[dim]Done in {tel.elapsed_seconds}s, {len(issues)} issues analyzed{noise_info}[/dim]",
            level=OutputLevel.NORMAL)
 
-    # Behavior tracking + prediction snapshot
-    cluster_dicts = [c.model_dump() for c in pain_clusters_list]
     record_command(
         command="pain",
         domain=domain,
-        flags={"data": data},
+        flags={"data": data, "backend": backend},
         output_path=output,
         user_dna_used=False,
         elapsed_seconds=tel.elapsed_seconds,
         status="success",
     )
     record_output_retention(output)
-    save_pain_snapshot(domain=domain, clusters=cluster_dicts,
-                       issue_count=len(issues), noise_count=noise_count)

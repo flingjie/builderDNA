@@ -6,6 +6,7 @@ from observability.output import OutputLevel, set_output_level
 from cli.commands.collect import collect
 from cli.commands.trend import trend
 from cli.commands.pain import pain
+from cli.commands.pain_finalize import pain_finalize
 from cli.commands.opportunity import opportunity
 from cli.commands.report_cmd import report
 from cli.commands.config_cmd import config
@@ -51,6 +52,7 @@ def main(
 app.command(name="collect")(collect)
 app.command(name="trend")(trend)
 app.command(name="pain")(pain)
+app.command(name="pain-finalize")(pain_finalize)
 app.command(name="opportunity")(opportunity)
 app.command(name="report")(report)
 app.command(name="config")(config)
