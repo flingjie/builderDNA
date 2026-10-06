@@ -42,6 +42,12 @@ ROUTING_EDGES = {
         ("twitter-learning", "reddit-opportunity routes X learning to twitter-learning"),
         ("concept-radar", "reddit-opportunity routes cross-source to concept-radar"),
     ],
+    "repo-evolution-learning": [
+        ("repo-trend", "repo-evolution-learning routes GitHub-only discovery to repo-trend"),
+        ("builderdna", "repo-evolution-learning routes developer DNA to builderdna"),
+        ("concept-radar", "repo-evolution-learning routes cross-source to concept-radar"),
+        ("twitter-learning", "repo-evolution-learning routes X learning to twitter-learning"),
+    ],
     "observability": [
         ("optimize", "observability routes improvement proposals to optimize"),
     ],

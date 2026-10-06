@@ -52,7 +52,7 @@ class OutputConfig(BaseModel):
     """Output configuration."""
 
     dir: str = Field(default="./output", description="Output directory")
-    formats: list[Literal["markdown", "json"]] = Field(
+    formats: list[Literal["markdown", "json", "html"]] = Field(
         default=["markdown", "json"], description="Output formats to generate"
     )
 
@@ -94,6 +94,38 @@ class VendorConfig(BaseModel):
     overseas: list[str] = Field(default_factory=list, description="Overseas vendor GitHub orgs")
 
 
+class RepoLearningLimits(BaseModel):
+    """Collection and analysis budgets for repo-evolution-learning.
+
+    These are initial budgets, not targets: when material runs short the report
+    records the gap rather than padding to reach the number.
+    """
+
+    candidate_episodes: int = Field(default=3, ge=1, description="Max candidate episodes to surface")
+    selected_episodes: int = Field(default=1, ge=1, description="Max episodes selected for analysis")
+    search_results: int = Field(default=60, ge=0, description="Max whole-web search results to record")
+    full_contents: int = Field(default=12, ge=0, description="Max article/discussion bodies to fetch in full")
+    comments_per_content: int = Field(default=30, ge=0, description="Max comments per fetched content")
+    followup_days: int = Field(default=30, ge=0, description="Observation window for follow-up issues/PRs")
+
+
+class RepoLearningPromotion(BaseModel):
+    """Promotion-content research configuration."""
+
+    enabled: bool = Field(default=True, description="Whether to search promotion content")
+    platforms: str = Field(default="auto", description="Platforms to search (auto or explicit list)")
+    languages: list[str] = Field(default_factory=lambda: ["en", "zh"], description="Search languages")
+    include_comments: bool = Field(default=True, description="Whether to fetch discussion comments")
+
+
+class RepoLearningConfig(BaseModel):
+    """repo-evolution-learning configuration."""
+
+    limits: RepoLearningLimits = Field(default_factory=RepoLearningLimits)
+    promotion_research: RepoLearningPromotion = Field(default_factory=RepoLearningPromotion)
+    output_language: str = Field(default="zh-CN", description="Report language code")
+
+
 class Config(BaseModel):
     """Root configuration for BuilderDNA."""
 
@@ -107,6 +139,7 @@ class Config(BaseModel):
     collect: CollectConfig = Field(default_factory=CollectConfig)
     vendors: VendorConfig = Field(default_factory=VendorConfig)
     opportunity: OpportunityConfig = Field(default_factory=OpportunityConfig)
+    repo_learning: RepoLearningConfig = Field(default_factory=RepoLearningConfig)
 
 
 _ENV_VAR_RE = re.compile(r"\$\{(\w+)(?::-([^}]*))?\}")

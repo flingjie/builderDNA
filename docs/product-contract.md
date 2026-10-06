@@ -103,6 +103,7 @@ risk_tolerance
 | 只从 Reddit 发现痛点 | `reddit-opportunity` |
 | 跨源验证概念 | `concept-radar` |
 | 运行完整可恢复生命周期 | `concept-radar-loop` |
+| 重建开发迭代 + 传播/反馈分析 + 交互式 HTML 报告 | `repo-evolution-learning` |
 | 检查历史预测与参数 | `observability` |
 
 ### 4.2 辅助认知工具

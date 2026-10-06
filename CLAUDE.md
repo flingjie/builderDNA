@@ -130,6 +130,7 @@ Skills are deployed under `.claude/skills/` (`*-workspace/` dirs, when present, 
 | `concept-radar-loop` | Resumable, deterministic radar-cycle orchestrator (start → import → decide → finalize) | "run the concept radar loop", "继续跑概念雷达", "resume my radar run" |
 | `repo-trend` | Discover trending repos via GitHub API search, 3-tier eval | "find trending X repos", "evaluate this repo", "check my watches" |
 | `repo-awesome` | Mine awesome-* lists for curated repo discovery | "mine awesome lists for X", "what do awesome lists recommend" |
+| `repo-evolution-learning` | Reconstruct a repo/PR/feature's development episode + its public promotion and feedback, rendered as an interactive HTML learning report | "分析这个 PR 的设计取舍", "复盘这个仓库的迭代", "这个项目怎么宣传的", "repo evolution learning", "interactive HTML learning report" |
 | `reddit-opportunity` | Discover product opportunities + pain points from a Reddit community (no product yet): RSS → Subreddit Profile → recurring problems → product concept | "find problems people will pay to solve", "what should I build from r/...", "从 Reddit 找商机" |
 | `value-discovery` | Extract the user's BuilderInterestProfile (domains, problem preferences, build constraints, learning goals) | "value discovery", "what do I value", "help me understand my preferences" |
 | `observability` | Run self-iteration diagnostics (mismatch, snapshot, hypothesis pruning) | "check my predictions", "validate assumptions", "任何东西变了吗" |

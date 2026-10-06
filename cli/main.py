@@ -17,6 +17,7 @@ from cli.commands.radar_cycle_cmd import radar_cycle
 from cli.commands.dna import dna
 from cli.commands.investigate import investigate
 from cli.commands.builders import builders
+from repo_learning.cli import repo_learning
 
 
 app = typer.Typer(
@@ -63,6 +64,7 @@ app.add_typer(radar_app, name="radar")
 app.add_typer(radar_cycle, name="radar-cycle")
 app.add_typer(investigate, name="investigate")
 app.add_typer(builders, name="builders")
+app.add_typer(repo_learning, name="repo-learning")
 
 if __name__ == "__main__":
     app()

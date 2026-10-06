@@ -138,7 +138,8 @@ class GitHubClient:
         return all_items
 
     async def _request(
-        self, method: str, url: str, params: dict[str, str] | None = None
+        self, method: str, url: str, params: dict[str, str] | None = None,
+        headers: dict[str, str] | None = None,
     ) -> httpx.Response | None:
         """Make an HTTP request with caching, rate limiting, and retry.
 
@@ -150,12 +151,16 @@ class GitHubClient:
         5. On 429/403 rate limit → wait and retry
         6. On 5xx/network → exponential backoff
 
+        ``headers`` are merged into every request (including the ETag
+        conditional) — used e.g. for ``Accept: application/vnd.github.diff``.
+
         Returns None for 404 (skip this resource).
         Raises httpx.HTTPStatusError on 401.
         """
         tel = self._telemetry
         skip_cache = url in self._force_refresh or self._disable_cache
         console = get_console()
+        req_headers = dict(headers or {})
 
         # Try cache first with conditional request
         if not skip_cache:
@@ -163,9 +168,9 @@ class GitHubClient:
             if etag:
                 async with self._semaphore:
                     await self._wait_if_needed()
-                    req_headers = {"If-None-Match": etag}
+                    cond_headers = {"If-None-Match": etag, **req_headers}
                     resp = await self._client.request(
-                        method, url, params=params, headers=req_headers,
+                        method, url, params=params, headers=cond_headers,
                     )
 
                 self.rate_limiter.update(dict(resp.headers))
@@ -200,7 +205,9 @@ class GitHubClient:
                 await self._wait_if_needed()
 
                 try:
-                    resp = await self._client.request(method, url, params=params)
+                    resp = await self._client.request(
+                        method, url, params=params, headers=req_headers,
+                    )
 
                     # Update rate limit state from response
                     self.rate_limiter.update(dict(resp.headers))

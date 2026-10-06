@@ -136,3 +136,18 @@ opportunity:
     frequency: 0.2             # demand weight for pain frequency
   gap_threshold_high: 1.5      # gap > this → Build or Niche
   market_size_threshold: 5.0   # market > this → Build or Monitor
+
+repo_learning:
+  limits:
+    candidate_episodes: 3
+    selected_episodes: 1
+    search_results: 60
+    full_contents: 12
+    comments_per_content: 30
+    followup_days: 30
+  promotion_research:
+    enabled: true
+    platforms: auto
+    languages: [en, zh]
+    include_comments: true
+  output_language: zh-CN
