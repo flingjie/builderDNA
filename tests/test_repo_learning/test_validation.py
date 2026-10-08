@@ -4,6 +4,7 @@ from repo_learning import workspace
 from repo_learning.models import (
     Analysis,
     Episode,
+    Narrative,
     RepoIdentity,
     SourceKind,
     SourceRecord,
@@ -13,11 +14,26 @@ from repo_learning.request import RequestSpec
 from repo_learning.validation import validate
 
 
-def _base_analysis(source_id="s1", *, canonical_url="https://github.com/o/r", outcome=""):
+def _narrative(**overrides):
+    fields = dict(
+        headline="h",
+        problem="p",
+        root_cause="r",
+        what_changed="w",
+        evidence="e",
+        lesson="l",
+        small_experiment="s",
+    )
+    fields.update(overrides)
+    return Narrative(**fields)
+
+
+def _base_analysis(source_id="s1", *, canonical_url="https://github.com/o/r", outcome="", narrative=None):
     ref = SourceRef(source_id=source_id)
     return Analysis(
         repo_identity=RepoIdentity(owner="o", name="r", canonical_url=canonical_url),
         episode=Episode(id="e", title="t", problem="p", outcome=outcome, source_refs=[ref]),
+        narrative=narrative or _narrative(),
     )
 
 
@@ -77,3 +93,21 @@ def test_missing_analysis(tmp_path):
     result = validate(RequestSpec(repo="o/r"), tmp_path)
     assert result["valid"] is False
     assert "not found" in result["errors"][0]["message"]
+
+
+def test_guess_question_without_answer_warns(tmp_path):
+    src = SourceRecord(id="s1", kind=SourceKind.GITHUB_PR)
+    _write(tmp_path, _base_analysis("s1", narrative=_narrative(guess_question="q?")), [src])
+    result = validate(RequestSpec(repo="o/r"), tmp_path)
+    assert result["valid"] is True
+    assert any(w["field"] == "narrative.guess_answer" for w in result["warnings"])
+
+
+def test_narrative_source_ref_is_checked(tmp_path):
+    narrative = _narrative()
+    narrative.source_refs = [SourceRef(source_id="missing2")]
+    # episode.source_refs points at "s1"; narrative.source_refs at "missing2". Neither is collected.
+    _write(tmp_path, _base_analysis("s1", narrative=narrative), [])
+    result = validate(RequestSpec(repo="o/r"), tmp_path)
+    assert result["valid"] is False
+    assert result["counts"]["unresolved_refs"] == 2

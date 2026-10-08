@@ -35,9 +35,9 @@
 
 ```json
 {
-  "id": "google:2026-10-06T16:59:00+00:00:ab12cd34ef56",
+  "id": "tavily:2026-10-06T16:59:00+00:00:ab12cd34ef56",
   "query": "\"项目名\" launch",
-  "engine": "google",
+  "engine": "tavily",
   "searched_at": "2026-10-06T16:59:00+00:00",
   "period": "",
   "results": [{"title": "…", "url": "https://…", "snippet": "…"}],
@@ -46,7 +46,8 @@
 ```
 
 - `id` 建议形如 `{engine}:{searched_at}:{sha1(query)[:12]}`。
-- 搜索引擎不可用时：写一条 `coverage_notes=["engine unavailable: …"]` 且 `results=[]`，不要用仓库搜索冒充全网覆盖。
+- 本 skill 使用 Tavily，`engine` 写 `tavily`；`results[].snippet` 使用 Tavily 的 `content` 摘要。
+- Tavily 不可用时：写一条 `coverage_notes=["engine unavailable: …"]` 且 `results=[]`，不要用仓库搜索冒充全网覆盖。
 
 ## analysis.json（Analysis 根对象）
 
@@ -74,6 +75,19 @@
     "outcome": "",
     "source_refs": []
   },
+  "narrative": {
+    "headline": "…",
+    "problem": "…",
+    "root_cause": "…",
+    "what_changed": "…",
+    "tradeoff": "",
+    "evidence": "…",
+    "lesson": "…",
+    "small_experiment": "…",
+    "guess_question": "",
+    "guess_answer": "",
+    "source_refs": []
+  },
   "claims": [],
   "promotion_contents": [],
   "feedback_links": [],
@@ -98,6 +112,30 @@
 - `evidence_status`：`sourced` `inferred` `unknown`
 - `sourced` 必须带 ≥1 个 `source_refs`；`sourced` 只表示材料直接支持该陈述。作者宣称性能提升时写「作者称」，不要改写为已验证结果。
 
+### Narrative（读者视图的 5 问叙事，必填）
+
+```json
+{
+  "headline": "Archify：生成失败，为什么检查仍然通过？",
+  "problem": "第一次生成成功，目录里留下一个 HTML 文件。第二次向同一路径生成失败，但旧文件仍然存在。检查程序检查了旧文件，随后报告通过。",
+  "root_cause": "检查程序能判断文件是否合格，却无法确认它是否来自本次生成。",
+  "what_changed": "作者让系统记录交付状态。生成失败后，后续检查会读到失败记录，阻止旧文件被当成新结果。",
+  "tradeoff": "自动清理遗留锁可能误删其他进程正在使用的锁。最终方案保留锁，要求人工确认后恢复。代价是恢复多了一步操作。",
+  "evidence": "问题报告人验证了原故障场景，相关回归测试和跨平台 CI 通过。材料尚未证明长期使用效果。",
+  "lesson": "当多个步骤通过文件传递结果时，需要确认文件属于哪次任务。文件存在，不足以证明当前任务成功。",
+  "small_experiment": "先成功生成，再向相同路径故意生成失败。检查下一步会不会继续使用旧结果。",
+  "guess_question": "第二次生成失败，但旧文件还在。下一步检查通过，能证明本次任务成功吗？",
+  "guess_answer": "不能。旧文件存在，不能证明本次任务成功。",
+  "source_refs": []
+}
+```
+
+- `headline` / `problem` / `root_cause` / `what_changed` / `evidence` / `lesson` / `small_experiment` 必填（`min_length=1`）。
+- `tradeoff` 可空；无次要取舍时留空。
+- `guess_question` / `guess_answer` 可空，但应成对出现（`validate` 对单边出现给 warning）。
+- 正文是「重新选择 + 重写」后的读者视图，不是原始 Episode 字段的拼接；原始 `alternatives` / `decisions` / `validation` / `implementation_changes` 保留完整，折叠进「展开证据」。
+- 写作规则见 `references/writing-rules.md`；正文约 800–1200 中文字，只保留 1 主要教训 + 1 次要取舍 + 1 小实验。
+
 ### PromotionContent
 
 ```json
@@ -107,11 +145,13 @@
   "platform": "hackernews",
   "actor_type": "author",
   "repo_match": "confirmed",
+  "featured": false,
   "content_type": "launch",
   "audience": "…",
   "hook": "…",
   "promise": "…",
   "proof": "…",
+  "borrowable": "…",
   "call_to_action": "…"
 }
 ```
@@ -119,6 +159,8 @@
 - `platform`：`x` `hackernews` `reddit` `linkedin` `producthunt` `v2ex` `juejin` `zhihu` `wechat` `xiaohongshu` `dev` `medium` `blog` `other`
 - `actor_type`：`author` `contributor` `third_party` `user` `unknown`
 - `repo_match`：`confirmed` `probable` `rejected`
+- `featured`：`true` 表示进入学传播正文的两篇有差异内容；其余保留完整但折叠进证据。
+- `borrowable`：哪句表达/框架值得借用、为什么（featured 内容必填，其余可空）。
 
 ### FeedbackLink
 

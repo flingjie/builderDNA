@@ -39,6 +39,7 @@ __all__ = [
     "SearchRecord",
     "Claim",
     "Episode",
+    "Narrative",
     "PromotionContent",
     "FeedbackLink",
     "LearningCard",
@@ -287,6 +288,52 @@ class Episode(BaseModel):
     )
 
 
+# ── Narrative (reader-facing distilled view) ──
+
+
+class Narrative(BaseModel):
+    """The compressed reader-facing story of one episode.
+
+    The report leads with this: five questions answered in plain language. The
+    full material stays in :class:`Episode` and :class:`LearningCard` and is
+    folded into the evidence sections rather than shown up front.
+    """
+
+    headline: str = Field(
+        min_length=1, description="Short title framing the episode as one specific fix"
+    )
+    problem: str = Field(
+        min_length=1, description="Q1: the observable behaviour that went wrong"
+    )
+    root_cause: str = Field(
+        min_length=1, description="Q2: why it happened (the mechanism)"
+    )
+    what_changed: str = Field(
+        min_length=1, description="Q3a: what the author changed"
+    )
+    tradeoff: str = Field(
+        default="", description="Q3b: the cost / secondary tradeoff accepted"
+    )
+    evidence: str = Field(
+        min_length=1, description="Q4: what evidence supports the change, with its boundary"
+    )
+    lesson: str = Field(
+        min_length=1, description="Q5a: the transferable condition (when it applies)"
+    )
+    small_experiment: str = Field(
+        min_length=1, description="Q5b: a one-line bounded experiment to verify"
+    )
+    guess_question: str = Field(
+        default="", description="Guess-before-reveal question testing reader understanding"
+    )
+    guess_answer: str = Field(
+        default="", description="Answer to guess_question"
+    )
+    source_refs: list[SourceRef] = Field(
+        default_factory=list, description="Sources backing the narrative"
+    )
+
+
 # ── Promotion / feedback ──
 
 
@@ -298,11 +345,17 @@ class PromotionContent(BaseModel):
     platform: Platform = Field(default=Platform.OTHER, description="Platform it appeared on")
     actor_type: ActorType = Field(default=ActorType.UNKNOWN, description="Who authored it")
     repo_match: RepoMatch = Field(default=RepoMatch.CONFIRMED, description="Identity match confidence")
+    featured: bool = Field(
+        default=False, description="Feature this piece in the 学传播 path (2 contrasting pieces)"
+    )
     content_type: str = Field(default="", description="Launch / release / tutorial / review / …")
     audience: str = Field(default="", description="Target audience")
     hook: str = Field(default="", description="Opening hook / framing")
     promise: str = Field(default="", description="Core promise to the reader")
     proof: str = Field(default="", description="Demonstration or evidence offered")
+    borrowable: str = Field(
+        default="", description="What expression / framing is worth borrowing"
+    )
     call_to_action: str = Field(default="", description="What it asks the reader to do")
 
 
@@ -371,6 +424,7 @@ class Analysis(BaseModel):
     schema_version: Literal[1] = Field(default=1, description="Analysis schema version")
     repo_identity: RepoIdentity = Field(description="Confirmed repo identity")
     episode: Episode = Field(description="The reconstructed episode (single, P0–P5)")
+    narrative: Narrative = Field(description="The compressed reader-facing 5-question story")
     claims: list[Claim] = Field(
         default_factory=list, description="Supplementary claims outside the episode"
     )

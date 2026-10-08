@@ -46,23 +46,34 @@
     padding: 10px 16px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
   }
   header.topbar h1 { font-size: 1.05rem; margin: 0; font-weight: 600; }
+  .top-group { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
   .filter-group { display: flex; gap: 6px; margin-left: auto; align-items: center; flex-wrap: wrap; }
-  .filter-btn {
+  .tab-btn, .filter-btn {
     font: inherit; font-size: .85rem; border: 1px solid var(--border);
     background: var(--panel); color: var(--text); border-radius: 999px;
-    padding: 3px 10px; cursor: pointer;
+    padding: 3px 12px; cursor: pointer;
   }
+  .tab-btn { font-weight: 600; }
+  .tab-btn[aria-pressed="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
   .filter-btn[aria-pressed="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
-  .filter-btn:focus-visible, button:focus-visible, a:focus-visible {
+  .tab-btn:focus-visible, .filter-btn:focus-visible, button:focus-visible, a:focus-visible {
     outline: 2px solid var(--focus); outline-offset: 2px;
   }
-  main { padding: 16px; max-width: 980px; margin: 0 auto; }
+  main { padding: 16px; max-width: 820px; margin: 0 auto; }
   section.module {
     background: var(--panel); border: 1px solid var(--border);
-    border-radius: 10px; padding: 16px; margin-bottom: 16px;
+    border-radius: 10px; padding: 20px; margin-bottom: 16px;
   }
   section.module h2 { margin: 0 0 12px; font-size: 1.05rem; }
-  section.module h3 { margin: 14px 0 6px; font-size: .95rem; }
+  .narrative-title { font-size: 1.35rem; line-height: 1.35; margin: 0 0 8px; font-weight: 700; }
+  .scope-line { color: var(--muted); font-size: .88rem; margin: 0 0 18px; }
+  .q-block { margin: 0 0 18px; }
+  .q-label { font-weight: 600; color: var(--accent); margin: 0 0 4px; }
+  .q-block p { margin: 0; }
+  .q-block .tradeoff { margin-top: 6px; padding-left: 10px; border-left: 2px solid var(--border); color: var(--muted); }
+  .guess { border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin: 0 0 18px; }
+  .guess summary { cursor: pointer; font-weight: 600; }
+  .guess .answer { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border); }
   .muted { color: var(--muted); font-size: .9rem; }
   .badge {
     display: inline-block; font-size: .72rem; border-radius: 4px;
@@ -87,10 +98,8 @@
   }
   table { border-collapse: collapse; width: 100%; font-size: .9rem; }
   th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
-  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  @media (max-width: 720px) { .compare { grid-template-columns: 1fr; } }
-  .cardbox { border: 1px solid var(--border); border-radius: 8px; padding: 10px; }
-  .timeline-item { padding: 8px 0; border-bottom: 1px dashed var(--border); }
+  .cardbox { border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin: 0 0 12px; }
+  .cardbox .q-block { margin-bottom: 10px; }
   .relation-explicit { color: var(--sourced); font-weight: 600; }
   .relation-possible { color: var(--inferred); font-weight: 600; }
   .relation-unconfirmed { color: var(--unknown); font-weight: 600; }
@@ -117,6 +126,10 @@
 <body>
 <header class="topbar">
   <h1 id="report-title">repo-evolution-learning</h1>
+  <div class="top-group" role="group" aria-label="阅读路径">
+    <button class="tab-btn" data-tab="design" aria-pressed="true">学设计</button>
+    <button class="tab-btn" data-tab="promotion" aria-pressed="false">学传播</button>
+  </div>
   <div class="filter-group" role="group" aria-label="事实/推断/未知筛选">
     <span class="muted">筛选:</span>
     <button class="filter-btn" data-filter="sourced" aria-pressed="false">事实</button>
@@ -127,36 +140,8 @@
   </div>
 </header>
 <main>
-  <section class="module" id="module-overview">
-    <h2>项目概览</h2>
-    <div id="overview"></div>
-    <details><summary>来源与范围</summary><div id="overview-sources"></div></details>
-  </section>
-
-  <section class="module" id="module-episode">
-    <h2>开发迭代</h2>
-    <div id="episode"></div>
-  </section>
-
-  <section class="module" id="module-promotion">
-    <h2>传播平台</h2>
-    <div id="promotion"></div>
-  </section>
-
-  <section class="module" id="module-article">
-    <h2>文章分析</h2>
-    <div id="article"></div>
-  </section>
-
-  <section class="module" id="module-timeline">
-    <h2>统一时间线</h2>
-    <div id="timeline"></div>
-  </section>
-
-  <section class="module" id="module-learning">
-    <h2>学习与迁移</h2>
-    <div id="learning"></div>
-  </section>
+  <section class="module" id="panel-design"></section>
+  <section class="module ev-hidden" id="panel-promotion"></section>
 
   <section class="module" id="module-notes">
     <h2>我的笔记</h2>
@@ -179,11 +164,10 @@
   var request = data.request || {};
   var sourcesIndex = data.sources_index || {};
   var episode = analysis.episode || {};
+  var narrative = analysis.narrative || {};
   var identity = analysis.repo_identity || {};
   var promotionContents = analysis.promotion_contents || [];
   var feedbackLinks = analysis.feedback_links || [];
-  var learningCards = analysis.learning_cards || [];
-  var claims = analysis.claims || [];
   var coverageNotes = analysis.coverage_notes || [];
   var platformStats = analysis.platform_stats || [];
 
@@ -204,6 +188,7 @@
     return null;
   }
   function evidenceClass(status) { return status || "unknown"; }
+  function para(text, cls) { return el("p", cls ? { class: cls } : null, text || ""); }
 
   function renderSourceRef(ref) {
     var src = sourcesIndex[ref.source_id];
@@ -227,8 +212,7 @@
   function renderClaim(claim) {
     var status = claim.evidence_status || "unknown";
     var div = el("div", { class: "claim", "data-evidence": status });
-    var text = el("span", {}, claim.text || "");
-    div.appendChild(text);
+    div.appendChild(el("span", {}, claim.text || ""));
     div.appendChild(el("span", { class: "badge " + evidenceClass(status) }, status));
     (claim.source_refs || []).forEach(function (r) { div.appendChild(renderSourceRef(r)); });
     (claim.limitations || []).forEach(function (l) {
@@ -237,59 +221,66 @@
     return div;
   }
 
-  // ── Overview ──
-  (function renderOverview() {
-    var box = document.getElementById("overview");
+  // One question block with a label and one or more body paragraphs.
+  function qBlock(label, nodes) {
+    var d = el("div", { class: "q-block" });
+    d.appendChild(el("div", { class: "q-label" }, label));
+    (Array.isArray(nodes) ? nodes : [nodes]).forEach(function (n) { d.appendChild(n); });
+    return d;
+  }
+
+  // ── 学设计 ──
+  (function renderDesign() {
+    var box = document.getElementById("panel-design");
     document.getElementById("report-title").textContent =
       identity.name ? ("repo-evolution-learning · " + identity.owner + "/" + identity.name) : "repo-evolution-learning";
-    box.appendChild(el("p", {}, request.learning_goal || "学习开发取舍与传播方法"));
-    box.appendChild(el("p", { class: "muted" }, "范围: " + (request.repo || "") +
-      (request.entry_url ? " · 入口 " + request.entry_url : "")));
-    if (coverageNotes.length) {
-      box.appendChild(el("h3", {}, "缺失材料"));
-      var ul = el("ul");
-      coverageNotes.forEach(function (n) { ul.appendChild(el("li", {}, n)); });
-      box.appendChild(ul);
-    } else {
-      box.appendChild(el("p", { class: "muted" }, "没有记录的缺失材料。"));
-    }
-    var src = document.getElementById("overview-sources");
-    src.appendChild(el("p", { class: "muted" },
-      "来源数量: " + Object.keys(sourcesIndex).length));
-    (identity.identity_evidence || []).forEach(function (r) {
-      src.appendChild(renderSourceRef(r));
-    });
-    if (manifest.errors && manifest.errors.length) {
-      src.appendChild(el("h3", {}, "运行错误"));
-      var eu = el("ul");
-      manifest.errors.forEach(function (e) { eu.appendChild(el("li", {}, e)); });
-      src.appendChild(eu);
-    }
-    if (manifest.observation_cutoff) {
-      src.appendChild(el("p", { class: "muted" }, "观察截止: " + manifest.observation_cutoff));
-    }
-  })();
 
-  // ── Episode ──
-  (function renderEpisode() {
-    var box = document.getElementById("episode");
-    box.appendChild(el("h3", {}, episode.title || ""));
-    box.appendChild(el("p", {}, "问题: " + (episode.problem || "")));
+    box.appendChild(el("h1", { class: "narrative-title" }, narrative.headline || episode.title || ""));
+
+    var scopeParts = ["本次只复盘一个迭代，不是整个项目的发展史"];
+    if (episode.id) scopeParts.push("迭代 " + episode.id);
+    if (request.entry_url) scopeParts.push("入口 " + request.entry_url);
+    box.appendChild(el("p", { class: "scope-line" }, scopeParts.join(" · ")));
+
+    box.appendChild(qBlock("出了什么问题？", para(narrative.problem)));
+    box.appendChild(qBlock("根本原因是什么？", para(narrative.root_cause)));
+
+    var changeNodes = [para(narrative.what_changed)];
+    if (narrative.tradeoff) changeNodes.push(para("代价：" + narrative.tradeoff, "tradeoff"));
+    box.appendChild(qBlock("作者怎么修？", changeNodes));
+
+    box.appendChild(qBlock("效果如何？", para(narrative.evidence)));
+
+    var lessonNodes = [para(narrative.lesson)];
+    if (narrative.small_experiment) lessonNodes.push(para("小实验：" + narrative.small_experiment));
+    box.appendChild(qBlock("我能学到什么？", lessonNodes));
+
+    if (narrative.guess_question) {
+      var g = el("details", { class: "guess" });
+      g.appendChild(el("summary", {}, "先猜再看：" + narrative.guess_question));
+      g.appendChild(el("div", { class: "answer" }, narrative.guess_answer || ""));
+      box.appendChild(g);
+    }
+
+    // 展开证据：完整备选 / 决策 / 实现调整 / 验证 / 来源 / 缺失材料
+    var ev = el("details");
+    ev.appendChild(el("summary", {}, "展开证据（完整方案、测试明细与来源）"));
+
     if (episode.constraints && episode.constraints.length) {
-      box.appendChild(el("h3", {}, "约束"));
-      var ul = el("ul");
-      episode.constraints.forEach(function (c) { ul.appendChild(el("li", {}, c)); });
-      box.appendChild(ul);
+      ev.appendChild(el("h3", {}, "约束"));
+      var ulC = el("ul");
+      episode.constraints.forEach(function (c) { ulC.appendChild(el("li", {}, c)); });
+      ev.appendChild(ulC);
     }
     if (episode.alternatives && episode.alternatives.length) {
-      box.appendChild(el("h3", {}, "备选方案"));
-      episode.alternatives.forEach(function (c) { box.appendChild(renderClaim(c)); });
+      ev.appendChild(el("h3", {}, "备选方案"));
+      episode.alternatives.forEach(function (c) { ev.appendChild(renderClaim(c)); });
     }
     if (episode.decisions && episode.decisions.length) {
-      box.appendChild(el("h3", {}, "决策"));
+      ev.appendChild(el("h3", {}, "决策"));
       var wrap = el("div", { id: "episode-decisions" });
       episode.decisions.forEach(function (c) { wrap.appendChild(renderClaim(c)); });
-      box.appendChild(wrap);
+      ev.appendChild(wrap);
       if (request.mode === "guided") {
         var gate = el("details");
         gate.appendChild(el("summary", {}, "先写下你的判断，再展开作者的决策（学习隐藏，非保密）"));
@@ -299,35 +290,67 @@
         ta.addEventListener("input", function () {
           if (ta.value.trim().length > 0) wrap.removeAttribute("hidden");
         });
-        box.appendChild(gate);
+        ev.appendChild(gate);
       }
     }
     if (episode.implementation_changes && episode.implementation_changes.length) {
-      box.appendChild(el("h3", {}, "实现调整"));
+      ev.appendChild(el("h3", {}, "实现调整"));
       var ul2 = el("ul");
       episode.implementation_changes.forEach(function (c) { ul2.appendChild(el("li", {}, c)); });
-      box.appendChild(ul2);
+      ev.appendChild(ul2);
     }
     if (episode.validation && episode.validation.length) {
-      box.appendChild(el("h3", {}, "验证与结果"));
-      episode.validation.forEach(function (c) { box.appendChild(renderClaim(c)); });
+      ev.appendChild(el("h3", {}, "验证与结果"));
+      episode.validation.forEach(function (c) { ev.appendChild(renderClaim(c)); });
     }
     if (episode.outcome) {
-      box.appendChild(el("p", {}, "结果: " + episode.outcome));
+      ev.appendChild(el("p", {}, "结果: " + episode.outcome));
     }
-    if (episode.source_refs && episode.source_refs.length) {
-      box.appendChild(el("h3", {}, "来源"));
-      episode.source_refs.forEach(function (r) { box.appendChild(renderSourceRef(r)); });
+    var srcRefs = (narrative.source_refs || []).concat(episode.source_refs || []);
+    if (srcRefs.length) {
+      ev.appendChild(el("h3", {}, "来源"));
+      srcRefs.forEach(function (r) { ev.appendChild(renderSourceRef(r)); });
     }
+    if (coverageNotes.length) {
+      ev.appendChild(el("h3", {}, "缺失材料"));
+      var ulM = el("ul");
+      coverageNotes.forEach(function (n) { ulM.appendChild(el("li", {}, n)); });
+      ev.appendChild(ulM);
+    }
+    box.appendChild(ev);
   })();
 
-  // ── Promotion platforms ──
+  // ── 学传播 ──
   (function renderPromotion() {
-    var box = document.getElementById("promotion");
-    if (!promotionContents.length) {
+    var box = document.getElementById("panel-promotion");
+    var featured = promotionContents.filter(function (p) { return p.featured; });
+    if (featured.length < 2) featured = promotionContents.slice(0, 2);
+
+    if (!featured.length) {
       box.appendChild(el("p", { class: "empty" }, "没有找到传播内容。"));
       return;
     }
+
+    featured.forEach(function (p) {
+      var card = el("div", { class: "cardbox" });
+      card.appendChild(el("h3", {}, (p.platform || "other") + " · " + (p.content_type || "content")));
+      var src = sourcesIndex[p.source_id];
+      if (src) {
+        var href = safeHref(src.url || src.canonical_url);
+        if (href) card.appendChild(el("a", { class: "ref", href: href, target: "_blank", rel: "noopener noreferrer" }, "原文链接"));
+      }
+      var introNodes = [para((p.audience ? "读者：" + p.audience : ""))];
+      if (p.hook) introNodes.push(para("开场：" + p.hook));
+      if (p.promise) introNodes.push(para("承诺：" + p.promise));
+      card.appendChild(qBlock("别人怎样介绍它？", introNodes));
+      card.appendChild(qBlock("用了什么证据？", para(p.proof || "未提供证据")));
+      card.appendChild(qBlock("哪些表达值得借用？", para(p.borrowable || "未标注可借鉴表达")));
+      box.appendChild(card);
+    });
+
+    var ev = el("details");
+    ev.appendChild(el("summary", {}, "展开证据（全部传播内容与反馈关联）"));
+
     if (platformStats.length) {
       var table = el("table");
       var thead = el("thead");
@@ -341,116 +364,37 @@
         ]));
       });
       table.appendChild(tbody);
-      box.appendChild(table);
+      ev.appendChild(el("h3", {}, "平台分布"));
+      ev.appendChild(table);
     }
-    var list = el("div");
-    promotionContents.forEach(function (p) {
-      var item = el("details", { class: "cardbox" });
-      var summary = el("summary", {}, (p.platform || "other") + " · " + (p.content_type || "content"));
-      item.appendChild(summary);
-      var body = el("div");
-      var src = sourcesIndex[p.source_id];
-      if (src) {
-        var href = safeHref(src.url || src.canonical_url);
-        if (href) body.appendChild(el("a", { class: "ref", href: href, target: "_blank", rel: "noopener noreferrer" }, "原文链接"));
-      }
-      var fields = [["目标读者", p.audience], ["开场", p.hook], ["承诺", p.promise],
-        ["证据", p.proof], ["行动要求", p.call_to_action]];
-      fields.forEach(function (f) {
-        if (f[1]) body.appendChild(el("p", {}, f[0] + ": " + f[1]));
-      });
-      body.appendChild(el("p", { class: "muted" },
-        "作者类型: " + (p.actor_type || "unknown") + " · 身份匹配: " + (p.repo_match || "confirmed")));
-      item.appendChild(body);
-      list.appendChild(item);
-    });
-    box.appendChild(list);
-  })();
 
-  // ── Article analysis + compare ──
-  (function renderArticle() {
-    var box = document.getElementById("article");
-    var articles = promotionContents.filter(function (p) {
-      var src = sourcesIndex[p.source_id];
-      return src && src.body;
-    });
-    if (articles.length < 2) {
-      box.appendChild(el("p", { class: "muted" }, "少于两篇完整文章，无法对比。"));
-      return;
+    if (promotionContents.length) {
+      ev.appendChild(el("h3", {}, "全部传播内容"));
+      var list = el("div");
+      promotionContents.forEach(function (p) {
+        var item = el("details", { class: "cardbox" });
+        item.appendChild(el("summary", {}, (p.platform || "other") + " · " + (p.content_type || "content")));
+        var body = el("div");
+        var src = sourcesIndex[p.source_id];
+        if (src) {
+          var href = safeHref(src.url || src.canonical_url);
+          if (href) body.appendChild(el("a", { class: "ref", href: href, target: "_blank", rel: "noopener noreferrer" }, "原文链接"));
+        }
+        var fields = [["目标读者", p.audience], ["开场", p.hook], ["承诺", p.promise],
+          ["证据", p.proof], ["可借鉴", p.borrowable], ["行动要求", p.call_to_action]];
+        fields.forEach(function (f) {
+          if (f[1]) body.appendChild(el("p", {}, f[0] + ": " + f[1]));
+        });
+        body.appendChild(el("p", { class: "muted" },
+          "作者类型: " + (p.actor_type || "unknown") + " · 身份匹配: " + (p.repo_match || "confirmed")));
+        item.appendChild(body);
+        list.appendChild(item);
+      });
+      ev.appendChild(list);
     }
-    var picker = el("div", { class: "toolbar" });
-    var leftSelect = el("select");
-    var rightSelect = el("select");
-    articles.forEach(function (a, i) {
-      var opt = el("option", { value: String(i) }, (a.platform || "other") + " · " + (a.content_type || "content"));
-      leftSelect.appendChild(opt);
-      rightSelect.appendChild(opt.cloneNode(true));
-    });
-    rightSelect.selectedIndex = 1;
-    picker.appendChild(el("span", {}, "对比:"));
-    picker.appendChild(leftSelect);
-    picker.appendChild(el("span", {}, "vs"));
-    picker.appendChild(rightSelect);
-    box.appendChild(picker);
 
-    function cardHtml(a) {
-      var c = el("div", { class: "cardbox" });
-      var fields = [["平台", a.platform], ["目标读者", a.audience], ["开场", a.hook],
-        ["承诺", a.promise], ["证据", a.proof], ["行动要求", a.call_to_action]];
-      fields.forEach(function (f) {
-        c.appendChild(el("p", {}, el("strong", {}, f[0] + ": ")));
-        c.appendChild(el("p", {}, f[1] || "—"));
-      });
-      return c;
-    }
-    var grid = el("div", { class: "compare" });
-    function refresh() {
-      grid.textContent = "";
-      grid.appendChild(cardHtml(articles[parseInt(leftSelect.value, 10)]));
-      grid.appendChild(cardHtml(articles[parseInt(rightSelect.value, 10)]));
-    }
-    leftSelect.addEventListener("change", refresh);
-    rightSelect.addEventListener("change", refresh);
-    refresh();
-    box.appendChild(grid);
-  })();
-
-  // ── Timeline ──
-  (function renderTimeline() {
-    var box = document.getElementById("timeline");
-    var dated = [];
-    var undated = [];
-    promotionContents.forEach(function (p) {
-      var src = sourcesIndex[p.source_id];
-      var ev = { when: src ? src.published_at : null, label: (p.platform || "other") + " · " + (p.content_type || "content"), kind: "promotion" };
-      (ev.when ? dated : undated).push(ev);
-    });
-    var seen = {};
-    (episode.source_refs || []).concat(
-      (claims || []).reduce(function (a, c) { return a.concat(c.source_refs || []); }, [])
-    ).forEach(function (r) {
-      if (seen[r.source_id]) return;
-      seen[r.source_id] = true;
-      var src = sourcesIndex[r.source_id];
-      if (!src || src.kind === "search_result") return;
-      var ev = { when: src.published_at, label: src.kind + (src.author ? " · " + src.author : ""), kind: "dev" };
-      (ev.when ? dated : undated).push(ev);
-    });
-    dated.sort(function (a, b) { return (a.when < b.when ? -1 : a.when > b.when ? 1 : 0); });
-    if (dated.length) {
-      dated.forEach(function (e) {
-        box.appendChild(el("div", { class: "timeline-item" },
-          [el("strong", {}, e.when), el("span", { class: "muted" }, " — " + e.label)]));
-      });
-    }
-    if (undated.length) {
-      box.appendChild(el("h3", {}, "日期未知"));
-      undated.forEach(function (e) {
-        box.appendChild(el("div", { class: "timeline-item" }, el("span", { class: "muted" }, e.label)));
-      });
-    }
     if (feedbackLinks.length) {
-      box.appendChild(el("h3", {}, "反馈 ↔ 开发关联"));
+      ev.appendChild(el("h3", {}, "反馈 ↔ 开发关联"));
       feedbackLinks.forEach(function (l) {
         var d = el("details");
         d.appendChild(el("summary", { class: "relation-" + (l.relation || "unconfirmed") },
@@ -461,37 +405,25 @@
         body.appendChild(el("p", {}, "开发来源:"));
         (l.development_refs || []).forEach(function (r) { body.appendChild(renderSourceRef(r)); });
         d.appendChild(body);
-        box.appendChild(d);
+        ev.appendChild(d);
       });
     }
+    box.appendChild(ev);
   })();
 
-  // ── Learning cards ──
-  (function renderLearning() {
-    var box = document.getElementById("learning");
-    if (!learningCards.length) {
-      box.appendChild(el("p", { class: "empty" }, "没有学习卡。"));
-      return;
-    }
-    learningCards.forEach(function (card) {
-      var d = el("details", { class: "cardbox" });
-      d.appendChild(el("summary", {}, card.decision || ""));
-      var body = el("div");
-      body.appendChild(el("p", {}, "问题: " + (card.problem || "")));
-      if (card.tradeoff) body.appendChild(el("p", {}, "取舍: " + card.tradeoff));
-      body.appendChild(el("p", {}, "适用: " + (card.applicable_when || "")));
-      if (card.avoid_when) body.appendChild(el("p", {}, "不适用: " + card.avoid_when));
-      var se = card.small_experiment || {};
-      if (se.hypothesis) {
-        body.appendChild(el("h3", {}, "小实验"));
-        body.appendChild(el("p", {}, "假设: " + se.hypothesis));
-        body.appendChild(el("p", {}, "最小改动: " + (se.minimal_change || "")));
-        body.appendChild(el("p", {}, "观察方法: " + (se.observe_method || "")));
-        body.appendChild(el("p", {}, "停止条件: " + (se.stop_condition || "")));
-      }
-      (card.source_refs || []).forEach(function (r) { body.appendChild(renderSourceRef(r)); });
-      d.appendChild(body);
-      box.appendChild(d);
+  // ── Tab switching ──
+  (function initTabs() {
+    var designPanel = document.getElementById("panel-design");
+    var promoPanel = document.getElementById("panel-promotion");
+    var tabs = Array.prototype.slice.call(document.querySelectorAll(".tab-btn"));
+    tabs.forEach(function (b) {
+      b.addEventListener("click", function () {
+        var tab = b.getAttribute("data-tab");
+        tabs.forEach(function (x) { x.setAttribute("aria-pressed", "false"); });
+        b.setAttribute("aria-pressed", "true");
+        designPanel.classList.toggle("ev-hidden", tab !== "design");
+        promoPanel.classList.toggle("ev-hidden", tab !== "promotion");
+      });
     });
   })();
 

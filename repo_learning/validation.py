@@ -53,6 +53,7 @@ def _collect_refs(analysis: Analysis):
     """Yield ``(field_path, SourceRef)`` for every SourceRef in the analysis."""
     yield from (("repo_identity.identity_evidence", r) for r in analysis.repo_identity.identity_evidence)
     yield from (("episode.source_refs", r) for r in analysis.episode.source_refs)
+    yield from (("narrative.source_refs", r) for r in analysis.narrative.source_refs)
     for i, claim in enumerate(analysis.episode.alternatives):
         yield from ((f"episode.alternatives[{i}]", r) for r in claim.source_refs)
     for i, claim in enumerate(analysis.episode.decisions):
@@ -80,6 +81,15 @@ def _required_checks(analysis: Analysis):
         yield "episode.problem", "problem is empty", "error"
     if not analysis.episode.title:
         yield "episode.title", "title is empty", "error"
+
+    narrative = analysis.narrative
+    for field in ("headline", "problem", "root_cause", "what_changed", "evidence", "lesson", "small_experiment"):
+        if not getattr(narrative, field):
+            yield f"narrative.{field}", f"{field} is empty", "error"
+    if narrative.guess_question and not narrative.guess_answer:
+        yield "narrative.guess_answer", "guess_question is set but guess_answer is empty", "warning"
+    if narrative.guess_answer and not narrative.guess_question:
+        yield "narrative.guess_question", "guess_answer is set but guess_question is empty", "warning"
 
     def _claim_texts():
         yield "episode.alternatives", analysis.episode.alternatives

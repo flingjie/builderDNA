@@ -7,6 +7,7 @@ from repo_learning import workspace
 from repo_learning.models import (
     Analysis,
     Episode,
+    Narrative,
     RepoIdentity,
     RunManifest,
     SourceKind,
@@ -18,11 +19,26 @@ from repo_learning.render import _tojson_embed, render
 from repo_learning.request import RequestSpec, save_request
 
 
+def _narrative(**overrides):
+    fields = dict(
+        headline="h",
+        problem="p",
+        root_cause="r",
+        what_changed="w",
+        evidence="e",
+        lesson="l",
+        small_experiment="s",
+    )
+    fields.update(overrides)
+    return Narrative(**fields)
+
+
 def _setup(tmp_path):
     ref = SourceRef(source_id="s1", excerpt="</script><script>alert(1)</script>")
     analysis = Analysis(
         repo_identity=RepoIdentity(owner="o", name="r", canonical_url="https://github.com/o/r"),
         episode=Episode(id="e", title="t", problem="p", source_refs=[ref]),
+        narrative=_narrative(guess_question="q?", guess_answer="a"),
     )
     (tmp_path / workspace.ANALYSIS_FILE).write_text(
         analysis.model_dump_json(indent=2), encoding="utf-8"
@@ -60,6 +76,15 @@ def test_embedded_json_parses(tmp_path):
     data = json.loads(m.group(1))
     assert data["analysis"]["repo_identity"]["name"] == "r"
     assert data["analysis"]["episode"]["title"] == "t"
+
+
+def test_render_includes_narrative_and_tabs(tmp_path):
+    report = render(_setup(tmp_path))
+    html = report.read_text(encoding="utf-8")
+    assert "先猜再看" in html
+    assert 'data-tab="design"' in html
+    assert 'data-tab="promotion"' in html
+    assert "narrative" in html  # embedded JSON carries the narrative key
 
 
 def test_render_scrubs_credential(tmp_path, monkeypatch):

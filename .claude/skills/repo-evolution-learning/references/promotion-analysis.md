@@ -2,7 +2,7 @@
 
 ## D. 搜索传播内容
 
-先做全网检索，再对实际出现的平台补定向检索。搜索引擎不可用时记录失败（`coverage_notes`），不要用仓库搜索替代全网覆盖结论。
+先调用 `<skill_dir>/scripts/tavily_search.py` 做全网检索，再对实际出现的平台补定向检索。Tavily 不可用或缺少 `TAVILY_API_KEY` 时记录失败（`coverage_notes`），不要用仓库搜索替代全网覆盖结论。调用方式、参数和结果映射见 `references/tavily-search.md`。
 
 ### 查询模板
 
@@ -18,12 +18,12 @@
 site:<平台域名> "项目名" "作者名"
 ```
 
-候选平台：X/Twitter、Hacker News、Reddit、LinkedIn、Product Hunt、V2EX、掘金、知乎、微信公众号、小红书、DEV、Medium、个人博客。
+候选平台：X/Twitter、Hacker News、Reddit、LinkedIn、Product Hunt、V2EX、掘金、知乎、微信公众号、小红书、DEV、Medium、个人博客。Tavily 的 `include_domains` 可用于定向到这些平台，但第一轮先不要过度限定，保留全网覆盖。
 
 ### 记录
 
-- 每次查询写一条 `SearchRecord` 到 `search-log.jsonl`。
-- 命中的摘要写 `SourceRecord`（`kind=search_result`，`fetch_status=partial`）到 `sources.jsonl`。
+- 每次查询写一条 `SearchRecord` 到 `search-log.jsonl`。`engine` 固定为 `tavily`；`results[].snippet` 使用 Tavily 返回的 `content` 摘要，不要假设已读过全文。
+- 命中的候选链接写 `SourceRecord`（`kind=search_result`，`fetch_status=partial`）到 `sources.jsonl`。
 
 ### 身份与去重
 
@@ -60,3 +60,13 @@ site:<平台域名> "项目名" "作者名"
 比较同一项目不同平台的表达，优先接近的版本/发布时间。说明受众、作者影响力、互动数据的限制；不要把高互动直接归因于写法。
 
 每篇文章 → 一条 `PromotionContent`；平台分布 → `platform_stats`（带统计范围）。
+
+### 学传播精选（学传播路径正文）
+
+学传播正文只选两篇有差异的内容，每篇回答三问，其余内容折叠进证据：
+
+1. 从全部 `promotion_contents` 里选 2 篇有差异的内容（不同平台或不同作者类型），标 `featured=true`；其余保留完整但不进正文。
+2. 每篇 featured 内容补写 `borrowable`：哪句表达/框架值得借用、为什么。
+3. 三问：别人怎样介绍它（`audience` / `hook` / `promise`）、用了什么证据（`proof`）、哪些表达值得借用（`borrowable`）。
+4. 少于两篇时如实说明，不补造；正文只展示已采集到的内容。
+

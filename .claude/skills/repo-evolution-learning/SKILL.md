@@ -8,7 +8,7 @@ description: >
   "generate a dev-episode learning report", "repo evolution learning", "interactive HTML
   learning report", and any request to learn a project's design tradeoffs and promotion methods.
   It reconstructs one episode (problem → alternatives → constraints → decisions → validation →
-  outcome), searches the project's public promotion content via opencli, analyzes per-platform
+  outcome), searches the project's public promotion content via Tavily Search API, analyzes per-platform
   expression and user feedback, and links feedback to development (explicit/possible/unconfirmed).
   Important: GitHub-only discovery goes to repo-trend; developer DNA to builderdna; cross-source
   concept validation to concept-radar; X-only learning to twitter-learning. This skill never posts,
@@ -17,14 +17,14 @@ description: >
 
 # repo-evolution-learning Skill
 
-你重建一个仓库/PR/功能的开发迭代，分析项目的对外传播与用户反馈，并生成一份自包含的交互式 HTML 学习报告。你编排 opencli（搜索 + 正文采集）与 `builderdna repo-learning`（GitHub 采集、校验、渲染）。搜索与语义分析是你的职责；GitHub 采集、校验、HTML 渲染是确定性 Python 工具。
+你重建一个仓库/PR/功能的开发迭代，分析项目的对外传播与用户反馈，并生成一份自包含的交互式 HTML 学习报告。你编排 Tavily Search API（搜索）+ opencli（正文采集）与 `builderdna repo-learning`（GitHub 采集、校验、渲染）。搜索与语义分析是你的职责；GitHub 采集、校验、HTML 渲染是确定性 Python 工具。
 
 ## 这个 Skill 做什么 / 不做什么
 
 | 做 | 不做 |
 |----|------|
 | 重建一个开发迭代（问题→方案→约束→决策→验证→结果）| 发现/评估/追踪 GitHub repo（那是 repo-trend 的事）|
-| 搜索并采集项目对外传播内容（opencli）| 分析开发者技术 DNA（那是 builderdna 的事）|
+| 搜索并采集项目对外传播内容（Tavily + opencli）| 分析开发者技术 DNA（那是 builderdna 的事）|
 | 分析各平台表达与用户反馈 | 跨源验证概念生命周期（那是 concept-radar 的事）|
 | 把反馈关联到开发（explicit/possible/unconfirmed）| 回复/发帖/联系作者（本项目明确不支持）|
 | 提炼带小实验的迁移学习卡，渲染 HTML | 修改被分析仓库、运行被分析仓库的代码 |
@@ -45,11 +45,11 @@ description: >
 User: "分析这个 PR 的设计取舍，生成 HTML 报告"
        │
        ▼
-You (Claude) — 编排 opencli + gh + builderdna repo-learning
+You (Claude) — 编排 Tavily + opencli + gh + builderdna repo-learning
        │
        ├─► builderdna repo-learning init --repo … --entry-url …   (建 run 工作区)
        ├─► builderdna repo-learning collect --run-dir …           (GitHub: PR/review/diff/后续)
-       ├─► opencli / smart-search  搜索传播内容 → search-log.jsonl
+       ├─► python <skill_dir>/scripts/tavily_search.py --query …  搜索传播内容 → search-log.jsonl
        ├─► opencli <site> read / web read  采集正文 → sources.jsonl
        ├─► 你写 analysis.json（Episode / PromotionContent / FeedbackLink / LearningCard）
        ├─► builderdna repo-learning validate --run-dir …
@@ -63,7 +63,7 @@ You (Claude) — 编排 opencli + gh + builderdna repo-learning
 |-----------|--------|
 | "分析这个 PR 的设计取舍" | init(entry-url) → collect → 重建决策 → validate → render |
 | "复盘这个仓库如何做任务恢复" | init(repo) → collect(候选) → 选一个迭代 → collect(entry-url) → 分析 → render |
-| "这个项目怎么宣传的" | init → collect → opencli 搜索 + 采集 → 文章/平台分析 → render |
+| "这个项目怎么宣传的" | init → collect → Tavily 搜索 + opencli 采集 → 文章/平台分析 → render |
 | "生成交互式 HTML" | 走完 collect/分析 → validate → render，报告 run_dir/report.html |
 | "guided 模式" | init --mode guided；渲染时先隐藏决策，用户写判断后再揭示 |
 
@@ -88,7 +88,8 @@ You (Claude) — 编排 opencli + gh + builderdna repo-learning
 
 ### 4. 搜索传播内容（spec 步骤 D）
 
-- 先用 opencli/smart-search 做全网检索（见 `references/promotion-analysis.md` 的查询模板）。搜索引擎不可用时记录失败，不要用仓库搜索替代全网覆盖结论。
+- 先调用本 skill 的 `<skill_dir>/scripts/tavily_search.py` 做全网检索。必须配置 `TAVILY_API_KEY`；不要硬编码或把密钥写入日志。查询模板与参数见 `references/tavily-search.md`。
+- Tavily 不可用或缺少密钥时，写 `coverage_notes=["engine unavailable: …"]` 且 `results=[]`，不要用仓库搜索冒充全网覆盖结论。
 - 按 canonical URL 与正文相似度去重，保留转载关系；平台原生与转载分别计数。
 - 把每次查询记入 `search-log.jsonl`（SearchRecord），命中的摘要记入 `sources.jsonl`（`kind=search_result`）。
 
@@ -113,11 +114,13 @@ You (Claude) — 编排 opencli + gh + builderdna repo-learning
 
 ### 8. 写 analysis.json 与收尾
 
-1. 按 `references/output-contract.md` 的 schema 写 `analysis.json` 到 run_dir（`Analysis` 根对象：repo_identity、episode、claims、promotion_contents、feedback_links、learning_cards、platform_stats、coverage_notes）。
-2. 默认生成 1–3 张学习卡（`references/evidence-rules.md` 的证据/表达规则）。
-3. `builderdna repo-learning validate --run-dir <dir>`，修掉 error，复核 warning。
-4. `builderdna repo-learning render --run-dir <dir>`。
-5. 交付：报告路径 + 一行关键发现 + 分析范围。不要整份贴进聊天。
+1. 按 `references/output-contract.md` 的 schema 写 `analysis.json` 到 run_dir（`Analysis` 根对象：repo_identity、episode、narrative、claims、promotion_contents、feedback_links、learning_cards、platform_stats、coverage_notes）。
+2. 先写 `narrative`（5 问叙事 + 标题 + 可选猜题），遵循 `references/writing-rules.md` 的可检查规则：约 800–1200 中文字，只保留 1 主要教训 + 1 次要取舍 + 1 小实验。原始 `episode.alternatives/decisions/validation/implementation_changes` 与 `learning_cards` 保留完整，作为折叠证据，不在正文重复。
+3. 从 `promotion_contents` 选 2 篇有差异的内容标 `featured=true` 并各写 `borrowable`（学传播正文三问），其余折叠进证据。
+4. 默认生成 1–3 张学习卡（`references/evidence-rules.md` 的证据/表达规则）；报告正文只突出叙事里的 1 个主要教训。
+5. `builderdna repo-learning validate --run-dir <dir>`，修掉 error，复核 warning。
+6. `builderdna repo-learning render --run-dir <dir>`。
+7. 交付：报告路径 + 一行关键发现 + 分析范围。不要整份贴进聊天。
 
 ## 运行工作区
 
@@ -136,7 +139,7 @@ analysis.json     manifest.json    report.html
 
 - `request.yaml` 的 `limits` 是初始预算，不是目标；材料不足时报告缺口，不硬凑数量。
 - 预算耗尽返回部分材料；报告显示截断范围（`coverage_notes` / `missing_scope`）。
-- 搜索或正文失败：记录失败，不阻塞已有分析；短时网络失败有限重试，访问限制不无限重试。
+- Tavily 搜索或正文失败：记录失败，不阻塞已有分析；短时网络失败有限重试，访问限制不无限重试。
 - 文章采集用有限并发；需要浏览器的操作按 opencli 工具约束串行执行。
 
 ## Reference Files
@@ -144,6 +147,7 @@ analysis.json     manifest.json    report.html
 | When to read | Which file |
 |--------------|-----------|
 | 身份确认 / 迭代选择 / 决策重建（步骤 A–C）| `references/episode-analysis.md` |
+| Tavily 调用、查询模板与 SearchRecord 映射（步骤 D）| `references/tavily-search.md` |
 | 搜索 / 平台归类 / 去重 / 文章与反馈分析（步骤 D–F）| `references/promotion-analysis.md` |
 | evidence_status / relation / 事实-推断-未知 / 禁用表达 | `references/evidence-rules.md` |
 | analysis.json / sources.jsonl / search-log.jsonl 精确 schema | `references/output-contract.md` |
@@ -154,7 +158,7 @@ analysis.json     manifest.json    report.html
 1. 解析 `--repo` 或 `--entry-url`，判断是 PR 入口还是仓库入口。
 2. `init` → `collect`，确认仓库身份。
 3. （仓库入口）选一个迭代 → 二次 `collect --entry-url` 拉全量。
-4. opencli 搜索 + 采集传播内容。
+4. Tavily 搜索 + opencli 采集传播内容。
 5. 重建决策 + 分析表达/反馈 + 关联反馈与开发 + 提炼学习卡。
-6. 写 `analysis.json` → `validate` → `render`。
+6. 写 `narrative`（5 问叙事）+ 标 2 篇 featured 传播内容 → `analysis.json` → `validate` → `render`。
 7. 交付报告路径 + 简短摘要，问是否深挖或 refine。

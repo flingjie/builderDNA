@@ -7,6 +7,7 @@ from pydantic import ValidationError
 
 from repo_learning.models import (
     FetchStatus,
+    Narrative,
     SearchRecord,
     SourceKind,
     SourceRecord,
@@ -54,3 +55,33 @@ def test_search_record_requires_id():
 def test_fetch_status_enum_rejects_unknown():
     with pytest.raises(ValidationError):
         SourceRecord(id="x", kind=SourceKind.WEB_ARTICLE, fetch_status="nope")  # type: ignore[arg-type]
+
+
+def _narrative_kwargs(**overrides):
+    base = dict(
+        headline="h",
+        problem="p",
+        root_cause="r",
+        what_changed="w",
+        evidence="e",
+        lesson="l",
+        small_experiment="s",
+    )
+    base.update(overrides)
+    return base
+
+
+def test_narrative_requires_core_fields():
+    for missing in ("headline", "problem", "root_cause", "what_changed", "evidence", "lesson", "small_experiment"):
+        kwargs = _narrative_kwargs()
+        kwargs[missing] = ""
+        with pytest.raises(ValidationError):
+            Narrative(**kwargs)
+
+
+def test_narrative_roundtrip_optional_fields():
+    n = Narrative(**_narrative_kwargs(guess_question="q?", guess_answer="a", tradeoff="t"))
+    dumped = n.model_dump(mode="json")
+    assert dumped["guess_question"] == "q?"
+    assert dumped["tradeoff"] == "t"
+    assert Narrative.model_validate(dumped) == n
