@@ -79,7 +79,8 @@
     display: inline-block; font-size: .72rem; border-radius: 4px;
     padding: 1px 7px; margin-left: 6px; vertical-align: middle; font-weight: 600;
   }
-  .badge.sourced { background: rgba(26,127,55,.15); color: var(--sourced); }
+  .badge.observed { background: rgba(26,127,55,.15); color: var(--sourced); }
+  .badge.author_stated { background: rgba(11,107,203,.15); color: var(--accent); }
   .badge.inferred { background: rgba(184,134,11,.18); color: var(--inferred); }
   .badge.unknown { background: rgba(107,107,107,.18); color: var(--unknown); }
   .claim { padding: 8px 0; border-bottom: 1px dashed var(--border); }
@@ -130,9 +131,10 @@
     <button class="tab-btn" data-tab="design" aria-pressed="true">学设计</button>
     <button class="tab-btn" data-tab="promotion" aria-pressed="false">学传播</button>
   </div>
-  <div class="filter-group" role="group" aria-label="事实/推断/未知筛选">
+  <div class="filter-group" role="group" aria-label="证据来源筛选">
     <span class="muted">筛选:</span>
-    <button class="filter-btn" data-filter="sourced" aria-pressed="false">事实</button>
+    <button class="filter-btn" data-filter="observed" aria-pressed="false">事实</button>
+    <button class="filter-btn" data-filter="author_stated" aria-pressed="false">自述</button>
     <button class="filter-btn" data-filter="inferred" aria-pressed="false">推断</button>
     <button class="filter-btn" data-filter="unknown" aria-pressed="false">未知</button>
     <button class="filter-btn" data-filter="all" aria-pressed="true">全部</button>
@@ -170,6 +172,7 @@
   var feedbackLinks = analysis.feedback_links || [];
   var coverageNotes = analysis.coverage_notes || [];
   var platformStats = analysis.platform_stats || [];
+  var decisionCards = analysis.decision_cards || [];
 
   function el(tag, attrs, children) {
     var node = document.createElement(tag);
@@ -188,6 +191,8 @@
     return null;
   }
   function evidenceClass(status) { return status || "unknown"; }
+  var EVIDENCE_LABELS = { observed: "事实", author_stated: "自述", inferred: "推断", unknown: "未知" };
+  function evidenceLabel(status) { return EVIDENCE_LABELS[status] || status; }
   function para(text, cls) { return el("p", cls ? { class: cls } : null, text || ""); }
 
   function renderSourceRef(ref) {
@@ -213,7 +218,7 @@
     var status = claim.evidence_status || "unknown";
     var div = el("div", { class: "claim", "data-evidence": status });
     div.appendChild(el("span", {}, claim.text || ""));
-    div.appendChild(el("span", { class: "badge " + evidenceClass(status) }, status));
+    div.appendChild(el("span", { class: "badge " + evidenceClass(status) }, evidenceLabel(status)));
     (claim.source_refs || []).forEach(function (r) { div.appendChild(renderSourceRef(r)); });
     (claim.limitations || []).forEach(function (l) {
       div.appendChild(el("div", { class: "limitations" }, "限制: " + l));
@@ -227,6 +232,59 @@
     d.appendChild(el("div", { class: "q-label" }, label));
     (Array.isArray(nodes) ? nodes : [nodes]).forEach(function (n) { d.appendChild(n); });
     return d;
+  }
+
+  // One key decision card: six questions + collapsible per-claim evidence.
+  function renderDecisionCard(card) {
+    var box = el("div", { class: "cardbox" });
+    box.appendChild(el("h3", {}, "决策卡 · " + (card.project_ref || "")));
+
+    box.appendChild(qBlock("问题（谁、何时、什么困难）", para(card.problem)));
+
+    var choiceNodes = [para(card.decision)];
+    if (card.alternatives && card.alternatives.length) {
+      choiceNodes.push(el("div", { class: "muted" }, "已知替代方案:"));
+      card.alternatives.forEach(function (a) { choiceNodes.push(renderClaim(a)); });
+    }
+    box.appendChild(qBlock("选择（方案与替代）", choiceNodes));
+
+    if (card.tradeoffs && card.tradeoffs.length) {
+      box.appendChild(qBlock("代价（增加或牺牲了什么）",
+        card.tradeoffs.map(function (t) { return para(t); })));
+    }
+
+    var condNodes = [];
+    if (card.applicable_when) condNodes.push(para("适用: " + card.applicable_when));
+    if (card.avoid_when) condNodes.push(para("不可迁移: " + card.avoid_when));
+    if (condNodes.length) box.appendChild(qBlock("条件（适用与不可迁移之处）", condNodes));
+
+    var outcome = card.outcome || {};
+    box.appendChild(qBlock("证据（来源证明了什么）",
+      para("结果状态: " + (outcome.status || "unknown") +
+        (outcome.summary ? " · " + outcome.summary : ""))));
+
+    if (card.unknowns && card.unknowns.length) {
+      box.appendChild(qBlock("尚不确定", card.unknowns.map(function (u) { return para(u); })));
+    }
+
+    if (card.small_experiment) {
+      var se = card.small_experiment;
+      var expNodes = [para(se.hypothesis || "")];
+      if (se.linked_problem) expNodes.push(para("关联问题: " + se.linked_problem));
+      if (se.minimal_change) expNodes.push(para("最小改动: " + se.minimal_change));
+      if (se.control) expNodes.push(para("对照: " + se.control));
+      if (se.observe_method) expNodes.push(para("观测: " + se.observe_method));
+      if (se.stop_condition) expNodes.push(para("停止条件: " + se.stop_condition));
+      box.appendChild(qBlock("可选小实验", expNodes));
+    }
+
+    var ev = el("details");
+    ev.appendChild(el("summary", {}, "展开证据（逐项主张与来源）"));
+    (card.claims || []).forEach(function (c) { ev.appendChild(renderClaim(c)); });
+    (card.source_refs || []).forEach(function (r) { ev.appendChild(renderSourceRef(r)); });
+    box.appendChild(ev);
+
+    return box;
   }
 
   // ── 学设计 ──
@@ -260,6 +318,12 @@
       g.appendChild(el("summary", {}, "先猜再看：" + narrative.guess_question));
       g.appendChild(el("div", { class: "answer" }, narrative.guess_answer || ""));
       box.appendChild(g);
+    }
+
+    // 关键决策卡：最多 3 张，逐项主张与来源折叠进证据。
+    if (decisionCards.length) {
+      box.appendChild(el("h2", {}, "关键决策卡"));
+      decisionCards.slice(0, 3).forEach(function (card) { box.appendChild(renderDecisionCard(card)); });
     }
 
     // 展开证据：完整备选 / 决策 / 实现调整 / 验证 / 来源 / 缺失材料

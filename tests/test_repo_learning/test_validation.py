@@ -3,8 +3,13 @@
 from repo_learning import workspace
 from repo_learning.models import (
     Analysis,
+    Claim,
+    DecisionCard,
     Episode,
+    EvidenceStatus,
     Narrative,
+    Outcome,
+    OutcomeStatus,
     RepoIdentity,
     SourceKind,
     SourceRecord,
@@ -111,3 +116,60 @@ def test_narrative_source_ref_is_checked(tmp_path):
     result = validate(RequestSpec(repo="o/r"), tmp_path)
     assert result["valid"] is False
     assert result["counts"]["unresolved_refs"] == 2
+
+
+def _decision_card_analysis(card):
+    return Analysis(
+        repo_identity=RepoIdentity(owner="o", name="r", canonical_url="https://github.com/o/r"),
+        episode=Episode(id="e", title="t", problem="p"),
+        narrative=_narrative(),
+        decision_cards=[card],
+    )
+
+
+def test_independently_checked_without_observed_claim_is_error(tmp_path):
+    src = SourceRecord(id="s1", kind=SourceKind.GITHUB_PR)
+    card = DecisionCard(
+        project_ref="o/r",
+        problem="p",
+        decision="d",
+        outcome=Outcome(status=OutcomeStatus.INDEPENDENTLY_CHECKED, summary="verified"),
+    )
+    _write(tmp_path, _decision_card_analysis(card), [src])
+    result = validate(RequestSpec(repo="o/r"), tmp_path)
+    assert result["valid"] is False
+    assert any("independently_checked requires" in e["message"] for e in result["errors"])
+
+
+def test_independently_checked_with_observed_claim_passes(tmp_path):
+    src = SourceRecord(id="s1", kind=SourceKind.GITHUB_PR)
+    claim = Claim(
+        text="code changed",
+        evidence_status=EvidenceStatus.OBSERVED,
+        source_refs=[SourceRef(source_id="s1")],
+    )
+    card = DecisionCard(
+        project_ref="o/r",
+        problem="p",
+        decision="d",
+        claims=[claim],
+        outcome=Outcome(status=OutcomeStatus.INDEPENDENTLY_CHECKED, summary="verified"),
+    )
+    _write(tmp_path, _decision_card_analysis(card), [src])
+    result = validate(RequestSpec(repo="o/r"), tmp_path)
+    assert result["valid"] is True
+
+
+def test_duplicate_decision_card_id_is_error(tmp_path):
+    src = SourceRecord(id="s1", kind=SourceKind.GITHUB_PR)
+    card = DecisionCard(project_ref="o/r", problem="p", decision="d")
+    analysis = Analysis(
+        repo_identity=RepoIdentity(owner="o", name="r", canonical_url="https://github.com/o/r"),
+        episode=Episode(id="e", title="t", problem="p"),
+        narrative=_narrative(),
+        decision_cards=[card, card],
+    )
+    _write(tmp_path, analysis, [src])
+    result = validate(RequestSpec(repo="o/r"), tmp_path)
+    assert result["valid"] is False
+    assert any("duplicate decision card id" in e["message"] for e in result["errors"])

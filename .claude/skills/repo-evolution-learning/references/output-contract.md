@@ -91,26 +91,29 @@
   "claims": [],
   "promotion_contents": [],
   "feedback_links": [],
-  "learning_cards": [],
+  "decision_cards": [],
   "platform_stats": [],
   "coverage_notes": [],
   "generated_at": "2026-10-06T16:59:00+00:00"
 }
 ```
 
-### Claim（alternatives / decisions / validation / claims 的元素）
+### Claim（alternatives / decisions / validation / claims / decision_cards 的元素）
 
 ```json
 {
   "text": "陈述",
-  "evidence_status": "sourced",
+  "evidence_status": "observed",
   "source_refs": [{"source_id": "…", "locator": "", "excerpt": "", "supports": []}],
   "limitations": []
 }
 ```
 
-- `evidence_status`：`sourced` `inferred` `unknown`
-- `sourced` 必须带 ≥1 个 `source_refs`；`sourced` 只表示材料直接支持该陈述。作者宣称性能提升时写「作者称」，不要改写为已验证结果。
+- `evidence_status`：`observed` `author_stated` `inferred` `unknown`
+- `observed`（事实）：由工件直接证明（代码差异、合并的 PR、关闭的 issue）。
+- `author_stated`（自述）：作者自己的宣称，未经独立验证。
+- `inferred`（推断）：你的重建，材料未直接陈述。
+- `observed` / `author_stated` 必须带 ≥1 个 `source_refs`（validate 会告警）。作者宣称性能提升时写 `author_stated`，不要改写为 `observed`。
 
 ### Narrative（读者视图的 5 问叙事，必填）
 
@@ -175,24 +178,42 @@
 
 - `relation`：`explicit` `possible` `unconfirmed`
 
-### LearningCard
+### DecisionCard（关键决策卡，最多 3 张进入正文）
+
+六问：问题 / 选择 / 证据 / 代价 / 条件 / 验证。
 
 ```json
 {
-  "problem": "…",
-  "decision": "…",
-  "tradeoff": "…",
-  "applicable_when": "…",
-  "avoid_when": "…",
+  "id": "dc-…（留空会自动从 project_ref + decision 计算，重复执行得到同一 id）",
+  "project_ref": "owner/repo",
+  "actor_ref": null,
+  "problem": "谁、何时、遇到了什么困难",
+  "decision": "采用了什么方案",
+  "alternatives": [{"text": "…", "evidence_status": "inferred", "source_refs": [], "limitations": []}],
+  "tradeoffs": ["增加了什么", "牺牲了什么"],
+  "applicable_when": "适用于什么场景",
+  "avoid_when": "哪些地方不能直接迁移",
+  "claims": [{"text": "…", "evidence_status": "observed", "source_refs": [], "limitations": []}],
+  "outcome": {"status": "unknown", "summary": "…"},
+  "unknowns": ["尚不确定的事项"],
   "small_experiment": {
     "hypothesis": "…",
     "minimal_change": "…",
     "observe_method": "…",
-    "stop_condition": "…"
+    "stop_condition": "…",
+    "linked_problem": "关联的用户问题（空则不生成实验）",
+    "control": "对照方式"
   },
-  "source_refs": []
+  "source_refs": [],
+  "created_at": "2026-10-06T16:59:00+00:00",
+  "updated_at": "2026-10-06T16:59:00+00:00"
 }
 ```
+
+- `outcome.status`：`unknown` `author_reported` `independently_checked`。`independently_checked` 要求 `claims` 里至少有一条 `observed` 且带 `source_refs`（validate 会报 error）。
+- `actor_ref` 现阶段留 `null`（开发者画像在后续阶段接入）。
+- 正文最多 3 张卡；不足 3 张时不要凑数量。
+- 旧字段 `learning_cards` 仍可解析（别名），但新报告只写 `decision_cards`。
 
 ### platform_stats
 

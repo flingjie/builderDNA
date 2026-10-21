@@ -6,9 +6,15 @@ import pytest
 from pydantic import ValidationError
 
 from repo_learning.models import (
+    Claim,
+    DecisionCard,
+    EvidenceStatus,
     FetchStatus,
     Narrative,
+    Outcome,
+    OutcomeStatus,
     SearchRecord,
+    SmallExperiment,
     SourceKind,
     SourceRecord,
 )
@@ -85,3 +91,44 @@ def test_narrative_roundtrip_optional_fields():
     assert dumped["guess_question"] == "q?"
     assert dumped["tradeoff"] == "t"
     assert Narrative.model_validate(dumped) == n
+
+
+def test_claim_legacy_sourced_migrates_to_observed():
+    claim = Claim(text="x", evidence_status="sourced")  # type: ignore[arg-type]
+    assert claim.evidence_status == EvidenceStatus.OBSERVED
+
+
+def test_decision_card_roundtrip_and_auto_id():
+    card = DecisionCard(
+        project_ref="o/r",
+        problem="who hit what difficulty",
+        decision="chose X",
+        alternatives=[Claim(text="alt", evidence_status=EvidenceStatus.INFERRED)],
+        tradeoffs=["gained speed", "lost flexibility"],
+        applicable_when="small teams",
+        avoid_when="strict compliance",
+        claims=[Claim(text="diff shows change", evidence_status=EvidenceStatus.OBSERVED)],
+        outcome=Outcome(status=OutcomeStatus.AUTHOR_REPORTED, summary="author reports faster"),
+        unknowns=["production effect"],
+        small_experiment=SmallExperiment(
+            hypothesis="h",
+            minimal_change="m",
+            observe_method="o",
+            stop_condition="s",
+            linked_problem="my task",
+            control="baseline",
+        ),
+    )
+    assert card.id.startswith("dc-")
+    dumped = card.model_dump(mode="json")
+    assert DecisionCard.model_validate(dumped) == card
+    assert dumped["small_experiment"]["linked_problem"] == "my task"
+    assert dumped["small_experiment"]["control"] == "baseline"
+
+
+def test_decision_card_id_is_deterministic():
+    a = DecisionCard(project_ref="o/r", problem="p1", decision="use sqlite")
+    b = DecisionCard(project_ref="o/r", problem="p2", decision="use sqlite")
+    assert a.id == b.id
+    c = DecisionCard(project_ref="o/r", problem="p1", decision="use postgres")
+    assert a.id != c.id

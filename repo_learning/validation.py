@@ -15,6 +15,7 @@ from pathlib import Path
 from repo_learning.models import (
     Analysis,
     EvidenceStatus,
+    OutcomeStatus,
     Relation,
     SourceKind,
     SourceRecord,
@@ -65,8 +66,12 @@ def _collect_refs(analysis: Analysis):
     for i, link in enumerate(analysis.feedback_links):
         yield from ((f"feedback_links[{i}].feedback_refs", r) for r in link.feedback_refs)
         yield from ((f"feedback_links[{i}].development_refs", r) for r in link.development_refs)
-    for i, card in enumerate(analysis.learning_cards):
-        yield from ((f"learning_cards[{i}]", r) for r in card.source_refs)
+    for i, card in enumerate(analysis.decision_cards):
+        yield from ((f"decision_cards[{i}].source_refs", r) for r in card.source_refs)
+        for j, claim in enumerate(card.alternatives):
+            yield from ((f"decision_cards[{i}].alternatives[{j}]", r) for r in claim.source_refs)
+        for j, claim in enumerate(card.claims):
+            yield from ((f"decision_cards[{i}].claims[{j}]", r) for r in claim.source_refs)
 
 
 def _required_checks(analysis: Analysis):
@@ -96,21 +101,51 @@ def _required_checks(analysis: Analysis):
         yield "episode.decisions", analysis.episode.decisions
         yield "episode.validation", analysis.episode.validation
         yield "claims", analysis.claims
+        for i, card in enumerate(analysis.decision_cards):
+            yield f"decision_cards[{i}].alternatives", card.alternatives
+            yield f"decision_cards[{i}].claims", card.claims
 
     for label, claims in _claim_texts():
         for i, c in enumerate(claims):
             if not c.text:
                 yield f"{label}[{i}].text", "claim text is empty", "error"
-            if c.evidence_status == EvidenceStatus.SOURCED and not c.source_refs:
+            if c.evidence_status in (EvidenceStatus.OBSERVED, EvidenceStatus.AUTHOR_STATED) and not c.source_refs:
                 yield f"{label}[{i}]", "sourced claim has no source_refs", "warning"
 
-    for i, card in enumerate(analysis.learning_cards):
+    seen_ids: dict[str, int] = {}
+    for i, card in enumerate(analysis.decision_cards):
+        if not card.id:
+            yield f"decision_cards[{i}].id", "id is empty", "error"
+        elif card.id in seen_ids:
+            yield (
+                f"decision_cards[{i}].id",
+                f"duplicate decision card id {card.id!r} (also at index {seen_ids[card.id]})",
+                "error",
+            )
+        else:
+            seen_ids[card.id] = i
+        if not card.problem:
+            yield f"decision_cards[{i}].problem", "problem is empty", "error"
         if not card.decision:
-            yield f"learning_cards[{i}].decision", "decision is empty", "error"
-        if not card.small_experiment.hypothesis:
-            yield f"learning_cards[{i}].small_experiment.hypothesis", "hypothesis is empty", "error"
-        if not card.small_experiment.stop_condition:
-            yield f"learning_cards[{i}].small_experiment.stop_condition", "stop_condition is empty", "error"
+            yield f"decision_cards[{i}].decision", "decision is empty", "error"
+        if not card.project_ref:
+            yield f"decision_cards[{i}].project_ref", "project_ref is empty", "error"
+        if card.small_experiment is not None:
+            if not card.small_experiment.hypothesis:
+                yield f"decision_cards[{i}].small_experiment.hypothesis", "hypothesis is empty", "error"
+            if not card.small_experiment.stop_condition:
+                yield f"decision_cards[{i}].small_experiment.stop_condition", "stop_condition is empty", "error"
+        if card.outcome.status == OutcomeStatus.INDEPENDENTLY_CHECKED:
+            has_observed = any(
+                c.evidence_status == EvidenceStatus.OBSERVED and c.source_refs
+                for c in card.claims
+            )
+            if not has_observed:
+                yield (
+                    f"decision_cards[{i}].outcome.status",
+                    "independently_checked requires an observed claim with source_refs",
+                    "error",
+                )
 
     for i, link in enumerate(analysis.feedback_links):
         if not link.rationale:

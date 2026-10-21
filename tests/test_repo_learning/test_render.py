@@ -6,6 +6,7 @@ import re
 from repo_learning import workspace
 from repo_learning.models import (
     Analysis,
+    DecisionCard,
     Episode,
     Narrative,
     RepoIdentity,
@@ -85,6 +86,19 @@ def test_render_includes_narrative_and_tabs(tmp_path):
     assert 'data-tab="design"' in html
     assert 'data-tab="promotion"' in html
     assert "narrative" in html  # embedded JSON carries the narrative key
+
+
+def test_render_includes_decision_cards(tmp_path):
+    rd = _setup(tmp_path)
+    analysis = workspace.load_analysis(rd)
+    analysis.decision_cards = [DecisionCard(project_ref="o/r", problem="p", decision="d")]
+    (rd / workspace.ANALYSIS_FILE).write_text(
+        analysis.model_dump_json(indent=2), encoding="utf-8"
+    )
+    report = render(rd)
+    html = report.read_text(encoding="utf-8")
+    assert "关键决策卡" in html
+    assert "decision_cards" in html
 
 
 def test_render_scrubs_credential(tmp_path, monkeypatch):

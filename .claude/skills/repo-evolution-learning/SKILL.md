@@ -27,7 +27,7 @@ description: >
 | 搜索并采集项目对外传播内容（Tavily + opencli）| 分析开发者技术 DNA（那是 builderdna 的事）|
 | 分析各平台表达与用户反馈 | 跨源验证概念生命周期（那是 concept-radar 的事）|
 | 把反馈关联到开发（explicit/possible/unconfirmed）| 回复/发帖/联系作者（本项目明确不支持）|
-| 提炼带小实验的迁移学习卡，渲染 HTML | 修改被分析仓库、运行被分析仓库的代码 |
+| 提炼带小实验的关键决策卡，渲染 HTML | 修改被分析仓库、运行被分析仓库的代码 |
 
 ## 路由 (Routing)
 
@@ -51,7 +51,7 @@ You (Claude) — 编排 Tavily + opencli + gh + builderdna repo-learning
        ├─► builderdna repo-learning collect --run-dir …           (GitHub: PR/review/diff/后续)
        ├─► python <skill_dir>/scripts/tavily_search.py --query …  搜索传播内容 → search-log.jsonl
        ├─► opencli <site> read / web read  采集正文 → sources.jsonl
-       ├─► 你写 analysis.json（Episode / PromotionContent / FeedbackLink / LearningCard）
+       ├─► 你写 analysis.json（Episode / Narrative / DecisionCard / PromotionContent / FeedbackLink）
        ├─► builderdna repo-learning validate --run-dir …
        ├─► builderdna repo-learning render --run-dir …            (生成 report.html)
        └─► 报告 run_dir/report.html + 简短摘要（不在聊天里重复整份报告）
@@ -78,8 +78,8 @@ You (Claude) — 编排 Tavily + opencli + gh + builderdna repo-learning
 
 ### 2. 选择开发迭代（spec 步骤 B）
 
-- PR 入口优先：只扩读相关 Issue、代码与后续记录。
-- 仓库入口：从 `collect` 得到的候选 PR（`fetch_status=partial`）里选一个「有清楚问题/讨论/验证」的迭代，记录选择与排除理由；然后 `collect --run-dir <dir> --entry-url <选中 PR>` 拉全量详情。
+- **默认轻量**：`init --repo` + `collect`（不带 `--entry-url`）得到 README、项目介绍、公开时间线 + 候选 PR（`fetch_status=partial`）。从这些轻量来源识别**最多 3 个**有证据的决策候选。
+- 只有用户主动深入、或满足 `references/episode-analysis.md` 的深入触发条件时，才 `collect --run-dir <dir> --entry-url <选中 PR>` 拉全量 Issue / PR / 代码（这是后续阶段的「深入」路径）。
 - 不要把 README 当前架构解释直接当早期设计理由；Squash 或缺早期提交时说明无法完整还原。
 
 ### 3. 重建决策（spec 步骤 C）
@@ -114,10 +114,10 @@ You (Claude) — 编排 Tavily + opencli + gh + builderdna repo-learning
 
 ### 8. 写 analysis.json 与收尾
 
-1. 按 `references/output-contract.md` 的 schema 写 `analysis.json` 到 run_dir（`Analysis` 根对象：repo_identity、episode、narrative、claims、promotion_contents、feedback_links、learning_cards、platform_stats、coverage_notes）。
-2. 先写 `narrative`（5 问叙事 + 标题 + 可选猜题），遵循 `references/writing-rules.md` 的可检查规则：约 800–1200 中文字，只保留 1 主要教训 + 1 次要取舍 + 1 小实验。原始 `episode.alternatives/decisions/validation/implementation_changes` 与 `learning_cards` 保留完整，作为折叠证据，不在正文重复。
+1. 按 `references/output-contract.md` 的 schema 写 `analysis.json` 到 run_dir（`Analysis` 根对象：repo_identity、episode、narrative、claims、promotion_contents、feedback_links、decision_cards、platform_stats、coverage_notes）。
+2. 先写 `narrative`（5 问叙事 + 标题 + 可选猜题），遵循 `references/writing-rules.md` 的可检查规则：约 600–1000 中文字，正文只做读者视图的压缩引述。原始 `episode.alternatives/decisions/validation/implementation_changes` 与 `decision_cards` 的逐项证据保留完整，作为折叠证据，不在正文重复。
 3. 从 `promotion_contents` 选 2 篇有差异的内容标 `featured=true` 并各写 `borrowable`（学传播正文三问），其余折叠进证据。
-4. 默认生成 1–3 张学习卡（`references/evidence-rules.md` 的证据/表达规则）；报告正文只突出叙事里的 1 个主要教训。
+4. 默认生成最多 3 张决策卡（`references/evidence-rules.md` 的事实/自述/推断/未知规则 + `episode-analysis.md` 的六问六维度）；报告正文只突出叙事里的 1 个主要教训。
 5. `builderdna repo-learning validate --run-dir <dir>`，修掉 error，复核 warning。
 6. `builderdna repo-learning render --run-dir <dir>`。
 7. 交付：报告路径 + 一行关键发现 + 分析范围。不要整份贴进聊天。

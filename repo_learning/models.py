@@ -15,16 +15,19 @@ Design rules enforced structurally here:
 """
 from __future__ import annotations
 
+import hashlib
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field, field_validator, model_validator
 
 from models.concept import UtcDatetime
 
 __all__ = [
     "EvidenceStatus",
+    "OutcomeStatus",
+    "Outcome",
     "FetchStatus",
     "ActorType",
     "RepoMatch",
@@ -42,7 +45,8 @@ __all__ = [
     "Narrative",
     "PromotionContent",
     "FeedbackLink",
-    "LearningCard",
+    "DecisionCard",
+    "decision_card_id",
     "RunManifest",
     "Analysis",
 ]
@@ -56,11 +60,19 @@ def _now_utc() -> datetime:
 
 
 class EvidenceStatus(str, Enum):
-    """How well a claim is supported by collected material."""
+    """How a claim is supported, and by what kind of source.
 
-    SOURCED = "sourced"      # material directly supports the statement
-    INFERRED = "inferred"    # analyst's reconstruction, not stated by material
-    UNKNOWN = "unknown"      # neither sourced nor confidently inferred
+    ``observed`` and ``author_stated`` are the split of the old ``sourced``:
+    ``observed`` is proven by an artifact (code diff, merged PR, closed issue),
+    while ``author_stated`` is the author's own claim, not independently
+    verified. ``inferred`` is the analyst's reconstruction; ``unknown`` is
+    neither sourced nor confidently inferred.
+    """
+
+    OBSERVED = "observed"            # artifact proves it (code diff, merged PR, closed issue)
+    AUTHOR_STATED = "author_stated"  # author's own claim, not independently verified
+    INFERRED = "inferred"            # analyst's reconstruction, not stated by material
+    UNKNOWN = "unknown"              # neither sourced nor confidently inferred
 
 
 class FetchStatus(str, Enum):
@@ -155,6 +167,28 @@ class SmallExperiment(BaseModel):
     minimal_change: str = Field(min_length=1, description="The smallest change that tests it")
     observe_method: str = Field(min_length=1, description="How to observe the result")
     stop_condition: str = Field(min_length=1, description="Bounded stop condition (time or cost)")
+    linked_problem: str = Field(
+        default="", description="Which of the user's problems this maps to (empty = no experiment)"
+    )
+    control: str = Field(default="", description="The comparison / control method")
+
+
+# ── Outcome ──
+
+
+class OutcomeStatus(str, Enum):
+    """How a decision's outcome was verified (provenance, not the result itself)."""
+
+    UNKNOWN = "unknown"
+    AUTHOR_REPORTED = "author_reported"
+    INDEPENDENTLY_CHECKED = "independently_checked"
+
+
+class Outcome(BaseModel):
+    """The outcome of a decision, with its evidence boundary."""
+
+    status: OutcomeStatus = OutcomeStatus.UNKNOWN
+    summary: str = Field(default="", description="What happened, and by whose account")
 
 
 # ── Source references ──
@@ -251,7 +285,7 @@ class Claim(BaseModel):
 
     text: str = Field(min_length=1, description="The statement")
     evidence_status: EvidenceStatus = Field(
-        default=EvidenceStatus.UNKNOWN, description="sourced / inferred / unknown"
+        default=EvidenceStatus.UNKNOWN, description="observed / author_stated / inferred / unknown"
     )
     source_refs: list[SourceRef] = Field(
         default_factory=list, description="Sources backing the statement"
@@ -259,6 +293,15 @@ class Claim(BaseModel):
     limitations: list[str] = Field(
         default_factory=list, description="Known limits of the statement"
     )
+
+    @field_validator("evidence_status", mode="before")
+    @classmethod
+    def _migrate_legacy_sourced(cls, value):
+        # Legacy "sourced" conflated observed + author_stated; map it to observed
+        # (ambiguous, but keeps pre-split analysis.json readable).
+        if value == "sourced":
+            return EvidenceStatus.OBSERVED
+        return value
 
 
 class Episode(BaseModel):
@@ -295,7 +338,7 @@ class Narrative(BaseModel):
     """The compressed reader-facing story of one episode.
 
     The report leads with this: five questions answered in plain language. The
-    full material stays in :class:`Episode` and :class:`LearningCard` and is
+    full material stays in :class:`Episode` and :class:`DecisionCard` and is
     folded into the evidence sections rather than shown up front.
     """
 
@@ -374,21 +417,72 @@ class FeedbackLink(BaseModel):
     rationale: str = Field(min_length=1, description="Why this link is classified as it is")
 
 
-# ── Learning card ──
+# ── Decision card ──
 
 
-class LearningCard(BaseModel):
-    """A transferable takeaway with an applicable-condition and a small experiment."""
+def decision_card_id(project_ref: str, decision: str) -> str:
+    """Deterministic stable id: SHA-256 of ``project_ref`` + ``decision``.
 
-    problem: str = Field(min_length=1, description="The problem the lesson addresses")
-    decision: str = Field(min_length=1, description="The decision / tradeoff made")
-    tradeoff: str = Field(default="", description="What was sacrificed")
-    applicable_when: str = Field(min_length=1, description="When the lesson applies")
-    avoid_when: str = Field(default="", description="When it does not apply")
-    small_experiment: SmallExperiment = Field(description="A bounded, falsifiable experiment")
-    source_refs: list[SourceRef] = Field(
-        default_factory=list, description="Sources backing the lesson"
+    Re-running on the same source + decision yields the same id, so a later
+    run updates the same card instead of duplicating it.
+    """
+    digest = hashlib.sha256(f"{project_ref}:{decision}".encode("utf-8")).hexdigest()
+    return f"dc-{digest[:16]}"
+
+
+class DecisionCard(BaseModel):
+    """A key decision: six questions, each backed by evidence.
+
+    Q1 problem, Q2 choice (+ alternatives), Q3 evidence (outcome), Q4 cost
+    (tradeoffs), Q5 conditions (applicable / avoid), Q6 a bounded experiment.
+    """
+
+    id: str = Field(
+        default="", description="Stable id; auto-computed from project_ref + decision when empty"
     )
+    project_ref: str = Field(
+        default="", description="owner/repo (validate requires non-empty)"
+    )
+    actor_ref: str | None = Field(default=None, description="Who made it (P2; leave None for now)")
+    problem: str = Field(min_length=1, description="Q1: who hit what difficulty, and when")
+    decision: str = Field(min_length=1, description="Q2: what was chosen")
+    alternatives: list[Claim] = Field(
+        default_factory=list, description="Alternatives considered (author-stated vs analyst-proposed)"
+    )
+    tradeoffs: list[str] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("tradeoffs", "tradeoff"),
+        description="Q4: what was gained / sacrificed",
+    )
+    applicable_when: str = Field(default="", description="Q5: where it applies")
+    avoid_when: str = Field(default="", description="Q5: where it does NOT transfer")
+    claims: list[Claim] = Field(
+        default_factory=list, description="Per-claim evidence, each with its evidence_status"
+    )
+    outcome: Outcome = Field(default_factory=Outcome, description="Q3: evidence boundary")
+    unknowns: list[str] = Field(default_factory=list, description="Explicitly unknown items")
+    small_experiment: SmallExperiment | None = Field(
+        default=None, description="Q6: optional bounded experiment"
+    )
+    source_refs: list[SourceRef] = Field(
+        default_factory=list, description="Sources backing the card"
+    )
+    created_at: UtcDatetime = Field(default_factory=_now_utc)
+    updated_at: UtcDatetime = Field(default_factory=_now_utc)
+
+    @field_validator("tradeoffs", mode="before")
+    @classmethod
+    def _coerce_single_tradeoff(cls, value):
+        # Legacy LearningCard had a single "tradeoff" string; wrap it into a list.
+        if isinstance(value, str):
+            return [value]
+        return value
+
+    @model_validator(mode="after")
+    def _fill_id(self) -> "DecisionCard":
+        if not self.id:
+            self.id = decision_card_id(self.project_ref, self.decision)
+        return self
 
 
 # ── Run manifest ──
@@ -434,8 +528,10 @@ class Analysis(BaseModel):
     feedback_links: list[FeedbackLink] = Field(
         default_factory=list, description="Feedback↔development links"
     )
-    learning_cards: list[LearningCard] = Field(
-        default_factory=list, description="Transferable lessons"
+    decision_cards: list[DecisionCard] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("decision_cards", "learning_cards"),
+        description="Key decision cards (max 3 shown in report)",
     )
     platform_stats: list[dict] = Field(
         default_factory=list, description="Per-platform distribution stats with their scope"
