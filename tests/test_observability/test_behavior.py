@@ -190,23 +190,19 @@ class TestDetectMismatches:
     """Tests for DNA-behavior mismatch detection."""
 
     def setup_method(self):
-        """Isolate behavior_log, profile, and legacy DNA paths."""
+        """Isolate behavior_log and profile paths."""
         self.tmp = tempfile.mkdtemp()
         import observability.behavior as bmod
         self._orig_behavior = bmod.BEHAVIOR_LOG_PATH
-        self._orig_dna = bmod.USER_DNA_PATH
         self._orig_profile = bmod.PROFILE_PATH
         self._test_log = os.path.join(self.tmp, "behavior_log.jsonl")
-        self._test_dna = os.path.join(self.tmp, "user_dna.json")
         self._test_profile = os.path.join(self.tmp, "builder_interest_profile.json")
         bmod.BEHAVIOR_LOG_PATH = self._test_log
-        bmod.USER_DNA_PATH = self._test_dna
         bmod.PROFILE_PATH = self._test_profile
 
     def teardown_method(self):
         import observability.behavior as bmod
         bmod.BEHAVIOR_LOG_PATH = self._orig_behavior
-        bmod.USER_DNA_PATH = self._orig_dna
         bmod.PROFILE_PATH = self._orig_profile
 
     def test_no_dna_returns_empty(self):
@@ -216,14 +212,12 @@ class TestDetectMismatches:
 
     def test_few_events_returns_empty(self):
         # Not enough events to trigger mismatch
-        dna = {
-            "values": {
-                "output": {"ranking": ["devtools"], "scores": {"devtools": 9}},
-                "activity": {"ranking": ["creation"], "scores": {"creation": 9}},
-                "reward": {"ranking": ["growth"], "scores": {"wealth": 3}},
-            }
+        profile = {
+            "domains": [{"value": "devtools", "source": "user_confirmed", "confirmed": True}],
+            "learning_goals": [{"value": "build", "source": "user_confirmed", "confirmed": True}],
+            "problem_preferences": [{"value": "growth", "source": "user_confirmed", "confirmed": True}],
         }
-        Path(self._test_dna).write_text(json.dumps(dna))
+        Path(self._test_profile).write_text(json.dumps(profile))
         # Only 3 events — below threshold of 7
         for _ in range(3):
             record_command("collect", domain="agent")
@@ -231,15 +225,13 @@ class TestDetectMismatches:
         assert mismatches == []
 
     def test_output_mismatch_detected(self):
-        dna = {
-            "values": {
-                "output": {"ranking": ["end_user"], "scores": {"end_user": 9, "devtools": 3}},
-                "activity": {"ranking": ["exploration"], "scores": {"creation": 5}},
-                "reward": {"ranking": ["growth"], "scores": {"wealth": 3}},
-            }
+        profile = {
+            "domains": [{"value": "consumer", "source": "user_confirmed", "confirmed": True}],
+            "learning_goals": [{"value": "explore", "source": "user_confirmed", "confirmed": True}],
+            "problem_preferences": [{"value": "growth", "source": "user_confirmed", "confirmed": True}],
         }
-        Path(self._test_dna).write_text(json.dumps(dna))
-        # 8 events all in devtools domain — mismatches with end_user preference
+        Path(self._test_profile).write_text(json.dumps(profile))
+        # 8 events all in devtools domain — mismatches with consumer preference
         for _ in range(8):
             record_command("collect", domain="agent")  # agent → devtools
         mismatches = detect_mismatches()
@@ -249,15 +241,13 @@ class TestDetectMismatches:
         assert output_mismatch[0]["confidence"] >= 0.85
 
     def test_no_mismatch_when_aligned(self):
-        dna = {
-            "values": {
-                "output": {"ranking": ["devtools"], "scores": {"devtools": 9}},
-                "activity": {"ranking": ["exploration"], "scores": {"creation": 5, "exploration": 8}},
-                "reward": {"ranking": ["growth"], "scores": {"wealth": 8}},
-            }
+        profile = {
+            "domains": [{"value": "devtools", "source": "user_confirmed", "confirmed": True}],
+            "learning_goals": [{"value": "explore", "source": "user_confirmed", "confirmed": True}],
+            "problem_preferences": [{"value": "wealth", "source": "user_confirmed", "confirmed": True}],
         }
-        Path(self._test_dna).write_text(json.dumps(dna))
-        # All events in devtools domain — matches DNA
+        Path(self._test_profile).write_text(json.dumps(profile))
+        # All events in devtools domain — matches profile
         for _ in range(7):
             record_command("collect", domain="agent")  # agent → devtools
         mismatches = detect_mismatches()
@@ -265,15 +255,13 @@ class TestDetectMismatches:
         assert len(output_mismatch) == 0  # aligned now
 
     def test_reward_mismatch_with_commercial_domains(self):
-        dna = {
-            "values": {
-                "output": {"ranking": ["devtools"], "scores": {"devtools": 9}},
-                "activity": {"ranking": ["exploration"], "scores": {"creation": 5}},
-                "reward": {"ranking": ["growth"], "scores": {"wealth": 2}},
-            }
+        profile = {
+            "domains": [{"value": "devtools", "source": "user_confirmed", "confirmed": True}],
+            "learning_goals": [{"value": "explore", "source": "user_confirmed", "confirmed": True}],
+            "problem_preferences": [{"value": "growth", "source": "user_confirmed", "confirmed": True}],
         }
-        Path(self._test_dna).write_text(json.dumps(dna))
-        # 7 events, most in commercial domains, but DNA says wealth=2
+        Path(self._test_profile).write_text(json.dumps(profile))
+        # 7 events, most in commercial domains, but profile says growth (low commercial)
         for _ in range(5):
             record_command("collect", domain="fintech")
         for _ in range(2):

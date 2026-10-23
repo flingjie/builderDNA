@@ -136,7 +136,7 @@ class IssueSignal(BaseModel):
     repo: str = Field(description="Repository full name where this issue was opened")
     issue_number: int = Field(description="GitHub issue number")
     title: str = Field(description="Issue title")
-    body: str = Field(default="", description="Issue body text. Used by pain command for embedding-based clustering.")
+    body: str = Field(default="", description="Issue body text. Used by pain command for candidate grouping.")
     comments: int = Field(default=0, description="Number of comments on the issue")
     participants: int = Field(default=0, description="Number of unique participants in the issue discussion")
     reactions: int = Field(default=0, description="Total reaction count (sum of all reaction types)")
@@ -212,7 +212,7 @@ class IssueSummary(BaseModel):
 
 class PainCluster(BaseModel):
     """A single pain cluster from the pain command."""
-    cluster_id: int = Field(description="HDBSCAN cluster ID")
+    cluster_id: int = Field(description="Candidate cluster ID (TF-IDF or HDBSCAN backend)")
     title: str = Field(description="Human-readable cluster title summarizing the pain theme")
     severity: float = Field(description="Average severity score across issues in this cluster (0-10)")
     frequency: int = Field(description="Number of issues in this cluster")
@@ -397,8 +397,7 @@ class DeveloperDNA(BaseModel):
 class RepoActivity(BaseModel):
     """Bounded activity summary for one repo, used by the DeveloperDNA computation.
 
-    Produced by ``collector/github/activity.fetch_repo_activity`` — a limited,
-    bounded evidence collection (PRs, releases, commits, CI/test presence).
+    No current producer — retained as an optional schema for a future activity collector.
     """
     repo: str = Field(description="Repository full name")
     open_prs: int = Field(default=0, description="Open pull requests")

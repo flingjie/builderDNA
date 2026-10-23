@@ -23,7 +23,6 @@ def dna(
     data: str = typer.Option(..., "--data", "-d", help="Input signals JSON (collect output)"),
     developer: str = typer.Option(..., "--developer", help="Developer/org login to analyze"),
     output: str = typer.Option("output/developer_dna.json", "--output", "-o", help="Output JSON file"),
-    activity: str | None = typer.Option(None, "--activity", help="RepoActivity JSON file (optional; populates build/iteration/testing dimensions)"),
 ) -> None:
     """Compute an evidence-backed DeveloperDNA from collected signals."""
     tel = RunTelemetry()
@@ -46,16 +45,7 @@ def dna(
             if s.get("type") == "repo_created":
                 repos.append(s.get("payload", {}))
 
-    activity_data = None
-    if activity:
-        activity_path = Path(activity)
-        if not activity_path.exists():
-            vprint(f"[yellow]Activity file not found: {activity} — continuing without it[/yellow]", level=OutputLevel.NORMAL)
-        else:
-            activity_raw = json.loads(activity_path.read_text(encoding="utf-8"))
-            activity_data = activity_raw.get("activity", activity_raw)
-
-    result_dna = compute_developer_dna(developer, repos, issues, activity=activity_data)
+    result_dna = compute_developer_dna(developer, repos, issues)
 
     diag = Diagnostics()
     for d in result_dna.dimensions:

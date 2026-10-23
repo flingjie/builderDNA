@@ -21,8 +21,7 @@ from models.payload import (
     SandboxResult, OpportunityPayload, OpportunityCard,
     Diagnostics, ConfidenceDiag,
 )
-from models.builder_interest_profile import load_profile
-from models.user_dna_schema import UserDNA
+from models.builder_interest_profile import load_profile, BuilderInterestProfile
 from intelligence.opportunity.scoring import (
     compute_demand, compute_competition, compute_gap,
     compute_market_size, compute_confidence, classify_quadrant,
@@ -40,7 +39,7 @@ from cli.commands.schema_validation import (
 def _generate_cards(
     trends: list[dict],
     pain_clusters: list[dict],
-    user_dna= None,
+    profile: BuilderInterestProfile | None = None,
     weights: dict | None = None,
     gap_threshold: float = 1.5,
     market_threshold: float = 5.0,
@@ -113,9 +112,9 @@ def _generate_cards(
         personalized_score = None
         alignment_reason = ""
         alignment_multiplier = 1.0
-        if user_dna:
+        if profile:
             alignment_multiplier, alignment_reason = compute_alignment(
-                trend, top_repos, user_dna, known_orgs=known_orgs,
+                trend, top_repos, profile, known_orgs=known_orgs,
             )
             personalized_score = round(rank_score * alignment_multiplier, 1)
 
@@ -227,12 +226,11 @@ def opportunity(
 
     # Load BuilderInterestProfile if available (only when explicitly requested)
     prof = load_profile(profile) if profile else None
-    dna = UserDNA(values=prof.to_values()) if prof else None
-    if dna:
+    if prof:
         vprint(f"[dim]Interest profile loaded — applying personalized alignment[/dim]", level=OutputLevel.VERBOSE)
 
     cards = _generate_cards(
-        trend_list, pain_list, dna,
+        trend_list, pain_list, prof,
         weights=weights,
         gap_threshold=gap_threshold,
         market_threshold=market_threshold,
@@ -291,7 +289,7 @@ def opportunity(
         stats={
             "total": len(cards),
             "avg_gap": round(sum(c.gap_score for c in cards) / max(1, len(cards)), 2),
-            "personalized": dna is not None,
+            "personalized": prof is not None,
             "algorithm_version": algorithm_version("opportunity"),
             **tel.to_stats(),
         },
@@ -324,7 +322,7 @@ def opportunity(
         domain=t_payload.get("domain", ""),
         flags={"trends": trends, "pains": pains},
         output_path=output,
-        user_dna_used=dna is not None,
+        user_dna_used=prof is not None,
         elapsed_seconds=tel.elapsed_seconds,
         status="success",
     )

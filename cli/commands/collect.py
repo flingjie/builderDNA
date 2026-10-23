@@ -1,7 +1,7 @@
 """collect — fetch GitHub repos and issues for a domain, output structured signals.
 
 Supports BuilderInterestProfile personalization: reads state/builder_interest_profile.json
-and applies mapping rules to customize domain, topics, window, and repo sorting.
+and applies domain preferences to customize topics and repo sorting.
 """
 import asyncio
 import json
@@ -21,91 +21,85 @@ from models.payload import (
     Diagnostics, DataQualityDiag, ConfidenceDiag,
 )
 from observability import RunTelemetry, OutputLevel, vprint, record_command, record_output_retention
-from models.builder_interest_profile import load_profile
-from models.user_dna_schema import (
-    UserDNA,
-    OUTPUT_DOMAIN_MAP, ACTIVITY_CONFIG,
-    REWARD_WEIGHTS, ENVIRONMENT_SOURCE_MIX,
-)
+from models.builder_interest_profile import load_profile, BuilderInterestProfile
 
 DEMAND_SET = set(DEMAND_LABELS)
 
 
-def _apply_user_dna_rules(
+def _apply_profile_rules(
     domain: str,
     cfg: Config,
-    user_dna: UserDNA,
+    profile: BuilderInterestProfile,
 ) -> tuple[str, list[str], int, dict, dict]:
-    """Apply 4 mapping rules from User DNA to collect parameters.
+    """Apply profile preferences to collect parameters.
 
     Returns: (domain, topics, window_days, repo_sort_weights, source_mix)
 
-    Rules are applied in priority order:
-      1. output → domain + topics
-      2. activity → window + filter thresholds
-      3. reward → repo sort weights
-      4. environment → data source mix
+    Rules:
+      1. domains[0] → preferred domain + topics
+      2. learning_goals[0] → window + filter thresholds
+      3. problem_preferences → repo sort weights
+      4. build_constraints → data source mix
     """
-    output_ranking = user_dna.values.output.ranking
-    activity_ranking = user_dna.values.activity.ranking
-    reward_ranking = user_dna.values.reward.ranking
-    env_ranking = user_dna.values.environment.ranking
-
-    # ── Rule 1: output → domain + topics ──
+    # Rule 1: preferred domain from profile.domains[0]
     final_domain = domain
     final_topics: list[str] = []
     domain_config = cfg.domains.get(domain, {})
 
-    if output_ranking:
-        top_output = output_ranking[0]
-        mapping = OUTPUT_DOMAIN_MAP.get(top_output, {})
-        new_domain = mapping.get("domain")
-
-        if new_domain and new_domain != domain and new_domain in cfg.domains:
-            final_domain = new_domain
+    if profile.domains:
+        top_domain = profile.domains[0].value.lower()
+        if top_domain in cfg.domains:
+            final_domain = top_domain
             final_topics = cfg.domains[final_domain].get("topics", [])
-        elif "topics_filter" in mapping:
-            # Filter current domain topics
-            all_topics = domain_config.get("topics", [])
-            final_topics = [t for t in all_topics if any(
-                kw in t.lower() for kw in mapping["topics_filter"]
-            )] or all_topics
-        elif "topics_append" in mapping:
-            final_topics = list(domain_config.get("topics", [])) + mapping["topics_append"]
 
     if not final_topics:
         final_topics = domain_config.get("topics", [])
 
-    # ── Rule 2: activity → window + filter thresholds ──
+    # Rule 2: learning_goals → window
     window_days = 365
     repo_filter = {"min_stars": 0, "boost": "velocity"}
 
-    if activity_ranking:
-        top_activity = activity_ranking[0]
-        act_cfg = ACTIVITY_CONFIG.get(top_activity, ACTIVITY_CONFIG["exploration"])
-        window_days = act_cfg["window"]
-        repo_filter = {"min_stars": act_cfg["min_stars"], "boost": act_cfg["boost"]}
+    if profile.learning_goals:
+        top_goal = profile.learning_goals[0].value.lower()
+        goal_window = {
+            "build": 90, "create": 90, "prototype": 90,
+            "explore": 365, "learn": 365, "research": 365,
+            "deepen": 180, "optimize": 180, "improve": 180,
+            "ship": 90, "launch": 90, "productionize": 90,
+        }
+        window_days = goal_window.get(top_goal, 365)
+        repo_filter = {"min_stars": 0, "boost": "velocity"}
 
-    # ── Rule 3: reward → repo sort weights ──
-    repo_sort_weights = REWARD_WEIGHTS.get("growth", REWARD_WEIGHTS["growth"])
-    if reward_ranking:
-        # Blend top 2: ranking[0] gets 0.5, ranking[1] gets 0.3, rest gets 0.2 distributed
-        primary = REWARD_WEIGHTS.get(reward_ranking[0], REWARD_WEIGHTS["growth"])
-        if len(reward_ranking) > 1:
-            secondary = REWARD_WEIGHTS.get(reward_ranking[1], REWARD_WEIGHTS["growth"])
-            repo_sort_weights = {
-                k: primary.get(k, 0) * 0.6 + secondary.get(k, 0) * 0.3
-                for k in primary
-            }
-        else:
-            repo_sort_weights = dict(primary)
+    # Rule 3: problem_preferences → repo sort weights
+    repo_sort_weights = {"velocity": 0.5, "stars_log": 0.2, "commercial": 0.1, "contributors": 0.2}
+    if profile.problem_preferences:
+        top_pref = profile.problem_preferences[0].value.lower()
+        pref_weights = {
+            "growth": {"velocity": 0.5, "stars_log": 0.2, "commercial": 0.1, "contributors": 0.2},
+            "mastery": {"velocity": 0.15, "stars_log": 0.15, "commercial": 0.1, "contributors": 0.6},
+            "recognition": {"velocity": 0.15, "stars_log": 0.5, "commercial": 0.2, "contributors": 0.15},
+            "revenue": {"velocity": 0.15, "stars_log": 0.2, "commercial": 0.5, "contributors": 0.15},
+            "wealth": {"velocity": 0.15, "stars_log": 0.2, "commercial": 0.5, "contributors": 0.15},
+        }
+        repo_sort_weights = pref_weights.get(top_pref, repo_sort_weights)
 
-    # ── Rule 4: environment → data source mix ──
-    source_mix = ENVIRONMENT_SOURCE_MIX.get("autonomy", ENVIRONMENT_SOURCE_MIX["autonomy"])
-    if env_ranking:
-        source_mix = ENVIRONMENT_SOURCE_MIX.get(
-            env_ranking[0], ENVIRONMENT_SOURCE_MIX["autonomy"]
-        )
+    # Rule 4: build_constraints → source mix
+    source_mix = {"accounts": 0.7, "vendors": 0.2, "topics": 0.1}
+    if profile.build_constraints:
+        top_constraint = profile.build_constraints[0].value.lower()
+        constraint_mix = {
+            "solo": {"accounts": 0.7, "vendors": 0.2, "topics": 0.1},
+            "independent": {"accounts": 0.7, "vendors": 0.2, "topics": 0.1},
+            "autonomy": {"accounts": 0.7, "vendors": 0.2, "topics": 0.1},
+            "collaborative": {"accounts": 0.2, "vendors": 0.5, "topics": 0.3},
+            "team": {"accounts": 0.2, "vendors": 0.5, "topics": 0.3},
+            "oss": {"accounts": 0.2, "vendors": 0.5, "topics": 0.3},
+            "stable": {"accounts": 0.1, "vendors": 0.3, "topics": 0.6},
+            "mature": {"accounts": 0.1, "vendors": 0.3, "topics": 0.6},
+            "competitive": {"accounts": 0.2, "vendors": 0.2, "topics": 0.6},
+            "fast-moving": {"accounts": 0.2, "vendors": 0.2, "topics": 0.6},
+        }
+        source_mix = constraint_mix.get(top_constraint, source_mix)
 
     return final_domain, final_topics, window_days, repo_sort_weights, source_mix
 
@@ -163,10 +157,9 @@ async def _run_collect(
 
     # Load BuilderInterestProfile and apply mapping rules (only when explicitly requested)
     profile = load_profile(profile_path) if profile_path else None
-    user_dna = UserDNA(values=profile.to_values()) if profile else None
-    if user_dna:
-        final_domain, topics, w_days, sort_weights, source_mix = _apply_user_dna_rules(
-            domain, cfg, user_dna
+    if profile:
+        final_domain, topics, w_days, sort_weights, source_mix = _apply_profile_rules(
+            domain, cfg, profile
         )
         vprint(f"[dim]Interest profile loaded → domain={final_domain}, window={w_days}d, "
                f"topics={topics[:3]}...[/dim]", level=OutputLevel.VERBOSE)
@@ -174,8 +167,8 @@ async def _run_collect(
         final_domain = domain
         topics = domain_config.get("topics", [])
         w_days = window_days or 365
-        sort_weights = REWARD_WEIGHTS["growth"]
-        source_mix = ENVIRONMENT_SOURCE_MIX["autonomy"]
+        sort_weights = {"velocity": 0.5, "stars_log": 0.2, "commercial": 0.1, "contributors": 0.2}
+        source_mix = {"accounts": 0.7, "vendors": 0.2, "topics": 0.1}
 
     client = GitHubClient(
         token=cfg.github.token,
@@ -313,7 +306,7 @@ async def _run_collect(
         "topics_searched": len(topics),
         "topics_with_results": topics_with_results,
         "vendors_scanned": len(vendor_accounts),
-        "personalized": user_dna is not None,
+        "personalized": profile is not None,
     }
 
     # ── Build diagnostics ──────────────────────────────────────────
@@ -415,9 +408,9 @@ async def _run_collect(
         command="collect",
         domain=final_domain,
         flags={"window": w_days, "no_cache": no_cache, "clear_cache": clear_cache,
-               "user_dna": user_dna is not None},
+               "profile": profile is not None},
         output_path=output,
-        user_dna_used=user_dna is not None,
+        user_dna_used=profile is not None,
         elapsed_seconds=tel.elapsed_seconds,
         status="success",
     )

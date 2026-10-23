@@ -29,7 +29,6 @@ from observability.output import OutputLevel, vprint
 BEHAVIOR_LOG_PATH = "state/behavior_log.jsonl"
 MISMATCH_REPORT_PATH = "state/mismatch_report.json"
 PROFILE_PATH = "state/builder_interest_profile.json"
-USER_DNA_PATH = "state/user_dna.json"  # legacy path (pre-P4), kept as a fallback
 CONFIG_PATH = "config.yaml"
 
 
@@ -228,21 +227,21 @@ def record_output_retention(output_path: str, referenced_by: str = "") -> None:
 
 # ── Mismatch detection ───────────────────────────────────────────
 
-def _load_user_dna_values() -> dict | None:
-    """Load profile/values for mismatch comparison. Returns None if none found.
-
-    Prefers the converged BuilderInterestProfile; falls back to the legacy
-    ``user_dna.json`` (4-dimension values) so pre-migration state keeps working.
-    """
+def _load_profile_values() -> dict | None:
+    """Load profile values for mismatch comparison. Returns None if none found."""
     from models.builder_interest_profile import load_profile
 
     profile = load_profile(PROFILE_PATH)
-    if profile is not None:
-        return profile.to_values().model_dump()
-    dna = _read_json(USER_DNA_PATH)
-    if not dna or not dna.get("values"):
+    if profile is None:
         return None
-    return dna["values"]
+
+    # Convert profile fields to the dimension format mismatch detection expects
+    return {
+        "output": {"ranking": [d.value for d in profile.domains]},
+        "activity": {"ranking": [g.value for g in profile.learning_goals]},
+        "environment": {"ranking": [c.value for c in profile.build_constraints]},
+        "reward": {"ranking": [p.value for p in profile.problem_preferences]},
+    }
 
 
 def _map_domain_to_output(domain: str) -> str:
@@ -294,17 +293,17 @@ def _map_domain_to_commercial_score(events: list[dict]) -> float:
 
 
 def detect_mismatches() -> list[dict]:
-    """Detect mismatches between User DNA and observed behavior.
+    """Detect mismatches between User Interest Profile and observed behavior.
 
     Analyzes 3 dimensions:
-      - Output: domain choices vs stated output preference (confidence 0.85+)
-      - Activity: pipeline completion rate vs stated activity preference (confidence 0.6-0.75)
-      - Reward: commercial domain frequency vs stated wealth score (confidence 0.5-0.6)
+      - Output: domain choices vs stated domain preferences (confidence 0.85+)
+      - Activity: pipeline completion rate vs stated learning goals (confidence 0.6-0.75)
+      - Reward: commercial domain frequency vs stated problem preferences (confidence 0.5-0.6)
 
     Returns a list of mismatch dicts, each with:
       dimension, dna_value, behavior_signal, confidence, detail, suggested_question
     """
-    dna = _load_user_dna_values()
+    dna = _load_profile_values()
     if not dna:
         return []
 
@@ -318,7 +317,6 @@ def detect_mismatches() -> list[dict]:
     # ── Output dimension (high confidence) ──
     output_dna = dna.get("output", {})
     output_ranking = output_dna.get("ranking", [])
-    output_scores = output_dna.get("scores", {})
 
     if output_ranking and cmd_events:
         # Map each command's domain to output type and count
@@ -339,53 +337,53 @@ def detect_mismatches() -> list[dict]:
                 actual_top = max(output_counts, key=output_counts.get) if output_counts else "unknown"
                 mismatches.append({
                     "dimension": "output",
-                    "dna_value": f"top output preference: {top_dna_output} (score={output_scores.get(top_dna_output, '?')})",
+                    "dna_value": f"top output preference: {top_dna_output}",
                     "behavior_signal": f"only {top_behavior_fraction:.0%} of domains match {top_dna_output}; most frequent: {actual_top} ({output_counts.get(actual_top, 0)}/{total})",
                     "confidence": 0.85,
-                    "detail": f"DNA ranks '{top_dna_output}' #1 but behavior shows only {top_behavior_fraction:.0%} alignment across {total} commands.",
-                    "suggested_question": f"你的DNA显示你最看重'{top_dna_output}'类产品，但最近{total}次分析中有{total - output_counts.get(top_dna_output, 0)}次在看'{actual_top}'方向——是兴趣变了还是DNA需要更新？",
+                    "detail": f"Profile ranks '{top_dna_output}' #1 but behavior shows only {top_behavior_fraction:.0%} alignment across {total} commands.",
+                    "suggested_question": f"你的 Profile 显示你最看重'{top_dna_output}'类方向，但最近{total}次分析中有{total - output_counts.get(top_dna_output, 0)}次在看'{actual_top}'方向——是兴趣变了还是 Profile 需要更新？",
                 })
 
     # ── Activity dimension (medium confidence) ──
     activity_dna = dna.get("activity", {})
     activity_ranking = activity_dna.get("ranking", [])
-    activity_scores = activity_dna.get("scores", {})
 
     if activity_ranking and len(cmd_events) >= 5:
         full_runs, collect_runs = _map_command_to_activity(cmd_events)
         completion_rate = full_runs / max(1, collect_runs)
 
         top_activity = activity_ranking[0]
-        creation_score = activity_scores.get("creation", 5)
-        exploration_score = activity_scores.get("exploration", 5)
 
-        # If DNA says "creation" but completion rate is low, they behave more like exploration
-        if top_activity == "creation" and creation_score > exploration_score and completion_rate < 0.30:
+        # If DNA says "build" (creation-oriented) but completion rate is low, they behave more like exploration
+        if top_activity in ["build", "create", "ship"] and completion_rate < 0.30:
             if collect_runs >= 3:
                 mismatches.append({
                     "dimension": "activity",
-                    "dna_value": f"top activity: creation (score={creation_score})",
+                    "dna_value": f"top activity: {top_activity}",
                     "behavior_signal": f"pipeline completion rate: {completion_rate:.0%} ({full_runs}/{collect_runs} runs)",
                     "confidence": 0.65,
-                    "detail": f"DNA values 'creation' highly but only {completion_rate:.0%} of collect runs result in full pipeline completion — behavior looks more like exploration.",
-                    "suggested_question": f"你的DNA里creation={creation_score}，但{collect_runs}次collect只有{full_runs}次跑完了全流水线——更像在探索而非创造，要不要调高exploration的权重？",
+                    "detail": f"Profile values '{top_activity}' highly but only {completion_rate:.0%} of collect runs result in full pipeline completion — behavior looks more like exploration.",
+                    "suggested_question": f"你的 Profile 里 {top_activity} 排第一，但{collect_runs}次 collect 只有{full_runs}次跑完了全流水线——更像在探索而非完成，要不要调高 explore/deepen 的权重？",
                 })
 
     # ── Reward dimension (lower confidence) ──
     reward_dna = dna.get("reward", {})
-    reward_scores = reward_dna.get("scores", {})
-    wealth_score = reward_scores.get("wealth", 5)
+    reward_ranking = reward_dna.get("ranking", [])
 
     if len(cmd_events) >= 5:
         commercial_fraction = _map_domain_to_commercial_score(cmd_events)
-        if commercial_fraction > 0.60 and wealth_score < 5:
+        # Check if top preference is non-commercial (growth/mastery) but behavior is commercial
+        top_reward = reward_ranking[0] if reward_ranking else None
+        non_commercial_prefs = {"growth", "mastery", "depth", "craft", "learning"}
+
+        if top_reward in non_commercial_prefs and commercial_fraction > 0.60:
             mismatches.append({
                 "dimension": "reward",
-                "dna_value": f"wealth={wealth_score} (low commercial interest)",
+                "dna_value": f"{top_reward} (low commercial interest)",
                 "behavior_signal": f"{commercial_fraction:.0%} of domains are commercial (fintech/consumer/enterprise)",
                 "confidence": 0.55,
-                "detail": f"DNA says wealth is low priority ({wealth_score}/10) but {commercial_fraction:.0%} of analyses target commercial domains.",
-                "suggested_question": f"你的DNA里wealth只有{wealth_score}分，但最近{commercial_fraction:.0%}的分析都在商业化领域——是DNA需要更新，还是你在做竞品调研？",
+                "detail": f"Profile says '{top_reward}' is top priority but {commercial_fraction:.0%} of analyses target commercial domains.",
+                "suggested_question": f"你的 Profile 里 {top_reward} 排第一，但最近{commercial_fraction:.0%}的分析都在商业化领域——是 Profile 需要更新，还是你在做竞品调研？",
             })
 
     return mismatches

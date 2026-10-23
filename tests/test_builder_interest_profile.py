@@ -9,9 +9,7 @@ from models.builder_interest_profile import (
     BuilderInterestProfile,
     InterestItem,
     load_profile,
-    migrate_user_dna,
 )
-from models.user_dna_schema import UserDNA, Values, ValueDimension
 
 
 def _profile(**overrides) -> BuilderInterestProfile:
@@ -48,7 +46,7 @@ class TestBuilderInterestProfile:
             "migrated_from",
         }
 
-    def test_to_values_produces_valid_internal_values(self):
+    def test_profile_roundtrip(self, tmp_path):
         p = _profile(
             domains=[
                 InterestItem(value="agent", source="user_confirmed", confirmed=True),
@@ -64,80 +62,16 @@ class TestBuilderInterestProfile:
                 InterestItem(value="mastery", source="user_confirmed", confirmed=True),
             ],
         )
-        values = p.to_values()
-        assert isinstance(values, Values)
-        assert values.output.ranking  # domains → output ranking
-        assert values.activity.ranking  # learning_goals → activity
-        assert values.environment.ranking  # build_constraints → environment
-        assert values.reward.ranking  # problem_preferences → reward
-
-    def test_empty_profile_uses_fallback_rankings(self):
-        values = BuilderInterestProfile().to_values()
-        assert values.output.ranking
-        assert values.activity.ranking
-        assert values.environment.ranking
-        assert values.reward.ranking
+        # Serialize and reload
+        profile_file = tmp_path / "profile.json"
+        profile_file.write_text(p.model_dump_json(indent=2))
+        loaded = load_profile(str(profile_file))
+        assert loaded is not None
+        assert len(loaded.domains) == 2
+        assert len(loaded.learning_goals) == 1
 
 
-class TestMigration:
-    def _legacy_dna(self) -> dict:
-        return {
-            "version": 1,
-            "extracted_at": "2026-01-01T00:00:00+00:00",
-            "values": {
-                "environment": {
-                    "ranking": ["autonomy", "collaboration"],
-                    "scores": {"autonomy": 9, "collaboration": 6},
-                },
-                "activity": {
-                    "ranking": ["creation", "exploration"],
-                    "scores": {"creation": 9, "exploration": 8},
-                },
-                "output": {
-                    "ranking": ["infrastructure", "devtools"],
-                    "scores": {"infrastructure": 9, "devtools": 7},
-                },
-                "reward": {
-                    "ranking": ["growth", "mastery"],
-                    "scores": {"growth": 9, "mastery": 8},
-                },
-            },
-            "beliefs": [], "criteria": [], "preferences": {}, "evidence_log": [],
-        }
-
-    def test_migration_writes_profile_and_backup(self, tmp_path):
-        old = tmp_path / "user_dna.json"
-        new = tmp_path / "builder_interest_profile.json"
-        old.write_text(json.dumps(self._legacy_dna()))
-
-        profile = migrate_user_dna(str(old), str(new), backup=True)
-
-        assert profile.domains[0].value == "agent"  # infrastructure → agent
-        assert profile.learning_goals[0].value == "build"  # creation → build
-        assert profile.build_constraints[0].value == "solo"  # autonomy → solo
-        assert profile.problem_preferences[0].value == "growth"  # growth → growth
-        assert profile.migrated_from == str(old)
-        assert all(item.confirmed for item in profile.domains)
-
-        # Backup of the legacy file exists and is unchanged.
-        backup = Path(str(old) + ".bak")
-        assert backup.exists()
-        assert json.loads(backup.read_text()) == self._legacy_dna()
-
-        # New profile file is loadable.
-        assert load_profile(str(new)) is not None
-
-    def test_migration_is_idempotent(self, tmp_path):
-        old = tmp_path / "user_dna.json"
-        new = tmp_path / "builder_interest_profile.json"
-        old.write_text(json.dumps(self._legacy_dna()))
-
-        first = migrate_user_dna(str(old), str(new))
-        second = migrate_user_dna(str(old), str(new))
-
-        # Second run returns the already-written profile, does not re-migrate.
-        assert second == first
-
+class TestLoadProfile:
     def test_load_profile_returns_none_on_missing(self, tmp_path):
         assert load_profile(str(tmp_path / "nope.json")) is None
 
