@@ -179,11 +179,6 @@ Read: hyp_001 "Agent Memory needs unified State Engine" is EXPLORING, confidence
   → Ask: "Deep dive on either?"
 ```
 
-## User Weights
-
-Read `state/user_weights.json` at session start. Apply `scoring_bias` when interpreting opportunities.
-Record feedback in `feedback_log` after each session.
-
 ## BuilderInterestProfile (Value Discovery Integration)
 
 BuilderDNA integrates with the `value-discovery` Skill for personalized **ranking only**.

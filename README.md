@@ -116,7 +116,6 @@ BuilderDNA/
 │
 ├── state/
 │   ├── hypotheses.json        # 跨对话的探索状态追踪
-│   ├── user_weights.json      # 用户偏好权重（只影响排序）
 │   ├── builder_interest_profile.json  # 用户兴趣画像（只影响优先级）
 │   ├── builders/              # builders.jsonl 问题快照 + events.jsonl 轨迹事件
 │   ├── reflections.jsonl      # 技术复盘事件日志

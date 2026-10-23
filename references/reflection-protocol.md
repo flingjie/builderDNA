@@ -3,9 +3,7 @@
 Shared protocol specification for the `/reflect` and `/distill` skills. **Single source of truth** — both skills reference this file for schemas, lens definitions, adversary rules, and storage conventions.
 
 > **Convergence note (P4):** the `/reflect` and `/distill` skills now focus on
-> *technical judgment and cognition* only. The legacy `state/user_dna.json`
-> "self-model" (a `values`/`beliefs`/`criteria` diff model, with Value/Ability
-> lens framing) is **superseded**. Interests live in
+> *technical judgment and cognition* only. Interests live in
 > `state/builder_interest_profile.json` (6 fields, ranking-only); cognitive
 > blind-spots live in `state/digest_gaps.jsonl`. Lens names are interpreted as
 > Decision/Assumption/Pattern (technical), not Value/Ability (personality). See

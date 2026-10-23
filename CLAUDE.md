@@ -156,7 +156,6 @@ Evals exist for builderdna (`.claude/skills/builderdna/evals/`) via the skill-cr
 | `config.yaml` | Accounts, domains (topic tags), vendors, embedding, output config |
 | `models/payload.py` | Output schemas for all data-producing commands — the contract Claude Code reads |
 | `models/builder_interest_profile.py` | Public user-interest profile (domains, adjacencies, prefs, constraints, goals, risk) + migration |
-| `models/user_dna_schema.py` | Internal scoring representation (Values) + domain/activity/reward mapping rule tables |
 | `models/builder_problem.py` | Builder problem snapshot, append-only trajectory event, cross-person comparison, verifiable opportunity card |
 | `schema.md` | Human-readable schema reference for all SandboxResult payloads (including diagnostics) |
 | `signals/models.py` | Unified Signal model — all data sources normalize to this |
@@ -169,7 +168,6 @@ Evals exist for builderdna (`.claude/skills/builderdna/evals/`) via the skill-cr
 | `adapters/` | Embed BuilderDNA in agent frameworks: interface.py, cli.py, claude_code.py |
 | `state/bootstrap.json` | Bootstrap state — records successful run parameters for optimize skill hints |
 | `state/builder_interest_profile.json` | User interest profile (domains, adjacencies, problem prefs, build constraints, learning goals, risk tolerance) — ranking only |
-| `state/user_weights.json` | User preference weights for opportunity scoring bias |
 | `state/reflections.jsonl` | Reflection event log for /reflect and /distill skills |
 | `state/digest_gaps.jsonl` | Feynman verification gap reports — blind-spot tracking (digest skill, created on first use) |
 | `state/distill_reports/` | Growth reports from /distill (YYYY-MM-DD_distill.md) |
