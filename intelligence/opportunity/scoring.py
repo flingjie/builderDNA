@@ -88,12 +88,16 @@ def compute_gap(demand: float, competition: float) -> float:
 # ── Market Size ───────────────────────────────────────────────────────
 
 def compute_market_size(trends: list[dict]) -> float:
-    """Absolute market size from total star activity across all trends.
+    """Activity-strength hint from total star activity across all trends.
+
+    Star count is an *activity* signal, NOT a measured market size. It is a
+    coarse ordering hint only — it does not establish that a real, addressable
+    market exists.
 
     Log-scaled to prevent a few mega-repos from dominating. Capped at 10.
 
     Returns:
-        Market size score (0-10). 0 when there are no trends.
+        Activity-strength score (0-10). 0 when there are no trends.
     """
     total_stars = 0
     for t in trends:
@@ -189,11 +193,12 @@ def recommend_action(
     market_size: float,
     confidence: float,
 ) -> str:
-    """Generate an action recommendation from quadrant + market context.
+    """Generate a signal-ordering hint from quadrant + activity context.
 
-    Unlike the old gap-only logic, this distinguishes:
-      - "Big market, moderate gap" (Monitor — might still be worth entering)
-      - "Small market, high gap" (Niche — real need but limited scale)
+    These strings are *hints to investigate further*, not conclusions. Demand is
+    not proven, market size is not measured, and a "Build" quadrant does not mean
+    "go build" — it means the activity/gap signals are strong enough to justify
+    bounded validation.
     """
     confidence_note = ""
     if confidence < 0.5:
@@ -201,23 +206,23 @@ def recommend_action(
 
     if quadrant == "Build":
         return (
-            f"强烈推荐在 {topic} 方向创业或立项——大市场+高缺口，需求明确且竞争尚未饱和"
-            f"{confidence_note}"
+            f"{topic} 的活跃度与缺口信号较强（gap={gap:.1f}），值得**进一步验证**需求；"
+            f"尚未证明需求成立，先做有界验证而非立项{confidence_note}"
         )
     elif quadrant == "Niche":
         return (
-            f"建议以利基策略切入 {topic}——需求真实但市场规模有限({market_size:.1f}/10)，"
-            f"适合小而美的独立产品{confidence_note}"
+            f"{topic} 的缺口信号较强但活跃度有限（activity={market_size:.1f}/10），"
+            f"可作为利基方向观察并验证{confidence_note}"
         )
     elif quadrant == "Monitor":
         return (
-            f"密切关注 {topic} 发展——市场规模大({market_size:.1f}/10)但竞争较充分"
-            f"(gap={gap:.1f})，需差异化切入点{confidence_note}"
+            f"关注 {topic} 的后续证据——活跃度较高（activity={market_size:.1f}/10）"
+            f"但竞争较充分（gap={gap:.1f}），暂不进入{confidence_note}"
         )
     else:  # Avoid
         return (
-            f"暂不建议进入 {topic}——市场规模小({market_size:.1f}/10)且竞争饱和"
-            f"(gap={gap:.1f}){confidence_note}"
+            f"{topic} 当前活跃度低（activity={market_size:.1f}/10）且竞争充分"
+            f"（gap={gap:.1f}），暂不建议投入{confidence_note}"
         )
 
 

@@ -17,7 +17,7 @@
 
 ## 架构
 
-BuilderDNA 是一组可组合的 CLI 沙盒命令。每个命令：**结构化 JSON 输入 → 确定性计算 → 结构化 JSON 输出**。Claude Code 负责语义推理和编排，读取 JSON 输出。无 LLM（除本地 Ollama 嵌入）、无 Web 服务、无通用 Agent Runtime。
+BuilderDNA 是一组可组合的 CLI 沙盒命令。每个命令：**结构化 JSON 输入 → 确定性计算 → 结构化 JSON 输出**。Claude Code 负责语义推理和编排，读取 JSON 输出。无云 LLM（可选本地 Ollama 嵌入，opt-in）、无 Web 服务、无通用 Agent Runtime。
 
 ```
 Claude Code（编排 + 语义判断）── 读取 state/*.json，决定跑什么
@@ -41,7 +41,7 @@ Claude Code（编排 + 语义判断）── 读取 state/*.json，决定跑什�
 ## 快速开始
 
 ```bash
-# 环境：Python >= 3.11，GitHub Token，可选 Ollama（pain 命令需要）
+# 环境：Python >= 3.11，GitHub Token，可选 Ollama（仅 --backend embedding 时需要）
 uv sync --dev
 
 # 配置 .env
@@ -60,7 +60,7 @@ PYTHONPATH=. uv run builderdna collect agent --window 365 --output output/signal
 # 趋势分析 — 从信号计算主题趋势（速度、阶段）
 PYTHONPATH=. uv run builderdna trend agent --data output/signals.json
 
-# 痛点挖掘 — HDBSCAN 聚类 issue 文本（需要 Ollama + bge-m3）
+# 痛点候选召回 — TF-IDF（默认，离线）；--backend embedding 可选 Ollama + HDBSCAN
 PYTHONPATH=. uv run builderdna pain agent --data output/signals.json
 
 # 机会发现 — 规则引擎，gap_score = demand / competition
@@ -99,7 +99,7 @@ BuilderDNA/
 ├── collector/normalizer.py    # 原始 API 响应 → Signal 统一模型
 │
 ├── intelligence/trend/        # 趋势计算（velocity, stage）
-├── intelligence/pain/         # 痛点挖掘（HDBSCAN + embeddings）
+├── intelligence/pain/         # 痛点候选召回（TF-IDF 默认 + 可选 embedding）
 ├── intelligence/opportunity/  # 机会评分（规则引擎）
 ├── intelligence/builder_problems/ # Builder 问题快照、轨迹事件、跨人比较、机会卡
 │
@@ -145,7 +145,7 @@ BuilderDNA/
 | 用户兴趣画像（BuilderInterestProfile） | `value-discovery` |
 | 工具执行轨迹分析 | `trace-classify` |
 
-**X 只负责学习信号；Reddit 只负责痛点和机会信号。** 本项目不生成社交回复、不做获客、不维护关系。
+**X 可提供公开问题线索；Reddit 可提供痛点与机会线索；跨源整合归 `concept-radar`。** 本项目不生成社交回复、不做获客、不维护关系。
 
 ## 设计原则
 

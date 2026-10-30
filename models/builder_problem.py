@@ -57,6 +57,7 @@ class BuilderProblem(BaseModel):
     user_segment: str = Field(default="", description="Who the person is, e.g. independent Agent developer")
     trigger_context: str = Field(default="", description="What action/change triggers the problem")
     job_to_be_done: str = Field(default="", description="The task the person is trying to complete")
+    obstacle: str = Field(default="", description="The concrete obstacle blocking the task (cross-person comparison groups by task + obstacle)")
     primary_cost: str = Field(default="", description="The main cost the problem imposes")
 
     source_refs: list[str] = Field(default_factory=list, description="Evidence references backing this record")
@@ -116,21 +117,27 @@ class ValidationTarget(BaseModel):
 class ProblemComparison(BaseModel):
     """A task-and-obstacle based comparison across multiple people.
 
-    Only problems whose normalized ``job_to_be_done`` and ``trigger_context``
-    match are grouped. Mentioning the same keyword such as 'eval' is not enough.
+    Only problems whose normalized ``job_to_be_done`` and ``obstacle`` match are
+    grouped. Mentioning the same keyword such as 'eval' is not enough, and a
+    different obstacle keeps two problems apart even when they share a task.
     """
 
     scenario_key: str = Field(description="Deterministic task+obstacle fingerprint")
     title: str = Field(description="Human-readable scenario title")
     user_segment: str = Field(default="", description="User segment when all problems agree; otherwise empty")
-    trigger_context: str = Field(description="Shared trigger context")
+    trigger_context: str = Field(default="", description="Trigger context when all problems agree; otherwise empty")
     job_to_be_done: str = Field(description="Shared job to be done")
+    obstacle: str = Field(description="Shared obstacle")
     current_workaround: str = Field(default="", description="Shared workaround when all problems agree; otherwise empty")
     primary_cost: str = Field(default="", description="Shared primary cost when all problems agree; otherwise empty")
 
     problem_ids: list[str] = Field(default_factory=list)
     person_refs: list[str] = Field(default_factory=list)
     project_refs: list[str] = Field(default_factory=list)
+    independent_person_count: int = Field(default=0, description="Distinct person_ref count in this group")
+    confirmable_person_count: int = Field(default=0, description="Distinct persons with at least one source_ref (confirmable independent people)")
+    review_status: str = Field(default="candidate", description="candidate | single_person | cross_person_repeat")
+    source_coverage: str = Field(default="", description="Human-readable coverage note, e.g. '2/3 persons have sources'")
     similarities: dict[str, str] = Field(default_factory=dict)
     differences: dict[str, list[dict[str, str]]] = Field(default_factory=dict)
     evidence: list[ProblemEvidenceRef] = Field(default_factory=list)
@@ -144,7 +151,12 @@ class ProblemOpportunityCard(BaseModel):
 
     scenario_key: str = Field(min_length=1)
     title: str = Field(min_length=1)
-    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    confidence: float = Field(
+        default=0.0, ge=0.0, le=1.0,
+        description="Evidence-coverage indicator (confirmable_person_count / independent_person_count), NOT a probability that demand exists",
+    )
+    evidence_coverage: str = Field(default="", description="Human-readable evidence coverage note")
+    review_status: str = Field(default="candidate", description="candidate | single_person | cross_person_repeat")
     who: list[ProblemEvidenceRef] = Field(default_factory=list, description="Who encountered the problem and the evidence")
     same_parts: list[str] = Field(default_factory=list, description="What is the same across people")
     different_parts: list[str] = Field(default_factory=list, description="What differs across people")

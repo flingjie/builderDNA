@@ -29,7 +29,7 @@ Two modes coexist:
 
 | 做 | 不做 |
 |----|------|
-| 从 Reddit 发现重复痛点与付费意愿，产出 PainCluster 候选 | 回复帖子、私信、获客（超出本项目范围）|
+| 从 Reddit 发现重复痛点与潜在需求，产出 PainCluster 候选 | 回复帖子、私信、获客（超出本项目范围）|
 | 通过 `investigate` 控制面动态决定下一步动作 | 从 X 学习技术信号（那是 twitter-learning 的事）|
 | 扫描多源预设，聚合跨区段痛点 | 跨源验证概念（那是 concept-radar 的事）|
 | 把被选中的候选交给 concept radar 做跨源验证 | 替代 `investigate` 控制面的状态机与持久化 |
@@ -39,7 +39,7 @@ Two modes coexist:
 | 请求 | 路由 |
 |------|------|
 | 只从 Reddit 发现痛点/机会 | **`reddit-opportunity`**（本 skill）|
-| 只从 X 学习技术信号 | `twitter-learning` |
+| 从 X 学习技术信号（X 也可提供公开问题线索） | `twitter-learning` |
 | 跨源验证概念 | `concept-radar` |
 
 ## Quick Reference
@@ -92,7 +92,7 @@ source call, budget, state, and persistence; you own which evidence gap to close
 先 `init`，然后每轮从控制面返回的 `allowed_next_actions` 里选一个动作：
 
 - `search_discussions` — 扩展相关讨论（`--params '{"subreddit":"X","sort":"new","limit":25}'`）
-- `inspect_thread` — 深读一个已采集的讨论（完整 selftext + 链接的上游来源）
+- `inspect_thread` — 查看一个已采集讨论的**已存 500 字摘录**（不深读完整 selftext/上游；完整正文需另行补取）
 - `find_similar_cases` — 检查重复是否来自独立讨论（按共同上游去重）
 - `seek_workaround` — 查用户当前如何解决（保留原文，区分真实实践 vs 建议）
 - `seek_counterevidence` — 找"问题不成立/已经解决"的证据
@@ -184,7 +184,7 @@ For each recurring problem you find across posts, record:
 - **pain / urgency** — low / medium / high
 - **tried solutions** — what they've already attempted
 - **why they fail** — the gap those attempts leave
-- **willingness to pay** — explicit ("I'd pay for this"), implicit (frustration + no free fix), or none
+- **willingness to pay** — one of `stated` (口头表达付费意愿), `spent` (已在替代方案上支出), `purchased` (实际购买过), or `unknown` (未知)。手工绕过是解决动力，不自动等于付费
 
 In preset mode, also record `source_subreddits` and `source_segments` for each problem. Normalize
 wording only when posts describe the same underlying job or failure; preserve verbatim quotations
@@ -198,9 +198,10 @@ Use four evidence labels:
 - **Buyer recurrence** — repeated in `automation-buyers` or `chinese-market`.
 - **Cross-segment validation** — supported by at least two distinct segments.
 
-Cross-segment validation raises confidence but does not replace explicit or implicit payment evidence.
+Cross-segment validation raises confidence but does not replace actual payment/spend evidence.
 
-Start ranking with `frequency × urgency × willingness_to_pay`. In preset mode, use Cross-segment
+Start ranking with `frequency × urgency × willingness_to_pay`. `willingness_to_pay` is a rough
+signal, not a proven purchase. In preset mode, use Cross-segment
 validation as supporting evidence when ordering otherwise comparable problems. Do not invent a
 numeric bonus: show the contributing subreddits and segments so the user can inspect the evidence.
 Pick the top problem as the primary opportunity.
@@ -223,7 +224,7 @@ single-subreddit shape:
       "verbatim_language": ["we keep copy-pasting the same onboarding steps"],
       "tried_solutions": ["Zapier", "manual SOP docs"],
       "why_they_fail": "brittle, not product-specific",
-      "willingness_to_pay": "explicit",
+      "willingness_to_pay": "stated",
       "product_concept": "An onboarding automation assistant for small B2B SaaS teams.",
       "guide_outline": ["Map the current onboarding workflow", "Identify safe automation boundaries"],
       "landing_copy": "Stop copy-pasting every customer onboarding step."
@@ -271,7 +272,7 @@ Preset mode writes `output/reddit_opportunities.json`:
       "cross_segment_validation": true,
       "tried_solutions": ["custom retry loops", "manual runbooks"],
       "why_they_fail": "recovery logic is duplicated and incomplete",
-      "willingness_to_pay": "implicit",
+      "willingness_to_pay": "unknown",
       "product_concept": "A recovery and observability layer for multi-agent workflows.",
       "guide_outline": ["Model workflow state explicitly", "Design idempotent retries"],
       "landing_copy": "Recover failed agent workflows without rebuilding your orchestration stack."

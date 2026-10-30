@@ -81,6 +81,7 @@ def _snapshot_fields(
     user_segment: str,
     trigger_context: str,
     job_to_be_done: str,
+    obstacle: str,
     primary_cost: str,
     source_refs: list[str],
 ) -> dict:
@@ -93,6 +94,7 @@ def _snapshot_fields(
         "user_segment": user_segment,
         "trigger_context": trigger_context,
         "job_to_be_done": job_to_be_done,
+        "obstacle": obstacle,
         "primary_cost": primary_cost,
         "source_refs": sorted(set(source_refs)),
     }
@@ -109,6 +111,7 @@ def capture_problem(
     user_segment: str = "",
     trigger_context: str = "",
     job_to_be_done: str = "",
+    obstacle: str = "",
     primary_cost: str = "",
     source_refs: list[str] | None = None,
     problem_id: str | None = None,
@@ -144,6 +147,7 @@ def capture_problem(
         user_segment=(user_segment or "").strip(),
         trigger_context=(trigger_context or "").strip(),
         job_to_be_done=(job_to_be_done or "").strip(),
+        obstacle=(obstacle or "").strip(),
         primary_cost=(primary_cost or "").strip(),
         source_refs=source_refs,
     )
@@ -356,8 +360,17 @@ def _norm(text: str) -> str:
     return re.sub(r"[\s\W_]+", "", (text or "").lower())
 
 
-def _scenario_key(job_to_be_done: str, trigger_context: str) -> str:
-    return f"{_norm(job_to_be_done)}|{_norm(trigger_context)}"
+def _scenario_key(job_to_be_done: str, obstacle: str) -> str:
+    return f"{_norm(job_to_be_done)}|{_norm(obstacle)}"
+
+
+def _distinct_persons(group: list[BuilderProblem]) -> list[str]:
+    return sorted({p.person_ref for p in group})
+
+
+def _confirmable_persons(group: list[BuilderProblem]) -> list[str]:
+    """Distinct persons who have at least one source_ref (confirmable identity)."""
+    return sorted({p.person_ref for p in group if p.source_refs})
 
 
 def _common_value(problems: list[BuilderProblem], field: str) -> str:
@@ -392,10 +405,12 @@ def _build_differences(
     return differences
 
 
-def _open_questions(problems: list[BuilderProblem], group_size: int) -> list[str]:
+def _open_questions(problems: list[BuilderProblem], confirmable_person_count: int) -> list[str]:
     questions: list[str] = []
-    if group_size < 3:
-        questions.append("共同需求假设目前只有 2 个独立人物，样本仍较小")
+    if confirmable_person_count < 2:
+        questions.append(
+            f"可确认的独立人物仅 {confirmable_person_count} 个，不足以支撑『跨人共同需求』判断"
+        )
     for p in problems:
         if not p.source_refs:
             questions.append(f"{p.person_ref} 的问题 {p.problem_id} 缺少可核验来源")
@@ -438,12 +453,12 @@ def _validation_targets(problems: list[BuilderProblem]) -> list[ValidationTarget
 
 def _minimal_deliverable(
     job_to_be_done: str,
-    trigger_context: str,
+    obstacle: str,
     targets: list[ValidationTarget],
 ) -> str:
     if not targets:
         return (
-            f"复现“{job_to_be_done}”在“{trigger_context}”下的失败路径，"
+            f"复现“{job_to_be_done}”在“{obstacle}”障碍下的失败路径，"
             "形成一页可交给验证对象的复现记录"
         )
     names = []
@@ -455,33 +470,49 @@ def _minimal_deliverable(
     who = "、".join(names)
     return (
         f"向 {who} 做一次 20 分钟访谈，确认“{job_to_be_done}”在"
-        f"“{trigger_context}”下是否真实发生；交付一段复现路径和 3 条验证问题"
+        f"“{obstacle}”障碍下是否真实发生；交付一段复现路径和 3 条验证问题"
     )
 
 
 def compare_problems(store: BuilderProblemStore) -> dict:
-    """Group problems by task+obstacle and produce structured comparisons."""
+    """Group problems by task+obstacle and classify each group by evidence.
+
+    A group is a *cross-person repeat* only when at least two distinct persons
+    each have a confirmable source. Same-person multi-snapshots and under-
+    confirmed groups stay candidates — never auto-promoted to a shared need.
+    """
     problems = store.list_problems()
     grouped: dict[str, list[BuilderProblem]] = {}
     ungrouped: list[str] = []
     for p in problems:
-        if not p.job_to_be_done or not p.trigger_context:
+        if not p.job_to_be_done or not p.obstacle:
             ungrouped.append(p.problem_id)
             continue
-        key = _scenario_key(p.job_to_be_done, p.trigger_context)
+        key = _scenario_key(p.job_to_be_done, p.obstacle)
         grouped.setdefault(key, []).append(p)
 
     comparisons: list[ProblemComparison] = []
+    candidates: list[ProblemComparison] = []
     for key, group in grouped.items():
         if len(group) < 2:
             ungrouped.extend(p.problem_id for p in group)
             continue
         group.sort(key=lambda p: (p.person_ref, p.problem_id))
         job = group[0].job_to_be_done
-        trigger = group[0].trigger_context
+        obstacle = group[0].obstacle
+        distinct = _distinct_persons(group)
+        confirmable = _confirmable_persons(group)
+
+        if len(confirmable) >= 2:
+            review_status = "cross_person_repeat"
+        elif len(distinct) == 1:
+            review_status = "single_person"
+        else:
+            review_status = "candidate"
+
         similarities = {
             "job_to_be_done": job,
-            "trigger_context": trigger,
+            "obstacle": obstacle,
             "user_segment": _common_value(group, "user_segment"),
             "current_workaround": _common_value(group, "current_workaround"),
             "primary_cost": _common_value(group, "primary_cost"),
@@ -489,6 +520,7 @@ def compare_problems(store: BuilderProblemStore) -> dict:
         differences = _build_differences(
             group,
             (
+                "trigger_context",
                 "user_segment",
                 "project_ref",
                 "context",
@@ -508,56 +540,73 @@ def compare_problems(store: BuilderProblemStore) -> dict:
             )
             for p in group
         ]
-        questions = _open_questions(group, len(group))
+        questions = _open_questions(group, len(confirmable))
         targets = _validation_targets(group)
-        comparisons.append(
-            ProblemComparison(
-                scenario_key=key,
-                title=f"{job} / {trigger}",
-                user_segment=similarities["user_segment"],
-                trigger_context=trigger,
-                job_to_be_done=job,
-                current_workaround=similarities["current_workaround"],
-                primary_cost=similarities["primary_cost"],
-                problem_ids=[p.problem_id for p in group],
-                person_refs=sorted({p.person_ref for p in group}),
-                project_refs=sorted({p.project_ref for p in group if p.project_ref}),
-                similarities=similarities,
-                differences=differences,
-                evidence=evidence,
-                open_questions=questions,
-                validation_targets=targets,
-                minimal_deliverable=_minimal_deliverable(job, trigger, targets),
-            )
+        comparison = ProblemComparison(
+            scenario_key=key,
+            title=f"{job} / {obstacle}",
+            user_segment=similarities["user_segment"],
+            trigger_context=_common_value(group, "trigger_context"),
+            job_to_be_done=job,
+            obstacle=obstacle,
+            current_workaround=similarities["current_workaround"],
+            primary_cost=similarities["primary_cost"],
+            problem_ids=[p.problem_id for p in group],
+            person_refs=distinct,
+            project_refs=sorted({p.project_ref for p in group if p.project_ref}),
+            independent_person_count=len(distinct),
+            confirmable_person_count=len(confirmable),
+            review_status=review_status,
+            source_coverage=f"{len(confirmable)}/{len(distinct)} 独立人物有来源",
+            similarities=similarities,
+            differences=differences,
+            evidence=evidence,
+            open_questions=questions,
+            validation_targets=targets,
+            minimal_deliverable=_minimal_deliverable(job, obstacle, targets),
         )
+        if review_status == "cross_person_repeat":
+            comparisons.append(comparison)
+        else:
+            candidates.append(comparison)
 
-    comparisons.sort(key=lambda c: (-len(c.person_refs), c.scenario_key))
+    comparisons.sort(key=lambda c: (-c.confirmable_person_count, c.scenario_key))
+    candidates.sort(key=lambda c: (c.review_status != "single_person", c.scenario_key))
     ungrouped = sorted(set(ungrouped))
     return {
         "action": "compared",
         "changed": [],
         "data": {
             "comparisons": [c.model_dump(mode="json") for c in comparisons],
+            "candidates": [c.model_dump(mode="json") for c in candidates],
             "ungrouped": ungrouped,
             "comparison_count": len(comparisons),
+            "candidate_count": len(candidates),
         },
     }
 
 
 def build_opportunity_cards(store: BuilderProblemStore) -> dict:
-    """Convert task+obstacle comparisons into verifiable opportunity cards."""
+    """Convert cross-person comparisons into verifiable opportunity cards.
+
+    Only groups with ``review_status == "cross_person_repeat"`` (>=2 confirmable
+    persons) become cards. Confidence is an evidence-coverage ratio, not a
+    probability that demand exists.
+    """
     compared = compare_problems(store)
     cards: list[ProblemOpportunityCard] = []
     for raw in compared["data"]["comparisons"]:
         comparison = ProblemComparison.model_validate(raw)
+        if comparison.review_status != "cross_person_repeat":
+            continue
         source_refs = sorted({r for item in comparison.evidence for r in item.source_refs})
         confidence = min(
             0.9,
-            0.45 + 0.15 * len(comparison.person_refs) + (0.05 if source_refs else 0.0),
+            comparison.confirmable_person_count / max(1, comparison.independent_person_count),
         )
         same_parts = [
             f"任务: {comparison.job_to_be_done}",
-            f"触发场景: {comparison.trigger_context}",
+            f"障碍: {comparison.obstacle}",
         ]
         if comparison.user_segment:
             same_parts.append(f"使用者: {comparison.user_segment}")
@@ -578,6 +627,8 @@ def build_opportunity_cards(store: BuilderProblemStore) -> dict:
                 scenario_key=comparison.scenario_key,
                 title=f"需要验证的需求：{comparison.job_to_be_done}",
                 confidence=round(confidence, 2),
+                evidence_coverage=comparison.source_coverage,
+                review_status=comparison.review_status,
                 who=comparison.evidence,
                 same_parts=same_parts,
                 different_parts=different_parts,
@@ -588,11 +639,30 @@ def build_opportunity_cards(store: BuilderProblemStore) -> dict:
             )
         )
     cards.sort(key=lambda c: (-c.confidence, c.scenario_key))
+
+    candidate_comparisons = [
+        ProblemComparison.model_validate(raw) for raw in compared["data"]["candidates"]
+    ]
+    validation_queue = [
+        {
+            "problem_ids": c.problem_ids,
+            "person_refs": c.person_refs,
+            "job_to_be_done": c.job_to_be_done,
+            "obstacle": c.obstacle,
+            "review_status": c.review_status,
+        }
+        for c in candidate_comparisons
+        if c.review_status == "single_person"
+    ]
+
     return {
         "action": "generated",
         "changed": [],
         "data": {
             "opportunities": [c.model_dump(mode="json") for c in cards],
             "count": len(cards),
+            "candidates": compared["data"]["candidates"],
+            "candidate_count": len(compared["data"]["candidates"]),
+            "validation_queue": validation_queue,
         },
     }

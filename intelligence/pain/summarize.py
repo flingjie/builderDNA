@@ -80,12 +80,14 @@ def summarize_cluster(
     *,
     cluster_id: int,
     title: str,
+    review_status: str = "candidate",
 ) -> PainCluster:
     """Compute the final ``PainCluster`` for a resolved set of candidates.
 
     ``candidates`` are ``PainCandidate`` objects (or anything exposing
     ``model_dump()`` with repo/issue_number/title/body/comments/participants/
-    reactions/created_at).
+    reactions/created_at). ``review_status`` marks whether this cluster was
+    semantically confirmed ("confirmed") or is TF-IDF recall only ("candidate").
     """
     issues = [c.model_dump() for c in candidates]
     severities = [
@@ -107,6 +109,7 @@ def summarize_cluster(
     return PainCluster(
         cluster_id=cluster_id,
         title=title,
+        review_status=review_status,
         severity=round(sum(severities) / len(severities), 2),
         frequency=len(issues),
         affected_repos=repos,

@@ -70,12 +70,13 @@ stats: { groups, issues_analyzed, noise_count, removed_duplicates, backend }
 
 ## pain-finalize -> output/pain_clusters.json
 
-payload.clusters[]: { cluster_id, title, severity, frequency, affected_repos[], independent_repo_count, time_span_days, existing_workarounds[], top_issues[{repo, issue_number, title, pain_score}] }
+payload.clusters[]: { cluster_id, title, review_status, severity, frequency, affected_repos[], independent_repo_count, time_span_days, existing_workarounds[], top_issues[{repo, issue_number, title, pain_score}] }
 
+- `review_status` — `"candidate"` (TF-IDF recall, not semantically confirmed) or `"confirmed"` (resolved via a confirmation file). Downstream must treat `candidate` as provisional.
 - `independent_repo_count` — deduplicated affected repos (`<2` = single-source).
 - `time_span_days` — recurrence span in days (0 = unknown).
 - `existing_workarounds[]` — deterministic keyword hints from issue text (empty = unknown).
-- `pain-finalize` applies an optional Agent confirmation (`output/pain_confirmations.json`, `{"clusters":[{"title","issue_keys","rationale"}]}`); without it, each candidate group is promoted deterministically.
+- `pain-finalize` applies an optional Agent confirmation (`output/pain_confirmations.json`, `{"clusters":[{"title","issue_keys","rationale"}]}`); without it, clusters are emitted as `review_status="candidate"` (provisional, not reviewed). A `--confirmations` path that does not exist is a hard error.
 stats: { clusters, issues_analyzed, noise_count }
 
 ## opportunity -> output/opportunities.json
@@ -86,6 +87,7 @@ payload.opportunities[]: { title, demand_score, competition_score, gap_score, ra
 - `demand_evidence` / `competition_evidence` / `counter_evidence` — the reasons behind each score, incl. evidence against.
 - `why_now` — why the opportunity is timely; `invalidation_condition` — what would disprove it.
 - `minimal_validation_action` — a bounded validation action, never full product development.
+- `market_size_score` is an **activity-strength hint** (star count), not a measured market size; `recommended_action` and `quadrant` are **signal-ordering hints**, not conclusions — they never establish that demand is real.
 - Low sample / single source triggers a confidence downgrade.
 stats: { total, avg_gap, personalized }
 
@@ -162,8 +164,8 @@ Problem snapshot fields:
 
 ```text
 problem_id, person_ref, project_ref, statement, context, current_workaround,
-user_segment, trigger_context, job_to_be_done, primary_cost, source_refs[],
-first_seen_at, last_seen_at, status, updated_at
+user_segment, trigger_context, job_to_be_done, obstacle, primary_cost,
+source_refs[], first_seen_at, last_seen_at, status, updated_at
 ```
 
 Trajectory events are append-only (`event_id`, `problem_id`, `event_type`,
@@ -172,6 +174,10 @@ Trajectory events are append-only (`event_id`, `problem_id`, `event_type`,
 appends a new event and updates only the current snapshot.
 
 Comparison output groups only problems whose normalized `job_to_be_done` and
-`trigger_context` match. Same keyword (`eval`) with different task/obstacle does
-not merge. Each comparison records similarities, differences, open questions,
-validation targets, and a minimal verifiable deliverable.
+`obstacle` match. Same keyword (`eval`) with a different obstacle does not
+merge. Each comparison records `review_status`
+(`candidate` / `single_person` / `cross_person_repeat`),
+`independent_person_count`, `confirmable_person_count`, `source_coverage`,
+similarities, differences, open questions, validation targets, and a minimal
+verifiable deliverable. Only `cross_person_repeat` groups (>=2 confirmable
+persons) become opportunity cards; under-confirmed groups stay candidates.

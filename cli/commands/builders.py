@@ -125,15 +125,25 @@ def _render_markdown(payload: dict) -> str:
 
     if command == "builders.compare":
         comparisons = data.get("comparisons", [])
-        lines.append(f"Comparisons: {data.get('comparison_count', len(comparisons))}")
+        candidates = data.get("candidates", [])
+        lines.append(f"Cross-person comparisons: {data.get('comparison_count', len(comparisons))}")
         lines.append("")
         for c in comparisons:
             lines.append(f"## {c.get('title', '')}")
+            lines.append(f"- Review: `{c.get('review_status', '')}`")
             lines.append(f"- People: {', '.join(c.get('person_refs', []))}")
+            lines.append(f"- Independent: {c.get('independent_person_count', 0)} (confirmable: {c.get('confirmable_person_count', 0)})")
+            lines.append(f"- Coverage: {c.get('source_coverage', '')}")
             lines.append(f"- Minimal deliverable: {c.get('minimal_deliverable', '')}")
             for question in c.get("open_questions", []):
                 lines.append(f"- Unknown: {question}")
             lines.append("")
+        if candidates:
+            lines.append(f"Candidates (needs evidence/confirmation): {len(candidates)}")
+            for c in candidates:
+                lines.append(f"- `{c.get('review_status', '')}` {c.get('title', '')} "
+                             f"(independent={c.get('independent_person_count', 0)}, "
+                             f"confirmable={c.get('confirmable_person_count', 0)})")
         return "\n".join(lines)
 
     if command == "builders.opportunity":
@@ -142,12 +152,18 @@ def _render_markdown(payload: dict) -> str:
         lines.append("")
         for card in cards:
             lines.append(f"## {card.get('title', '')}")
-            lines.append(f"- Confidence: {card.get('confidence', 0):.2f}")
+            lines.append(f"- Review: `{card.get('review_status', '')}`")
+            lines.append(f"- Evidence coverage: {card.get('evidence_coverage', '')}")
             lines.append(f"- Who: {', '.join(w.get('person_ref', '') for w in card.get('who', []))}")
             lines.append(f"- Minimal deliverable: {card.get('minimal_deliverable', '')}")
             for unknown in card.get("key_unknowns", []):
                 lines.append(f"- Unknown: {unknown}")
             lines.append("")
+        validation_queue = data.get("validation_queue", [])
+        if validation_queue:
+            lines.append(f"Validation queue (single-person, severe): {len(validation_queue)}")
+            for item in validation_queue:
+                lines.append(f"- `{item.get('job_to_be_done', '')}` ({', '.join(item.get('person_refs', []))})")
         return "\n".join(lines)
 
     return json.dumps(payload, ensure_ascii=False, indent=2)
@@ -164,6 +180,7 @@ def capture_cmd(
     user_segment: str = typer.Option("", "--user-segment", help="Who the person is"),
     trigger_context: str = typer.Option("", "--trigger-context", help="What action/change triggers the problem"),
     job_to_be_done: str = typer.Option("", "--job-to-be-done", help="Task the person is trying to complete"),
+    obstacle: str = typer.Option("", "--obstacle", help="Concrete obstacle blocking the task (groups comparisons)"),
     primary_cost: str = typer.Option("", "--primary-cost", help="Main cost the problem imposes"),
     source_ref: list[str] | None = typer.Option(None, "--source-ref", help="Evidence reference (repeatable)"),
     status: str = typer.Option("observed", "--status", help="observed, confirmed, resolved"),
@@ -184,6 +201,7 @@ def capture_cmd(
             user_segment=user_segment,
             trigger_context=trigger_context,
             job_to_be_done=job_to_be_done,
+            obstacle=obstacle,
             primary_cost=primary_cost,
             source_refs=list(source_ref or []),
             problem_id=problem_id,

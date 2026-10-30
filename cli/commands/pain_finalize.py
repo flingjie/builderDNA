@@ -6,9 +6,12 @@ the final ``PainPayload`` consumed by ``opportunity`` / ``report``.
 
 - With ``--confirmations``: resolves every ``issue_key`` against the candidate
   set (unknown refs abort, duplicates are skipped with a warning), then computes
-  severity / frequency / cross-repo reach / recurrence span per confirmed cluster.
+  severity / frequency / cross-repo reach / recurrence span per confirmed cluster
+  (``review_status="confirmed"``).
 - Without ``--confirmations``: deterministic fallback — each candidate group is
-  promoted to a cluster with a ``title_hint`` label.
+  emitted as a *provisional* cluster (``review_status="candidate"``), NOT a
+  semantically confirmed pain. A ``--confirmations`` path that does not exist is
+  a hard error, never a silent promotion.
 """
 
 import json
@@ -72,7 +75,13 @@ def pain_finalize(
 
     diag = Diagnostics()
 
-    if confirmations and Path(confirmations).exists():
+    if confirmations is None:
+        final = _deterministic_clusters(cand)
+        review_status = "candidate"
+    elif not Path(confirmations).exists():
+        vprint(f"[red]Confirmations file not found: {confirmations}[/red]", level=OutputLevel.QUIET)
+        raise typer.Exit(1)
+    else:
         specs = _load_confirmations(Path(confirmations))
         seen: set[str] = set()
         final: list[tuple[str, list]] = []
@@ -92,11 +101,10 @@ def pain_finalize(
                 resolved.append(by_key[key])
             if resolved:
                 final.append((title, resolved))
-    else:
-        final = _deterministic_clusters(cand)
+        review_status = "confirmed"
 
     clusters = [
-        summarize_cluster(resolved, cluster_id=idx, title=title)
+        summarize_cluster(resolved, cluster_id=idx, title=title, review_status=review_status)
         for idx, (title, resolved) in enumerate(final)
     ]
     clusters.sort(key=lambda c: c.severity, reverse=True)

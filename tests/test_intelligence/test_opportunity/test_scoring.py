@@ -216,9 +216,12 @@ class TestClassifyQuadrant:
 class TestRecommendAction:
     def test_build_action(self):
         action = recommend_action("agent", gap=3.0, quadrant="Build", market_size=8.0, confidence=0.9)
-        assert "强烈推荐" in action
         assert "agent" in action
-        assert "大市场" in action
+        assert "验证" in action
+        # Signal-ordering hint, not a go-to-market conclusion.
+        assert "强烈推荐" not in action
+        assert "创业" not in action
+        assert "需求明确" not in action
 
     def test_niche_action(self):
         action = recommend_action("mcp", gap=3.0, quadrant="Niche", market_size=3.0, confidence=0.8)
@@ -227,7 +230,7 @@ class TestRecommendAction:
 
     def test_monitor_action(self):
         action = recommend_action("langchain", gap=1.0, quadrant="Monitor", market_size=8.0, confidence=0.7)
-        assert "密切关注" in action
+        assert "关注" in action
 
     def test_avoid_action(self):
         action = recommend_action("sdk", gap=0.5, quadrant="Avoid", market_size=2.0, confidence=0.6)
@@ -241,6 +244,12 @@ class TestRecommendAction:
     def test_high_confidence_no_warning(self):
         action = recommend_action("agent", gap=3.0, quadrant="Build", market_size=8.0, confidence=0.9)
         assert "信号较弱" not in action
+
+    def test_no_absolute_market_or_entrepreneurship_claims(self):
+        for quadrant in ("Build", "Niche", "Monitor", "Avoid"):
+            action = recommend_action("agent", gap=3.0, quadrant=quadrant, market_size=8.0, confidence=0.9)
+            for banned in ("强烈推荐", "创业", "需求明确", "市场规模已知", "需求真实", "大市场"):
+                assert banned not in action, f"{banned!r} leaked into {quadrant}: {action}"
 
 
 # ── match_pains_to_trend ──────────────────────────────────────────────

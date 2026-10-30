@@ -38,6 +38,7 @@ def _capture(store, person, statement, **overrides):
         user_segment="独立 Agent 开发者",
         trigger_context="修改 prompt 或工具实现后",
         job_to_be_done="确认历史失败案例是否修复",
+        obstacle="确认旧失败案例与当前行为的差异",
         current_workaround="手工重跑历史失败输入",
         primary_cost="准备输入、恢复环境、判断结果",
         source_refs=[f"x/{person}/1"],
@@ -186,15 +187,58 @@ class TestComparison:
             "b",
             current_workaround="脚本",
             primary_cost="判断结果",
-            source_refs=[],
+            source_refs=["x/bob/1"],
         )
 
         comparison = compare_problems(store)["data"]["comparisons"][0]
+        assert comparison["review_status"] == "cross_person_repeat"
+        assert comparison["confirmable_person_count"] == 2
         assert "current_workaround" in comparison["differences"]
         assert "primary_cost" in comparison["differences"]
-        assert any("缺少可核验来源" in q for q in comparison["open_questions"])
         assert comparison["minimal_deliverable"]
         assert {t["person_ref"] for t in comparison["validation_targets"]} == {"alice", "bob"}
+
+    def test_same_person_different_obstacle_no_source_not_cross_person(self, tmp_path):
+        # Documented regression: same person, same task+trigger, different
+        # obstacle, no source — must NOT produce a cross-person need.
+        store = BuilderProblemStore(tmp_path)
+        _capture(store, "alice", "problem A", obstacle="障碍 A", source_refs=[])
+        _capture(store, "alice", "problem B", obstacle="障碍 B", source_refs=[])
+
+        compared = compare_problems(store)["data"]
+        assert compared["comparisons"] == []
+        assert compared["comparison_count"] == 0
+
+        cards = build_opportunity_cards(store)["data"]
+        assert cards["opportunities"] == []
+        assert cards["count"] == 0
+
+    def test_same_person_multiple_snapshots_not_cross_person(self, tmp_path):
+        store = BuilderProblemStore(tmp_path)
+        _capture(store, "alice", "first statement", source_refs=["x/alice/1"])
+        _capture(store, "alice", "second statement", source_refs=["x/alice/2"])
+
+        result = compare_problems(store)["data"]
+        assert result["comparisons"] == []
+        assert len(result["candidates"]) == 1
+        candidate = result["candidates"][0]
+        assert candidate["review_status"] == "single_person"
+        assert candidate["independent_person_count"] == 1
+        assert candidate["confirmable_person_count"] == 1
+
+    def test_under_confirmed_group_stays_candidate(self, tmp_path):
+        store = BuilderProblemStore(tmp_path)
+        _capture(store, "alice", "a", source_refs=["x/alice/1"])
+        _capture(store, "bob", "b", source_refs=[])
+
+        result = compare_problems(store)["data"]
+        assert result["comparisons"] == []
+        assert len(result["candidates"]) == 1
+        candidate = result["candidates"][0]
+        assert candidate["review_status"] == "candidate"
+        assert candidate["independent_person_count"] == 2
+        assert candidate["confirmable_person_count"] == 1
+        assert any("缺少可核验来源" in q for q in candidate["open_questions"])
 
     def test_single_problem_is_ungrouped(self, tmp_path):
         store = BuilderProblemStore(tmp_path)
@@ -247,6 +291,17 @@ class TestOpportunityCards:
         assert card["validation_targets"]
         assert card["minimal_deliverable"]
         assert card["source_refs"] == ["x/alice/1", "x/bob/1"]
+
+    def test_no_card_for_under_confirmed_group(self, tmp_path):
+        store = BuilderProblemStore(tmp_path)
+        _capture(store, "alice", "a", source_refs=["x/alice/1"])
+        _capture(store, "bob", "b", source_refs=[])
+
+        result = build_opportunity_cards(store)["data"]
+        assert result["opportunities"] == []
+        assert result["count"] == 0
+        assert result["candidate_count"] == 1
+        assert len(result["validation_queue"]) == 0  # bob+alice is a candidate, not single-person
 
 
 class TestStore:
@@ -321,6 +376,18 @@ class TestCLI:
         assert result.exit_code == 0
         assert "# builders.capture" in result.output
         assert "a problem" in result.output
+
+    def test_capture_obstacle_flag(self, tmp_path):
+        result = self._run(
+            "capture", "alice",
+            "--statement", "a problem",
+            "--job-to-be-done", "task",
+            "--obstacle", "the obstacle",
+            "--state-dir", str(tmp_path),
+        )
+        assert result.exit_code == 0, result.output
+        problem = json.loads(result.output)["data"]["problem"]
+        assert problem["obstacle"] == "the obstacle"
 
     def test_missing_person_is_error(self, tmp_path):
         result = self._run(

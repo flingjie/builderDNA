@@ -64,7 +64,17 @@ class TestDeterministicPromotion:
         assert len(clusters) == 1
         assert clusters[0]["frequency"] == 2
         assert clusters[0]["title"] == "Timeout issues"
+        assert clusters[0]["review_status"] == "candidate"  # provisional, not reviewed
         assert result["command"] == "pain-finalize"
+
+    def test_missing_confirmation_file_aborts(self, tmp_path):
+        candidates = _write_candidates(tmp_path)
+        output = str(tmp_path / "pain_clusters.json")
+        with pytest.raises(typer.Exit):
+            pain_finalize(domain="agent", candidates=candidates,
+                          confirmations=str(tmp_path / "nope.json"), output=output)
+        # No silent promotion when the confirmation path is explicitly wrong.
+        assert not tmp_path.joinpath("pain_clusters.json").exists()
 
 
 class TestConfirmationPath:
@@ -86,6 +96,7 @@ class TestConfirmationPath:
         titles = {c["title"] for c in clusters}
         assert titles == {"Config timeout", "Recovery timeout"}
         assert all(c["frequency"] == 1 for c in clusters)
+        assert all(c["review_status"] == "confirmed" for c in clusters)
 
     def test_unknown_issue_key_aborts(self, tmp_path):
         candidates = _write_candidates(tmp_path)

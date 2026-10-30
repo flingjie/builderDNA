@@ -53,8 +53,8 @@ Global memory — SQLite + output/*.json + state/*.json + claude-mem
 | 分析 GitHub 开发者技术 DNA / 趋势 / 机会 | **`builderdna`**（本 skill）|
 | 只发现/评估 GitHub repo | `repo-trend` |
 | 从 Awesome List 策展发现 | `repo-awesome` |
-| 只从 X 学习技术信号 | `twitter-learning` |
-| 只从 Reddit 发现痛点 | `reddit-opportunity` |
+| 从 X 学习技术信号（X 也可提供公开问题线索） | `twitter-learning` |
+| 从 Reddit 发现痛点/机会 | `reddit-opportunity` |
 | 跨源验证概念 / 生命周期 | `concept-radar` |
 | 运行完整可恢复生命周期 | `concept-radar-loop` |
 | 检查历史预测与参数 | `observability` |

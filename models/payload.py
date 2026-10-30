@@ -214,6 +214,10 @@ class PainCluster(BaseModel):
     """A single pain cluster from the pain command."""
     cluster_id: int = Field(description="Candidate cluster ID (TF-IDF or HDBSCAN backend)")
     title: str = Field(description="Human-readable cluster title summarizing the pain theme")
+    review_status: Literal["candidate", "confirmed"] = Field(
+        default="candidate",
+        description="candidate = TF-IDF recall without Agent confirmation; confirmed = resolved via a confirmation file",
+    )
     severity: float = Field(description="Average severity score across issues in this cluster (0-10)")
     frequency: int = Field(description="Number of issues in this cluster")
     affected_repos: list[str] = Field(default_factory=list, description="Repositories affected by this pain cluster")
@@ -303,12 +307,12 @@ class OpportunityCard(BaseModel):
         description="Composite objective rank: gap × confidence × evidence diversity. gap is auxiliary — confidence and evidence breadth reorder. Default sort key when unpersonalized.",
     )
     signals: list[str] = Field(default_factory=list, description="Supporting evidence: top repos and representative issues")
-    recommended_action: str = Field(default="", description="Suggested next action: 'Build', 'Niche', 'Monitor', or 'Avoid'")
+    recommended_action: str = Field(default="", description="Signal-ordering hint to investigate further, not a conclusion (Build/Niche/Monitor/Avoid quadrants only rank relative signal strength)")
     quadrant: Literal["Build", "Niche", "Monitor", "Avoid"] = Field(
-        default="Monitor", description="Quadrant classification from gap × market_size matrix"
+        default="Monitor", description="Quadrant classification from gap × activity-strength matrix — a signal hint, not a go/no-go decision"
     )
     market_size_score: float = Field(
-        default=0.0, description="Absolute market size (0-10), based on total star activity across trends"
+        default=0.0, description="Activity-strength hint (0-10) from total star activity — a coarse ordering signal, NOT a measured market size"
     )
     confidence: float = Field(
         default=0.5, ge=0.0, le=1.0, description="Confidence in this opportunity assessment. <0.5 means low evidence or signal conflict."

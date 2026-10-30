@@ -141,7 +141,7 @@ def _generate_cards(
             f"若 demand<2 且 competition>3（gap<{gap_threshold}），或连续两周无新增证据，则不值得做"
         )
         minimal_validation_action = (
-            f"用 5 次用户访谈验证「{topic}」的付费意愿（而非直接开发完整产品）"
+            f"用 5 次用户访谈验证「{topic}」的真实需求与使用场景（而非直接开发完整产品）"
         )
 
         cards.append(OpportunityCard(

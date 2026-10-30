@@ -9,8 +9,9 @@ description: >
   or asks to capture, scan, verify, review, build, or source-audit a concept.
   Owns cross-source synthesis and the Inbox → Watch → Verify → Build/Drop
   lifecycle. Single-source requests route to the specialist skills instead:
-  X-only learning → twitter-learning, Reddit-only pain discovery →
-  reddit-opportunity, GitHub-only discovery → repo-trend. X reply/engagement
+  X learning → twitter-learning (X may also surface public problem clues),
+  Reddit pain/opportunity discovery → reddit-opportunity, GitHub-only
+  discovery → repo-trend. X reply/engagement
   and customer outreach are out of scope for this project. Deterministic schemas, persistence, scoring, and gates live in the
   Python CLI; this skill orchestrates retrieval and semantic judgment through
   validated JSON contracts.
@@ -43,8 +44,8 @@ but never determines truth.
 
 | 请求 | 路由 |
 |------|------|
-| 只学 X / 建 X 知识库 | `twitter-learning` |
-| 只挖 Reddit 痛点/付费意愿 | `reddit-opportunity` |
+| 只学 X / 建 X 知识库（X 也可提供公开问题线索） | `twitter-learning` |
+| 只挖 Reddit 痛点/潜在需求 | `reddit-opportunity` |
 | 只发现/评估 GitHub repo | `repo-trend` |
 | 跨源弱信号、假设+证据、验证想法、生命周期 | **`concept-radar`**（本 skill）|
 
