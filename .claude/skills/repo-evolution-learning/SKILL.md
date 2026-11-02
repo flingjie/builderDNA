@@ -10,9 +10,9 @@ description: >
   It reconstructs one episode (problem → alternatives → constraints → decisions → validation →
   outcome), searches the project's public promotion content via Tavily Search API, analyzes per-platform
   expression and user feedback, and links feedback to development (explicit/possible/unconfirmed).
-  Important: GitHub-only discovery goes to repo-trend; developer DNA to builderdna; cross-source
-  concept validation to concept-radar; X-only learning to twitter-learning. This skill never posts,
-  replies, or contacts authors.
+  Important: GitHub-only discovery goes to repo-trend; cross-source concept validation to
+  concept-radar; X-only learning to twitter-learning. This skill never posts, replies, or
+  contacts authors.
 ---
 
 # repo-evolution-learning Skill
@@ -24,10 +24,9 @@ description: >
 | 做 | 不做 |
 |----|------|
 | 重建一个开发迭代（问题→方案→约束→决策→验证→结果）| 发现/评估/追踪 GitHub repo（那是 repo-trend 的事）|
-| 搜索并采集项目对外传播内容（Tavily + opencli）| 分析开发者技术 DNA（那是 builderdna 的事）|
-| 分析各平台表达与用户反馈 | 跨源验证概念生命周期（那是 concept-radar 的事）|
-| 把反馈关联到开发（explicit/possible/unconfirmed）| 回复/发帖/联系作者（本项目明确不支持）|
-| 提炼带小实验的关键决策卡，渲染 HTML | 修改被分析仓库、运行被分析仓库的代码 |
+| 搜索并采集项目对外传播内容（Tavily + opencli）| 跨源验证概念生命周期（那是 concept-radar 的事）|
+| 分析各平台表达与用户反馈 | 回复/发帖/联系作者（本项目明确不支持）|
+| 把反馈关联到开发（explicit/possible/unconfirmed）；提炼带小实验的关键决策卡，渲染 HTML | 修改被分析仓库、运行被分析仓库的代码 |
 
 ## 路由 (Routing)
 
@@ -35,7 +34,6 @@ description: >
 |------|------|
 | 重建迭代取舍 + 传播/反馈分析 + HTML 报告 | **`repo-evolution-learning`**（本 skill）|
 | 只发现/评估 GitHub repo | `repo-trend` |
-| 分析 GitHub 开发者技术 DNA | `builderdna` |
 | 跨源验证概念 | `concept-radar` |
 | X 情报/学习 | `twitter-learning` |
 

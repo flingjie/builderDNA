@@ -19,23 +19,14 @@ def read(name: str) -> str:
     return skill(name).read_text(encoding="utf-8")
 
 
-# The eight owners from docs/product-contract.md §4.1 — one owner per request.
+# The six owners from docs/product-contract.md §4.1 — one owner per request.
 ROUTING_EDGES = {
-    "builderdna": [
-        ("repo-trend", "builderdna routes repo discovery to repo-trend"),
-        ("repo-awesome", "builderdna routes awesome-list curation to repo-awesome"),
-        ("twitter-learning", "builderdna routes X learning to twitter-learning"),
-        ("reddit-opportunity", "builderdna routes Reddit pain to reddit-opportunity"),
-        ("concept-radar", "builderdna routes cross-source validation to concept-radar"),
-    ],
     "repo-trend": [
         ("repo-awesome", "repo-trend routes awesome-list to repo-awesome"),
-        ("builderdna", "repo-trend routes developer DNA to builderdna"),
         ("concept-radar", "repo-trend routes cross-source to concept-radar"),
     ],
     "repo-awesome": [
         ("repo-trend", "repo-awesome routes API search to repo-trend"),
-        ("builderdna", "repo-awesome routes developer DNA to builderdna"),
         ("concept-radar", "repo-awesome routes cross-source to concept-radar"),
     ],
     "reddit-opportunity": [
@@ -44,12 +35,8 @@ ROUTING_EDGES = {
     ],
     "repo-evolution-learning": [
         ("repo-trend", "repo-evolution-learning routes GitHub-only discovery to repo-trend"),
-        ("builderdna", "repo-evolution-learning routes developer DNA to builderdna"),
         ("concept-radar", "repo-evolution-learning routes cross-source to concept-radar"),
         ("twitter-learning", "repo-evolution-learning routes X learning to twitter-learning"),
-    ],
-    "observability": [
-        ("optimize", "observability routes improvement proposals to optimize"),
     ],
 }
 
@@ -70,12 +57,6 @@ def test_single_source_routes_to_exactly_one_specialist():
             assert target in body, f"{owner}: {reason}"
 
 
-def test_builderdna_does_not_replace_specialists():
-    body = read("builderdna")
-    assert "只编排 Python sandbox" in body
-    assert "不替代专家 Skill" in body
-
-
 def test_concept_radar_receives_selected_findings_not_search():
     """concept-radar owns synthesis, not single-source search."""
     body = read("concept-radar")
@@ -87,7 +68,7 @@ def test_concept_radar_receives_selected_findings_not_search():
 
 def test_engagement_and_outreach_have_no_owner():
     """X reply/engagement and customer outreach must not be owned by any skill."""
-    for name in ("concept-radar", "twitter-learning", "builderdna"):
+    for name in ("concept-radar", "twitter-learning", "reddit-opportunity"):
         body = read(name)
         assert "twitter-discussion" not in body, f"{name} routes to a deleted skill"
         assert "reddit-outreach" not in body, f"{name} routes to a deleted skill"
