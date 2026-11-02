@@ -95,7 +95,7 @@ risk_tolerance
 
 它**只能改变排序和推荐优先级**，不能改变：证据强度、趋势阶段、痛点严重度、假设成熟度、Build 硬门槛。
 
-> **注意：** digest/distill 的 `cognitive_patterns`（技术理解的盲点与掌握度追踪）是**技术认知**关注点，属于 digest 的 `state/digest_gaps.jsonl`，**不属于**兴趣画像。兴趣画像不写入任何价值观、信念、人格或写作风格字段。
+> **注意：** 兴趣画像不写入任何价值观、信念、人格或写作风格字段。个人认知工具（note/reflect/distill/digest）已迁出本仓，不属于产品对象。
 
 ## 4. Skill 路由
 
@@ -108,21 +108,16 @@ risk_tolerance
 | 从 Awesome List 策展发现 | `repo-awesome` |
 | 只从 X 学习技术信号 | `twitter-learning` |
 | 只从 Reddit 发现痛点 | `reddit-opportunity` |
-| 跨源验证概念 | `concept-radar` |
-| 运行完整可恢复生命周期 | `concept-radar-loop` |
+| 跨源验证概念 / 完整雷达生命周期 | `concept-radar` |
 | 重建开发迭代 + 传播/反馈分析 + 交互式 HTML 报告 | `repo-evolution-learning` |
 | 检查历史预测与参数 | `observability` |
 
-### 4.2 辅助认知工具
+### 4.2 辅助产品工具
 
 | Skill | 职责（收敛后） |
 |-------|----------------|
-| `reflect` | 仅复盘技术判断过程 |
-| `distill` | 仅合成阶段性技术认知 |
-| `digest` | 检查对技术概念/仓库/论文的真实理解 |
-| `note` | 捕获与技术探索相关的观察 |
 | `value-discovery` | 只输出 BuilderInterestProfile 所需信息 |
-| `trace-classify` | 分析 builderDNA 自身工具执行轨迹 |
+| `trace-classify` | 分析 BuilderDNA 自身工具执行轨迹 |
 | `optimize` | 基于诊断改进确定性分析能力 |
 
 ### 4.3 路由规则
@@ -149,6 +144,6 @@ risk_tolerance
 | 职责 | 所有者 |
 |------|--------|
 | 技术情报（采集/趋势/痛点/机会/DeveloperDNA/BuilderProblem） | Python CLI + `builderdna` Skill |
-| 概念验证（Inbox→Watch→Verify→Build/Drop） | `concept-radar` / `concept-radar-loop` |
+| 概念验证（Inbox→Watch→Verify→Build/Drop） | `concept-radar` + `concept`/`radar` CLI |
 | 个性化排序（只影响优先级） | `BuilderInterestProfile` |
 | 自校准（预测 vs 后续事实） | `observability` / `optimize` |

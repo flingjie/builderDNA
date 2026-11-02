@@ -41,6 +41,15 @@ PYTHONPATH=. uv run builderdna builders capture alice --statement "..." --job-to
 PYTHONPATH=. uv run builderdna builders compare
 PYTHONPATH=. uv run builderdna builders opportunity
 
+# Concept lifecycle + radar (deterministic gates; Claude owns semantic orchestration)
+PYTHONPATH=. uv run builderdna concept capture --title "..." --problem "..."
+PYTHONPATH=. uv run builderdna radar scan --radar agent-reliability
+PYTHONPATH=. uv run builderdna radar verify <CONCEPT_ID>
+
+# Developer DNA + Reddit investigation control plane
+PYTHONPATH=. uv run builderdna dna --data output/signals.json
+PYTHONPATH=. uv run builderdna investigate start --preset production-agent-failures
+
 # Run all tests
 uv run pytest tests/ -v
 
@@ -55,7 +64,7 @@ uv run pytest tests/test_signal/test_models.py::TestSignal -v
 config.yaml ──▶ config.py (Config model, env var ${SUBSTITUTION})
      │
      ▼
-cli/main.py ── Typer app (collect/trend/pain/pain-finalize/opportunity/report/config/observability + concept/radar/radar-cycle + builders)
+cli/main.py ── Typer app (collect/trend/pain/pain-finalize/opportunity/report/config/observability + concept/radar/dna/investigate/builders)
      │
      ├─ collect  ──▶ collector/github/ (httpx client, cache, rate limiter)
      │              ▶ collector/normalizer.py (raw API → Signal model)
@@ -78,15 +87,16 @@ cli/main.py ── Typer app (collect/trend/pain/pain-finalize/opportunity/repor
      │              ▶ models/builder_problem.py → BuilderProblem, ProblemEvent,
      │                ProblemComparison, ProblemOpportunityCard
      │
+     ├─ dna      ──▶ intelligence/developer_dna.py (evidence-backed DeveloperDNA)
+     ├─ investigate ▶ investigations/ (bounded Reddit pain-discovery control plane)
+     │
      ├─ report   ──▶ cli/commands/report_cmd.py (rendering only)
-     │
      ├─ config   ──▶ cli/commands/config_cmd.py (show resolved config)
-     │
-     └─ observability ▶ cli/commands/observability_cmd.py (mismatch detection, snapshot comparison, hypothesis pruning)
+     ├─ observability ▶ cli/commands/observability_cmd.py (mismatch detection, snapshot comparison, hypothesis pruning)
      │
      ├─ concept     ──▶ cli/commands/concept.py (capture/list/show/move/merge/score/outcome/review)
-     ├─ radar       ──▶ cli/commands/radar.py (scan/verify/experiment/review/source-audit)
-     └─ radar-cycle ──▶ cli/commands/radar_cycle_cmd.py (start/import/decide/status/complete/finalize)
+     └─ radar       ──▶ cli/commands/radar.py (scan/verify/experiment/review/source-audit)
+                    ▶ concepts/radar_config.py (radar YAML + Reddit preset loader)
 
 signals/ ── Unified Signal model + SQLite store
   models.py    — Signal (unified immutable event, all sources normalize to this)
@@ -99,11 +109,6 @@ observability/ ── Telemetry + behavior tracking (integrated into all other c
   hypothesis.py  — HypothesisManager for tracking exploration hypotheses
   diagnostics.py — Cross-run diagnostics: parameter sensitivity, bootstrap, comparison
   output.py      — OutputLevel enum, verbosity control, console formatting
-
-adapters/ ── Embed BuilderDNA in agent frameworks
-  interface.py   — Abstract BuilderDNAAdapter (analyze_domain, get_trends, get_diagnostics)
-  cli.py         — CLIAdapter: subprocess-based, process isolation
-  claude_code.py — ClaudeCodeAdapter: direct Python imports for Claude Code skills
 
 All commands wrap output in SandboxResult{command, domain, computed_at, payload, stats, diagnostics}.
 Schema contract: schema.md and models/payload.py — Claude Code reads these.
@@ -126,27 +131,24 @@ Skills are deployed under `.claude/skills/` (`*-workspace/` dirs, when present, 
 | Skill | Purpose | Trigger |
 |-------|---------|---------|
 | `builderdna` | Orchestrate the Python sandbox commands (collect/trend/pain/pain-finalize/opportunity), manage hypotheses | "analyze X's GitHub", "tech DNA", "find opportunities in Z" |
-| `concept-radar` | Cross-source concept lifecycle radar: turn weak signals into validated, falsifiable builds (Inbox → Watch → Verify → Build/Drop) | "validate an idea", "weak signals to validated builds", "hypothesis and evidence", "should I build or drop this", "track this concept", "雷达" |
-| `concept-radar-loop` | Resumable, deterministic radar-cycle orchestrator (start → import → decide → finalize) | "run the concept radar loop", "继续跑概念雷达", "resume my radar run" |
+| `concept-radar` | Cross-source concept lifecycle radar + full-cycle orchestration via `concept`/`radar` CLI (Inbox → Watch → Verify → Build/Drop) | "validate an idea", "weak signals to validated builds", "run the concept radar loop", "继续跑概念雷达", "雷达" |
 | `repo-trend` | Discover trending repos via GitHub API search, 3-tier eval | "find trending X repos", "evaluate this repo", "check my watches" |
 | `repo-awesome` | Mine awesome-* lists for curated repo discovery | "mine awesome lists for X", "what do awesome lists recommend" |
-| `repo-evolution-learning` | Reconstruct a repo/PR/feature's development episode + its public promotion and feedback, rendered as an interactive HTML learning report | "分析这个 PR 的设计取舍", "复盘这个仓库的迭代", "这个项目怎么宣传的", "repo evolution learning", "interactive HTML learning report" |
-| `reddit-opportunity` | Discover product opportunities + pain points from a Reddit community (no product yet): RSS → Subreddit Profile → recurring problems → product concept | "find problems people will pay to solve", "what should I build from r/...", "从 Reddit 找商机" |
+| `repo-evolution-learning` | Reconstruct a repo/PR episode + promotion/feedback via `gh` + Tavily + HTML template (pure skill orchestration) | "分析这个 PR 的设计取舍", "复盘这个仓库的迭代", "这个项目怎么宣传的", "repo evolution learning" |
+| `reddit-opportunity` | Discover product opportunities + pain points from a Reddit community (thin loop over `investigate`) | "find problems people will pay to solve", "what should I build from r/...", "从 Reddit 找商机" |
 | `value-discovery` | Extract the user's BuilderInterestProfile (domains, problem preferences, build constraints, learning goals) | "value discovery", "what do I value", "help me understand my preferences" |
 | `observability` | Run self-iteration diagnostics (mismatch, snapshot, hypothesis pruning) | "check my predictions", "validate assumptions", "任何东西变了吗" |
 | `optimize` | Diagnose→Propose→Apply→Verify loop — read diagnostics, generate improvement proposals, apply and re-run | "/optimize", "improve the analysis", "fix low confidence", "优化分析" |
-| `reflect` | Multi-pass adversarial reflection on conversations → self-model updates (v4 protocol) | "/reflect", "reflect on this conversation", "复盘" |
-| `distill` | Synthesize accumulated reflections + digest gap reports into growth reports, propose self-model updates (including cognitive_patterns) | "/distill", "synthesize my reflections", "growth report", "蒸馏" |
-| `note` | RAL recording layer — capture daily moments, amplify meaning, weekly connection review | "/note", "记一下", "take a note", "weekly review", "日复盘" |
-| `digest` | 5-layer Feynman adversarial interview — verify true understanding of a book/principle/repo by exposing blind spots | "/digest", "校验我对...的掌握", "verify my grasp of", "费曼校验" |
 | `trace-classify` | Classify raw tool-call traces into step-level trace files + periodic review for optimization insights | "classify the last trace", "trace this session", "review this week's traces" |
 | `twitter-learning` | Daily Twitter/X learning on a topic (default: agent): discover, filter, score by Learning Score → Top 10 learnings (7-angle analysis) + knowledge asset | "做今天的 X 情报", "帮我研究 Y 的推特", "今天 X 上有什么值得学的", "有哪些值得学习的高质量推文" |
+
+Personal cognitive skills (`note` / `reflect` / `distill` / `digest`) live under `~/.claude/skills/` with state in `~/.claude/personal-state/` — they are not part of this product.
 
 **Cross-source routing:** `concept-radar` owns cross-source synthesis and the `Inbox → Watch → Verify → Build/Drop` lifecycle. Single-source requests stay with their specialists — X learning/knowledge-base → `twitter-learning` (X may also surface public problem clues), Reddit pain/opportunity discovery → `reddit-opportunity`, GitHub-only discovery → `repo-trend`, awesome-list curation → `repo-awesome`. X reply/engagement and customer outreach are **out of scope** for this project. Selected `twitter-learning` findings may feed into `concept-radar`; never the reverse. Full routing rules: `docs/product-contract.md`.
 
 Evals exist for builderdna (`.claude/skills/builderdna/evals/`) via the skill-creator workflow. Shared evaluation rubrics: `references/repo-scout/`. Most skills are pure Claude-orchestrated — they use `gh` CLI, not the Python codebase. The `builderdna` skill orchestrates the Python CLI sandbox commands.
 
-**Skill path note:** Several skills (`reflect`, `distill`, `note`, `repo-trend`, `repo-awesome`, `builderdna`) reference files under `references/` at the project root (e.g., `references/reflection-protocol.md`, `references/repo-scout/eval.md`). These paths resolve because skills are always invoked from the project root — skills are not standalone/portable.
+**Skill path note:** Several skills (`repo-trend`, `repo-awesome`, `builderdna`) reference files under `references/` at the project root (e.g., `references/repo-scout/eval.md`). These paths resolve because skills are always invoked from the project root.
 
 ## Key Files
 
@@ -165,13 +167,11 @@ Evals exist for builderdna (`.claude/skills/builderdna/evals/`) via the skill-cr
 | `intelligence/builder_problems/` | Builder problem store + deterministic comparison/opportunity service |
 | `observability/metrics.py` | Self-calibration metrics (prediction resolution, hypothesis drop, source failure, …) |
 | `observability/` | Telemetry, behavior tracking, prediction snapshots, hypothesis management, diagnostics |
-| `adapters/` | Embed BuilderDNA in agent frameworks: interface.py, cli.py, claude_code.py |
+| `concepts/` | Concept store/scoring/handoffs + `radar_config.py` |
+| `investigations/` | Bounded Reddit investigation control plane |
+| `experiments/` | ExperimentProposal + FDE-Gym export used by `radar experiment` |
 | `state/bootstrap.json` | Bootstrap state — records successful run parameters for optimize skill hints |
 | `state/builder_interest_profile.json` | User interest profile (domains, adjacencies, problem prefs, build constraints, learning goals, risk tolerance) — ranking only |
-| `state/reflections.jsonl` | Reflection event log for /reflect and /distill skills |
-| `state/digest_gaps.jsonl` | Feynman verification gap reports — blind-spot tracking (digest skill, created on first use) |
-| `state/distill_reports/` | Growth reports from /distill (YYYY-MM-DD_distill.md) |
-| `state/records.jsonl` | RAL daily records — event captures, amplifications, daily/weekly reviews (note skill) |
 | `state/behavior_log.jsonl` | Telemetry behavior log — mismatch detection data (observability command) |
 | `state/hypotheses.json` | Exploration state tracking across conversations (builderdna skill) |
 | `state/watches.json` | Saved repo searches for recurring monitoring (repo-trend skill) |

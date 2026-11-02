@@ -27,16 +27,17 @@ Claude Code（编排 + 语义判断）── 读取 state/*.json，决定跑什�
   采集:   collect            —— GitHub 信号（repos + issues）
   分析:   trend / pain       —— 趋势速度 · 痛点聚类
   机会:   opportunity        —— 规则引擎生成机会卡片
-  验证:   concept / radar / radar-cycle —— 跨源概念生命周期
+  验证:   concept / radar    —— 跨源概念生命周期
   人物问题: builders           —— 问题记录、实践轨迹、跨人比较、可验证机会卡
+  调查:   investigate        —— Reddit 痛点调查控制面
   校准:   observability      —— 预测 vs 后续事实
-  工具:   report / config    —— 渲染 · 配置
+  工具:   report / config / dna —— 渲染 · 配置 · DeveloperDNA
     │
     ▼
 持久化 — SQLite（signals）+ output/*.json + state/*.json
 ```
 
-命令之间通过 JSON 文件传递数据：`collect` 产出 `signals.json` → `trend`/`pain` 消费 → `opportunity` 消费两者 → `report` 渲染任意结果。跨源验证走 `concept`/`radar`/`radar-cycle`。
+命令之间通过 JSON 文件传递数据：`collect` 产出 `signals.json` → `trend`/`pain` 消费 → `opportunity` 消费两者 → `report` 渲染任意结果。跨源验证走 `concept`/`radar`（由 `concept-radar` skill 编排）。
 
 ## 快速开始
 
@@ -68,8 +69,7 @@ PYTHONPATH=. uv run builderdna opportunity --trends output/trends.json --pains o
 
 # 概念验证 — 跨源生命周期（capture / scan / verify / build / source-audit）
 PYTHONPATH=. uv run builderdna concept capture --help
-PYTHONPATH=. uv run builderdna radar scan agent-reliability
-PYTHONPATH=. uv run builderdna radar-cycle start agent-reliability
+PYTHONPATH=. uv run builderdna radar scan --radar agent-reliability
 
 # Builder 问题与实践轨迹
 PYTHONPATH=. uv run builderdna builders capture alice --statement "修改 prompt 后难以确认旧问题是否修复" --job-to-be-done "确认历史失败案例是否修复" --trigger-context "修改 prompt 或工具实现后"
@@ -91,7 +91,7 @@ uv run pytest tests/ -v
 ```
 BuilderDNA/
 ├── cli/main.py                # Typer 入口
-├── cli/commands/              # collect / trend / pain / opportunity / report / config / observability / concept / radar / radar-cycle / builders
+├── cli/commands/              # collect / trend / pain / opportunity / report / config / observability / concept / radar / dna / investigate / builders
 ├── config.py                  # 配置系统（YAML + ${ENV} 变量替换）
 ├── config.yaml                # accounts, domains, vendors, embedding
 │
@@ -103,8 +103,9 @@ BuilderDNA/
 ├── intelligence/opportunity/  # 机会评分（规则引擎）
 ├── intelligence/builder_problems/ # Builder 问题快照、轨迹事件、跨人比较、机会卡
 │
-├── concepts/                  # 概念证据、适配器、评分、持久化
-├── radar_cycles/              # 可恢复的雷达周期状态机（checkpoint / engine / config）
+├── concepts/                  # 概念证据、适配器、评分、持久化、radar_config
+├── investigations/            # Reddit 痛点调查控制面
+├── experiments/               # ExperimentProposal + FDE-Gym 导出
 │
 ├── signals/
 │   ├── models.py              # Signal（统一不可变事件模型）
@@ -118,7 +119,6 @@ BuilderDNA/
 │   ├── hypotheses.json        # 跨对话的探索状态追踪
 │   ├── builder_interest_profile.json  # 用户兴趣画像（只影响优先级）
 │   ├── builders/              # builders.jsonl 问题快照 + events.jsonl 轨迹事件
-│   ├── reflections.jsonl      # 技术复盘事件日志
 │   └── watches.json           # 已保存的 repo 搜索（repo-trend skill）
 │
 ├── output/                    # JSON + Markdown 结果
@@ -133,15 +133,14 @@ BuilderDNA/
 | 职责 | Skill |
 |------|-------|
 | 编排 Python sandbox（collect/trend/pain/opportunity） | `builderdna` |
-| 跨源概念验证 + Build/Drop 决策 | `concept-radar` |
-| 可恢复的确定性雷达周期 | `concept-radar-loop` |
+| 跨源概念验证 + Build/Drop + 完整雷达循环 | `concept-radar` |
 | GitHub 仓库发现与趋势评估 | `repo-trend` |
 | Awesome List 策展发现 | `repo-awesome` |
+| 仓库迭代复盘 + HTML 学习报告（`gh` 编排） | `repo-evolution-learning` |
 | X 技术信号学习 | `twitter-learning` |
 | Reddit 痛点与机会发现 | `reddit-opportunity` |
 | 预测校准与诊断 | `observability` |
 | 确定性分析能力优化 | `optimize` |
-| 技术判断复盘 / 合成 / 校验 / 记录 | `reflect` / `distill` / `digest` / `note` |
 | 用户兴趣画像（BuilderInterestProfile） | `value-discovery` |
 | 工具执行轨迹分析 | `trace-classify` |
 
