@@ -12,7 +12,6 @@ state/*
 !state/__init__.py
 !state/jsonl.py
 !state/traces/
-!state/distill_reports/.gitkeep
 !state/replay/
 # twitter-learning runtime state (daily knowledge asset, dedup, reports — not versioned)
 .claude/skills/twitter-learning/state/
