@@ -229,18 +229,30 @@ def record_output_retention(output_path: str, referenced_by: str = "") -> None:
 
 def _load_profile_values() -> dict | None:
     """Load profile values for mismatch comparison. Returns None if none found."""
-    from models.builder_interest_profile import load_profile
-
-    profile = load_profile(PROFILE_PATH)
-    if profile is None:
+    p = Path(PROFILE_PATH)
+    if not p.exists():
         return None
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+    # Empty template (no domains and no other fields) is "no profile yet".
+    if not any(data.get(k) for k in (
+        "domains", "technical_adjacencies", "problem_preferences",
+        "build_constraints", "learning_goals",
+    )):
+        return None
+
+    def _values(items: list) -> list[str]:
+        return [i["value"] if isinstance(i, dict) else str(i) for i in items]
 
     # Convert profile fields to the dimension format mismatch detection expects
     return {
-        "output": {"ranking": [d.value for d in profile.domains]},
-        "activity": {"ranking": [g.value for g in profile.learning_goals]},
-        "environment": {"ranking": [c.value for c in profile.build_constraints]},
-        "reward": {"ranking": [p.value for p in profile.problem_preferences]},
+        "output": {"ranking": _values(data.get("domains", []))},
+        "activity": {"ranking": _values(data.get("learning_goals", []))},
+        "environment": {"ranking": _values(data.get("build_constraints", []))},
+        "reward": {"ranking": _values(data.get("problem_preferences", []))},
     }
 
 

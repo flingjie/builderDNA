@@ -1,12 +1,8 @@
 """Unified Signal model — normalization target for all upstream data sources.
 
-All upstream data normalizes into Signal. GitHub API responses remain the
-primary producer (via collector/normalizer.py), but the shared model is now
-cross-source (Task 3.1): x, reddit, paper, official_doc, and manual evidence
+All upstream data normalizes into Signal. The shared model is cross-source
+(Task 3.1): x, reddit, github, paper, official_doc, and manual evidence
 normalize into the same immutable event.
-
-Aggregate views are defined in models/payload.py as the canonical output
-contract.
 """
 from datetime import datetime, timezone
 from typing import Any, Literal
@@ -14,14 +10,11 @@ from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
-# Cross-source signal origins (Task 3.1). `github` remains the default and the
-# only source emitted by the existing collector pipeline. Adapters for the new
-# sources live elsewhere (concepts/adapters) and import SignalSource here.
+# Cross-source signal origins (Task 3.1). Adapters for non-GitHub sources
+# live in concepts/adapters and import SignalSource here.
 SignalSource = Literal["x", "reddit", "github", "paper", "official_doc", "manual"]
 
-# GitHub-specific event types — unchanged so existing GitHub records and
-# consumers (cli/commands/collect.py, intelligence/trend/velocity.py) keep
-# working verbatim.
+# GitHub-specific event types — preserved for historical/manual records.
 GITHUB_EVENT_TYPES: tuple[str, ...] = (
     "repo_created",       # active: new repository
     "star_growth",        # active: star increase event

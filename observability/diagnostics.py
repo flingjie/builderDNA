@@ -9,10 +9,21 @@ Functions here do NOT run CLI commands — they analyze existing output data.
 
 import json
 from pathlib import Path
+from typing import Any
 
-from models.payload import SandboxResult, ParamSensitivity
+from pydantic import BaseModel, Field
 
 BOOTSTRAP_PATH = "state/bootstrap.json"
+
+
+class ParamSensitivity(BaseModel):
+    """Parameter sensitivity hint — what would happen if we changed a parameter?"""
+
+    parameter: str = Field(description="Name of the parameter to adjust")
+    current_value: str = Field(description="Current value of the parameter")
+    suggested_value: str = Field(description="Suggested new value for the parameter")
+    expected_effect: str = Field(description="Human-readable description of the expected impact")
+    confidence: float = Field(default=0.5, description="Confidence in this suggestion (0-1)")
 
 
 def _ensure_dir(filepath: str) -> None:
@@ -24,10 +35,10 @@ def _ensure_dir(filepath: str) -> None:
 
 
 def generate_parameter_sensitivity(
-    result: SandboxResult,
+    result: Any,
     domain: str = "",
 ) -> list[ParamSensitivity]:
-    """Generate parameter sensitivity hints from a single SandboxResult.
+    """Generate parameter sensitivity hints from a single sandbox result.
 
     Analyzes the result's diagnostics to suggest concrete parameter changes.
     Cross-references with historical snapshots when available.
@@ -124,11 +135,11 @@ def _save_bootstrap(data: dict) -> None:
     Path(BOOTSTRAP_PATH).write_text(json.dumps(data, indent=2, ensure_ascii=False))
 
 
-def record_bootstrap(result: SandboxResult, quality: str) -> None:
+def record_bootstrap(result: Any, quality: str) -> None:
     """Record a high-quality run's parameters for future bootstrap hints.
 
     Args:
-        result: The SandboxResult that was marked as high quality.
+        result: The sandbox result that was marked as high quality.
         quality: 'high', 'medium', or 'low' — only 'high' is recorded.
     """
     if quality != "high":
@@ -205,8 +216,8 @@ def get_bootstrap_hints(domain: str, command: str) -> list[dict]:
 
 
 def compare_diagnostics(
-    current: SandboxResult,
-    previous: SandboxResult,
+    current: Any,
+    previous: Any,
 ) -> dict:
     """Compare diagnostics between two runs to detect improvement or regression.
 
