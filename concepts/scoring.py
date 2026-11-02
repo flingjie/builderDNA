@@ -20,7 +20,7 @@ Design rules honoured here:
 - **Gates are separate from the total** — they check structural evidence
   requirements, never a numeric threshold.
 
-Component name mapping (concept-radar-loop plan ↔ ``ComponentScores``):
+Component name mapping (concept-radar plan ↔ ``ComponentScores``):
 
 - ``pain_recurrence``        ↔ ``ComponentScores.problem``
 - ``evidence_strength``      ↔ ``ComponentScores.evidence``

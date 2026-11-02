@@ -68,7 +68,7 @@ from experiments.fde_gym import (
     export_fde_gym_scenario,
 )
 from experiments.generator import ExperimentGenerationError, generate_experiment
-from radar_cycles.config import (
+from concepts.radar_config import (
     Neighborhood,
     RadarConfig,
     RadarConfigError as RadarCyclesConfigError,
@@ -91,8 +91,7 @@ from observability import OutputLevel, vprint
 
 # ── Radar config models ──
 #
-# Imported from ``radar_cycles.config`` (the single source of truth) so the
-# ``radar`` and ``radar-cycle`` commands validate the same YAML identically.
+# Imported from ``concepts.radar_config`` (the single source of truth).
 
 
 # ── Verify payload (no canonical model exists for the build-gate report) ──
@@ -199,8 +198,8 @@ def _verify_requirements(
 def load_radar_config(name: str, config_dir: str | Path = "config/radars") -> RadarConfig:
     """Load and validate a versioned radar config from ``<config_dir>/<name>.yaml``.
 
-    Delegates to :func:`radar_cycles.config.load_radar_config` (the single source
-    of truth) so ``radar`` and ``radar-cycle`` validate identically. Raises the
+    Delegates to :func:`concepts.radar_config.load_radar_config` (the single
+    source of truth). Raises the
     local :class:`RadarConfigError` for a missing/unparsable/mismatched config.
     """
     try:

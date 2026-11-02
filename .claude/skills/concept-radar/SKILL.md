@@ -6,7 +6,9 @@ description: >
   evidence across multiple sources ("validate an idea", "weak signals to
   validated builds", "hypothesis and evidence", "should I build or drop this",
   "concept radar", "track this concept", "cross-source signal", "雷达", "验证一个想法"),
-  or asks to capture, scan, verify, review, build, or source-audit a concept.
+  or asks to capture, scan, verify, review, build, or source-audit a concept,
+  or to run / resume a full radar cycle ("run the concept radar loop",
+  "继续跑概念雷达", "resume my radar run").
   Owns cross-source synthesis and the Inbox → Watch → Verify → Build/Drop
   lifecycle. Single-source requests route to the specialist skills instead:
   X learning → twitter-learning (X may also surface public problem clues),
@@ -87,15 +89,19 @@ Inbox ──► Watch ──► Verify ──► Build ──► Drop（或持�
 
 完整契约见 `references/schema.md`。
 
-## 语义 vs 执行 (Semantics vs Execution)
+## 完整生命周期循环 (Full Lifecycle Loop)
 
-本 skill 定义**语义**：生命周期、模式、硬门槛、边界与不变量。
+需要跑一轮完整雷达时，按下面顺序手工编排——状态与门槛在 CLI，检索与语义判断在本 skill。中断后从最近未完成步骤继续；不另设 checkpoint 引擎。
 
-可恢复的确定性执行协议（`start → import → decide → finalize` 循环）由
-`concept-radar-loop` 定义——它驱动 `builderdna radar-cycle` 状态机，按每个
-`next_action` 加载对应专家 skill。需要跑一轮完整生命周期时路由到
-`concept-radar-loop`；本 skill 负责语义判断与单概念验证（capture/scan/verify/
-review/build/source-audit），不负责循环编排，也不反向接管单源搜索。
+1. **Capture / Import** — 用专家 skill 采集证据，经 `builderdna concept capture` 写入候选卡片（必要时 `--into <ID>` 合并）。
+2. **Scan** — `builderdna radar scan --radar <name>` 按雷达配置聚合证据。
+3. **Verify** — `builderdna radar verify <CONCEPT_ID>` 过硬门槛；缺口由 `repo-trend` / `reddit-opportunity` / `twitter-learning` 补证据后再 verify。
+4. **Decide** — `builderdna concept move` / `score` / `outcome` 推进或否决；Build 前必须满足硬门槛。
+5. **Experiment** — `builderdna radar experiment <CONCEPT_ID> --format fde-gym` 生成有界最小实验。
+6. **Review** — `builderdna radar review`（或 `concept review`）做周回顾与校准。
+7. **Source-audit** — `builderdna radar source-audit --radar <name>` 审计覆盖与独立性。
+
+停止条件（不要伪造证据、不要盲重试）：认证失败、CLI 返回 `ok: false`、模糊合并候选需用户消歧、任何外部平台写操作（发帖/PR/推送）一律禁止。本 skill 不自调度 cron/daemon。
 
 ## Reference Files
 

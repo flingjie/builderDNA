@@ -1,4 +1,4 @@
-"""Tests for the radar configuration loader (radar_cycles/config.py).
+"""Tests for the radar configuration loader (concepts/radar_config.py).
 
 A radar config lives in ``config/radars/<name>.yaml`` and may reference a Reddit
 feed preset in ``config/reddit_feeds/<preset>.yaml``. The loader:
@@ -22,7 +22,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from radar_cycles.config import (
+from concepts.radar_config import (
     RadarConfig,
     RadarConfigError,
     RedditPreset,
@@ -120,10 +120,6 @@ class TestLoadRealConfig:
         assert len(ids) == len(set(ids)) == 5
         assert all(n.label for n in cfg.neighborhoods)
 
-    def test_limits_reuse_radar_cycles_limits(self):
-        cfg = load_real("agent-reliability")
-        assert cfg.limits.daily_builds == cfg.daily_card_cap
-        assert cfg.limits.weekly_builds == cfg.weekly_build_cap
 
     def test_missing_file_rejected(self, tmp_path):
         with pytest.raises(RadarConfigError):

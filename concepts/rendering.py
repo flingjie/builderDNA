@@ -4,8 +4,7 @@ These helpers are deliberately *presentation over plain data*: each takes a
 ``dict`` (the ``mode="json"`` dump of a model) and returns a single line of
 Markdown text. They never import the report models, so they stay free of import
 cycles and can be reused anywhere a JSON-shaped concept/decision/evidence record
-needs a human-readable line — including the radar cycle report renderer in
-``radar_cycles/rendering.py``.
+needs a human-readable line.
 """
 from __future__ import annotations
 

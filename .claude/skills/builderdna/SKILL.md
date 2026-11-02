@@ -56,7 +56,6 @@ Global memory — SQLite + output/*.json + state/*.json + claude-mem
 | 从 X 学习技术信号（X 也可提供公开问题线索） | `twitter-learning` |
 | 从 Reddit 发现痛点/机会 | `reddit-opportunity` |
 | 跨源验证概念 / 生命周期 | `concept-radar` |
-| 运行完整可恢复生命周期 | `concept-radar-loop` |
 | 检查历史预测与参数 | `observability` |
 
 `builderdna` **只编排 Python sandbox，不替代专家 Skill 的深度分析**。单源请求交给专家

@@ -17,7 +17,6 @@ dependencies = [
     "hdbscan>=0.8",
     "scikit-learn>=1.5",
     "openai>=1.0",
-    "jinja2>=3.1",
 ]
 
 [project.optional-dependencies]
@@ -31,7 +30,7 @@ dev = [
 builderdna = "cli.main:app"
 
 [tool.setuptools.packages.find]
-include = ["models*", "collector*", "intelligence*", "signals*", "cli*", "observability*", "adapters*", "concepts*", "radar_cycles*", "experiments*", "repo_learning*"]
+include = ["models*", "collector*", "intelligence*", "signals*", "cli*", "observability*", "concepts*", "experiments*", "investigations*"]
 exclude = ["snapshots*", "tests*"]
 
 [tool.setuptools]

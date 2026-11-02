@@ -71,7 +71,6 @@ __all__ = [
 class SourcePhase(str, Enum):
     """The phases that produce a source handoff.
 
-    Mirrors the source-producing members of ``radar_cycles.models.PhaseName``.
     (The CLI layer may alias ``verification`` to ``verify``; this enum keeps the
     canonical phase name.)
     """

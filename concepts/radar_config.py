@@ -5,9 +5,8 @@ Loads a radar config from ``config/radars/<name>.yaml`` into a
 (``config/reddit_feeds/<preset>.yaml``) to its full validated contents, and
 derives a deterministic SHA-256 fingerprint over the *resolved* config.
 
-The fingerprint is what ``resume`` checks: if any field of the radar config or
-its referenced Reddit preset changes, the fingerprint changes and an in-progress
-run fails closed instead of silently continuing under different configuration.
+The fingerprint detects silent config drift: any field change in the radar
+config or its referenced Reddit preset changes the digest.
 """
 
 from __future__ import annotations
@@ -21,7 +20,6 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from models.concept import SourceType
-from radar_cycles.models import Limits
 
 __all__ = [
     "RadarConfigError",
@@ -140,18 +138,6 @@ class RadarConfig(BaseModel):
     reddit: RedditPreset | None = Field(
         default=None, description="Resolved Reddit preset contents (loader-populated)"
     )
-
-    @property
-    def limits(self) -> Limits:
-        """The radar's two caps surfaced as a :class:`Limits` for checkpoint reuse.
-
-        ``daily_card_cap`` occupies the daily slot and ``weekly_build_cap`` the
-        weekly slot, so the checkpoint carries both non-negative caps.
-        """
-        return Limits(
-            daily_builds=self.daily_card_cap,
-            weekly_builds=self.weekly_build_cap,
-        )
 
     @property
     def fingerprint(self) -> str:
