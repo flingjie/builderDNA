@@ -31,23 +31,6 @@ from pydantic import BaseModel, Field
 _load_dotenv(Path(".env"))
 
 
-class GitHubConfig(BaseModel):
-    """GitHub API configuration."""
-
-    token: str = Field(description="GitHub Personal Access Token")
-    cache_dir: str = Field(default="snapshots/cache", description="Directory for HTTP cache")
-    max_concurrent: int = Field(default=5, ge=1, le=20, description="Max concurrent API requests")
-    rate_limit_margin: int = Field(default=50, ge=10, le=500,
-                                   description="Pause when remaining calls below this")
-
-
-class EmbeddingConfig(BaseModel):
-    """Embedding model configuration (local Ollama, no API key needed)."""
-
-    model: str = Field(default="bge-m3:latest", description="Embedding model ID (config.yaml overrides)")
-    base_url: str = Field(default="http://localhost:11434/v1", description="Embedding API base URL")
-
-
 class OutputConfig(BaseModel):
     """Output configuration."""
 
@@ -57,56 +40,10 @@ class OutputConfig(BaseModel):
     )
 
 
-class CollectConfig(BaseModel):
-    """Data collection configuration."""
-
-    time_range_days: int = Field(
-        default=365, description="Only collect signals within this many days"
-    )
-
-
-class OpportunityWeights(BaseModel):
-    """Demand scoring weights for opportunity detection.
-
-    Configurable via config.yaml so weights can be tuned without code changes.
-    Bootstrap-driven weight optimization (L3) can read/write these values.
-    """
-    velocity: float = Field(default=0.4, ge=0.0, le=1.0, description="Weight for trend velocity in demand score")
-    severity: float = Field(default=0.4, ge=0.0, le=1.0, description="Weight for pain severity in demand score")
-    frequency: float = Field(default=0.2, ge=0.0, le=1.0, description="Weight for pain frequency in demand score")
-
-
-class OpportunityConfig(BaseModel):
-    """Opportunity scoring configuration."""
-    weights: OpportunityWeights = Field(default_factory=OpportunityWeights)
-    gap_threshold_high: float = Field(
-        default=1.5, description="Gap score above this threshold → Build or Niche quadrant"
-    )
-    market_size_threshold: float = Field(
-        default=5.0, description="Market size above this threshold → Build or Monitor quadrant"
-    )
-
-
-class VendorConfig(BaseModel):
-    """Vendor tracking configuration."""
-
-    domestic: list[str] = Field(default_factory=list, description="Domestic vendor GitHub orgs")
-    overseas: list[str] = Field(default_factory=list, description="Overseas vendor GitHub orgs")
-
-
 class Config(BaseModel):
     """Root configuration for BuilderDNA."""
 
-    accounts: list[str] = Field(description="GitHub accounts to analyze")
-    domains: dict[str, dict] = Field(
-        default_factory=dict, description="Radar domain configurations (e.g. agent.topics)"
-    )
-    github: GitHubConfig
-    embedding: EmbeddingConfig = Field(default_factory=EmbeddingConfig)
     output: OutputConfig = Field(default_factory=OutputConfig)
-    collect: CollectConfig = Field(default_factory=CollectConfig)
-    vendors: VendorConfig = Field(default_factory=VendorConfig)
-    opportunity: OpportunityConfig = Field(default_factory=OpportunityConfig)
 
 
 _ENV_VAR_RE = re.compile(r"\$\{(\w+)(?::-([^}]*))?\}")
