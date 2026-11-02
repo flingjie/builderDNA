@@ -1,6 +1,6 @@
 # 输出契约 (output contract)
 
-本文件是 `analysis.json`、`sources.jsonl`、`search-log.jsonl` 的精确 schema。Python 端的权威实现是 `repo_learning/models.py`（Pydantic）；`validate` 与 `render` 按此契约读取。你写 JSON 时必须匹配这些字段名与枚举值。
+本文件是 `analysis.json`、`sources.jsonl`、`search-log.jsonl` 的精确 schema。本 skill 按此契约自检并渲染；你写 JSON 时必须匹配这些字段名与枚举值。
 
 ## 通用规则
 
@@ -225,4 +225,4 @@
 
 ## HTML 模板位置
 
-权威模板是 Python 包内的 `repo_learning/templates/report.html`；`render --template <path>` 可覆盖。不要另存副本以免漂移。
+权威模板是 `references/report-template.html`。渲染时复制到 run 工作区的 `report.html`，把 `__REPORT_DATA_JSON__` 替换为嵌入的报告 JSON（见 SKILL.md 步骤 8）。

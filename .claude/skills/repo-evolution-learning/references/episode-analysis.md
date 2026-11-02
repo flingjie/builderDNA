@@ -3,8 +3,8 @@
 ## A. 确认仓库身份
 
 1. 校验 URL / `owner/repo`，识别是仓库、PR 还是 Issue。
-2. `builderdna repo-learning init --repo … [--entry-url …]` 建立 run 工作区。
-3. `builderdna repo-learning collect --run-dir <dir>`（PR 入口加 `--entry-url`）。
+2. 在 `output/repo-learning/<run_id>/` 建立 run 工作区并写 `request.yaml`。
+3. 用 `gh` 采集仓库元数据 / README /（可选）PR 详情，追加到 `sources.jsonl`。
 4. 读 `sources.jsonl` 的 `github_repo`（元数据）与 `github_readme`，收集：
    - 项目别名（旧名、新名、别称）
    - 官网链接（`homepage`）
@@ -20,10 +20,10 @@
 
 ## B. 选择开发迭代
 
-1. 读限定范围内的 Issue / PR 元数据（仓库入口时 `collect` 已拉 `candidate_episodes` 个候选）。
+1. 读限定范围内的 Issue / PR 元数据（仓库入口时用 `gh pr list` 拉候选）。
 2. 优先选「有问题描述 + 方案讨论 + Review 修改 + 测试或后续修复」的案例。
 3. 记录选择理由与排除理由（可写进 `episode` 的 `coverage_notes` 或 `analysis.coverage_notes`）。
-4. 选中后 `collect --run-dir <dir> --entry-url <PR>` 拉全量：普通评论、Review、行内评论、提交、文件差异。
+4. 选中后用 `gh pr view` / `gh api` 拉全量：普通评论、Review、行内评论、提交、文件差异。
 5. 按需读历史版本的相关代码（`github_commit` / `github_file`）。
 6. 读有明确链接或主题匹配的后续记录（`github_issue` follow-ups），标记匹配依据。
 

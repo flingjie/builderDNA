@@ -17,7 +17,7 @@ description: >
 
 # repo-evolution-learning Skill
 
-你重建一个仓库/PR/功能的开发迭代，分析项目的对外传播与用户反馈，并生成一份自包含的交互式 HTML 学习报告。你编排 Tavily Search API（搜索）+ opencli（正文采集）与 `builderdna repo-learning`（GitHub 采集、校验、渲染）。搜索与语义分析是你的职责；GitHub 采集、校验、HTML 渲染是确定性 Python 工具。
+你重建一个仓库/PR/功能的开发迭代，分析项目的对外传播与用户反馈，并生成一份自包含的交互式 HTML 学习报告。你编排 `gh` CLI（GitHub 采集）、Tavily Search API（搜索）、opencli（正文采集）；语义分析与 HTML 渲染也由你完成——本仓不再提供 `builderdna repo-learning` Python 命令。
 
 ## 这个 Skill 做什么 / 不做什么
 
@@ -45,41 +45,44 @@ description: >
 User: "分析这个 PR 的设计取舍，生成 HTML 报告"
        │
        ▼
-You (Claude) — 编排 Tavily + opencli + gh + builderdna repo-learning
+You (Claude) — 编排 gh + Tavily + opencli + 本地工作区
        │
-       ├─► builderdna repo-learning init --repo … --entry-url …   (建 run 工作区)
-       ├─► builderdna repo-learning collect --run-dir …           (GitHub: PR/review/diff/后续)
-       ├─► python <skill_dir>/scripts/tavily_search.py --query …  搜索传播内容 → search-log.jsonl
-       ├─► opencli <site> read / web read  采集正文 → sources.jsonl
+       ├─► mkdir output/repo-learning/<run_id>/ ；写 request.yaml
+       ├─► gh api / gh pr view / gh api repos/.../pulls/.../reviews|comments|files
+       ├─► python <skill_dir>/scripts/tavily_search.py --query …  → search-log.jsonl
+       ├─► opencli <site> read / web read  → sources.jsonl
        ├─► 你写 analysis.json（Episode / Narrative / DecisionCard / PromotionContent / FeedbackLink）
-       ├─► builderdna repo-learning validate --run-dir …
-       ├─► builderdna repo-learning render --run-dir …            (生成 report.html)
-       └─► 报告 run_dir/report.html + 简短摘要（不在聊天里重复整份报告）
+       ├─► 按 references/output-contract.md 自检（error 必须修，warning 复核）
+       ├─► 复制 references/report-template.html → report.html，替换 __REPORT_DATA_JSON__
+       └─► 交付 run_dir/report.html + 简短摘要（不在聊天里重复整份报告）
 ```
 
 ## Quick Reference
 
 | User says | You do |
 |-----------|--------|
-| "分析这个 PR 的设计取舍" | init(entry-url) → collect → 重建决策 → validate → render |
-| "复盘这个仓库如何做任务恢复" | init(repo) → collect(候选) → 选一个迭代 → collect(entry-url) → 分析 → render |
-| "这个项目怎么宣传的" | init → collect → Tavily 搜索 + opencli 采集 → 文章/平台分析 → render |
-| "生成交互式 HTML" | 走完 collect/分析 → validate → render，报告 run_dir/report.html |
-| "guided 模式" | init --mode guided；渲染时先隐藏决策，用户写判断后再揭示 |
+| "分析这个 PR 的设计取舍" | 建工作区(entry-url) → gh 采集 → 重建决策 → 自检 → 渲染 |
+| "复盘这个仓库如何做任务恢复" | 建工作区(repo) → 轻量采集候选 → 选一个迭代 → 深采 → 分析 → 渲染 |
+| "这个项目怎么宣传的" | 建工作区 → gh 采集 → Tavily + opencli → 文章/平台分析 → 渲染 |
+| "生成交互式 HTML" | 走完采集/分析 → 自检 → 渲染，报告 run_dir/report.html |
+| "guided 模式" | request.mode=guided；渲染后先隐藏决策，用户写判断后再揭示 |
 
 ## 执行流程
 
 ### 1. 确认仓库身份（spec 步骤 A）
 
-1. 校验 `--repo` / `--entry-url`（`owner/repo` 或 `https://github.com/…`）。
-2. 运行 `builderdna repo-learning init --repo … [--entry-url …] [--mode report|guided]`，记下返回的 `run_id` 与 `run_dir`。
-3. 运行 `builderdna repo-learning collect --run-dir <dir>`（若入口是 PR，用 `--entry-url <PR>`）。
-4. 从 `sources.jsonl` 读 `github_repo` 元数据 + `github_readme`，确认项目别名、官网、公开作者账号，写入 `analysis.json` 的 `repo_identity`。排除同名项目（无证据的搜索结果只进候选区）。
+1. 校验 `owner/repo` 或 `https://github.com/…`（含 PR URL）。
+2. 建工作区：`output/repo-learning/<run_id>/`（`run_id` 用时间戳或短 hash），写入 `request.yaml`（至少含 `repo`、可选 `entry_url`、`mode: report|guided`、`output.language`）。
+3. 用 `gh` 采集仓库元数据与 README：
+   - `gh repo view <owner>/<repo> --json nameWithOwner,description,url,homepageUrl,createdAt,updatedAt,primaryLanguage,stargazerCount`
+   - `gh api repos/<owner>/<repo>/readme --jq .content`（base64 解码）
+4. 若入口是 PR：`gh pr view <url> --json number,title,body,author,createdAt,mergedAt,commits,files,reviews,comments`；再用 `gh api` 拉 review comments / issue comments / files patch（按需）。
+5. 每条来源追加到 `sources.jsonl`（按 `references/output-contract.md`），确认别名/官网/作者账号写入 `analysis.json` 的 `repo_identity`。排除同名项目。
 
 ### 2. 选择开发迭代（spec 步骤 B）
 
-- **默认轻量**：`init --repo` + `collect`（不带 `--entry-url`）得到 README、项目介绍、公开时间线 + 候选 PR（`fetch_status=partial`）。从这些轻量来源识别**最多 3 个**有证据的决策候选。
-- 只有用户主动深入、或满足 `references/episode-analysis.md` 的深入触发条件时，才 `collect --run-dir <dir> --entry-url <选中 PR>` 拉全量 Issue / PR / 代码（这是后续阶段的「深入」路径）。
+- **默认轻量**：只拉 README、项目介绍、公开时间线 + 候选 PR 列表（`gh pr list --repo … --limit 20 --json …`），`fetch_status=partial`。从这些轻量来源识别**最多 3 个**有证据的决策候选。
+- 只有用户主动深入、或满足 `references/episode-analysis.md` 的深入触发条件时，才对选中 PR 拉全量 Issue / PR / review / diff。
 - 不要把 README 当前架构解释直接当早期设计理由；Squash 或缺早期提交时说明无法完整还原。
 
 ### 3. 重建决策（spec 步骤 C）
@@ -112,32 +115,62 @@ You (Claude) — 编排 Tavily + opencli + gh + builderdna repo-learning
 - `unconfirmed`：只能确定时间先后，或材料不足。
 - 显示关联证据，把「可能」写成待验证假设；不要以同关键词或时间邻近自动判定因果。
 
-### 8. 写 analysis.json 与收尾
+### 8. 写 analysis.json、自检与渲染
 
-1. 按 `references/output-contract.md` 的 schema 写 `analysis.json` 到 run_dir（`Analysis` 根对象：repo_identity、episode、narrative、claims、promotion_contents、feedback_links、decision_cards、platform_stats、coverage_notes）。
-2. 先写 `narrative`（5 问叙事 + 标题 + 可选猜题），遵循 `references/writing-rules.md` 的可检查规则：约 600–1000 中文字，正文只做读者视图的压缩引述。原始 `episode.alternatives/decisions/validation/implementation_changes` 与 `decision_cards` 的逐项证据保留完整，作为折叠证据，不在正文重复。
-3. 从 `promotion_contents` 选 2 篇有差异的内容标 `featured=true` 并各写 `borrowable`（学传播正文三问），其余折叠进证据。
-4. 默认生成最多 3 张决策卡（`references/evidence-rules.md` 的事实/自述/推断/未知规则 + `episode-analysis.md` 的六问六维度）；报告正文只突出叙事里的 1 个主要教训。
-5. `builderdna repo-learning validate --run-dir <dir>`，修掉 error，复核 warning。
-6. `builderdna repo-learning render --run-dir <dir>`。
+1. 按 `references/output-contract.md` 写 `analysis.json`（`Analysis` 根对象：repo_identity、episode、narrative、claims、promotion_contents、feedback_links、decision_cards、platform_stats、coverage_notes）。
+2. 先写 `narrative`（5 问叙事 + 标题 + 可选猜题），遵循 `references/writing-rules.md`：约 600–1000 中文字；原始 episode / decision_cards 保留完整作为折叠证据。
+3. 从 `promotion_contents` 选 2 篇有差异的内容标 `featured=true` 并各写 `borrowable`；其余折叠。
+4. 默认最多 3 张决策卡（`references/evidence-rules.md` + `episode-analysis.md`）；正文只突出叙事里的 1 个主要教训。
+5. **自检清单（替代原 validate 命令）**：
+   - 必填字段齐全；枚举值合法；时间戳为 UTC ISO-8601 或 null。
+   - 每个 `SourceRef.source_id` 都能在 `sources.jsonl` 找到。
+   - `evidence_status` / `relation` 与正文表述一致；禁用表达见 `evidence-rules.md`。
+   - 报告数据中不得出现 `GITHUB_TOKEN` / `TAVILY_API_KEY` 明文。
+6. **渲染**：复制 `references/report-template.html` 为 `run_dir/report.html`，把占位符 `__REPORT_DATA_JSON__` 替换为下面结构的 JSON（单行或紧凑均可；须转义 `</` 为 `<\/`，并替换 U+2028/U+2029）：
+
+```json
+{
+  "analysis": { },
+  "manifest": {
+    "run_id": "...",
+    "stage_status": {
+      "init": "completed",
+      "collect": "completed",
+      "search": "completed",
+      "content": "completed",
+      "analyze": "completed",
+      "validate": "completed",
+      "render": "completed"
+    },
+    "budgets_used": {}
+  },
+  "request": { },
+  "sources_index": {
+    "<source_id>": {
+      "id": "...", "kind": "...", "url": "...", "canonical_url": "...",
+      "author": "...", "published_at": null, "fetch_status": "full",
+      "body": "...", "missing_scope": []
+    }
+  }
+}
+```
+
 7. 交付：报告路径 + 一行关键发现 + 分析范围。不要整份贴进聊天。
 
 ## 运行工作区
 
-`init` 在 `<out_dir>/repo-learning/<run_id>/` 建立：
-
 ```
-request.yaml      sources.jsonl    search-log.jsonl
-analysis.json     manifest.json    report.html
+output/repo-learning/<run_id>/
+  request.yaml      sources.jsonl    search-log.jsonl
+  analysis.json     manifest.json    report.html
 ```
 
-- `sources.jsonl` / `search-log.jsonl` 由你（skill）追加 `web_article`/`web_discussion`/`search_result` 记录；GitHub 记录由 `collect` 追加。两条 JSONL 都按 `id` 去重。
-- `manifest.json` 是 checkpoint：`stage_status`（init/collect/search/content/analyze/validate/render）与 `budgets_used`。
-- 中断后 `builderdna repo-learning resume --run-dir <dir>` 返回下一个未完成阶段；`request.yaml` 变更会 fail-closed。
+- `sources.jsonl` / `search-log.jsonl` 由你追加；两条 JSONL 都按 `id` 去重（last-wins）。
+- `manifest.json` 记录 `stage_status` 与 `budgets_used`；中断后读它从最近未完成阶段继续。`request.yaml` 若中途变更，fail-closed 并说明原因。
 
 ## 预算与错误
 
-- `request.yaml` 的 `limits` 是初始预算，不是目标；材料不足时报告缺口，不硬凑数量。
+- `request.yaml` 的 `limits`（若有）是初始预算，不是目标；材料不足时报告缺口，不硬凑数量。
 - 预算耗尽返回部分材料；报告显示截断范围（`coverage_notes` / `missing_scope`）。
 - Tavily 搜索或正文失败：记录失败，不阻塞已有分析；短时网络失败有限重试，访问限制不无限重试。
 - 文章采集用有限并发；需要浏览器的操作按 opencli 工具约束串行执行。
@@ -151,14 +184,15 @@ analysis.json     manifest.json    report.html
 | 搜索 / 平台归类 / 去重 / 文章与反馈分析（步骤 D–F）| `references/promotion-analysis.md` |
 | evidence_status / relation / 事实-推断-未知 / 禁用表达 | `references/evidence-rules.md` |
 | analysis.json / sources.jsonl / search-log.jsonl 精确 schema | `references/output-contract.md` |
-| 中文简明表达规则（spec §7 中文适配）| `references/writing-rules.md` |
+| 中文简明表达规则 | `references/writing-rules.md` |
+| 交互式 HTML 报告模板 | `references/report-template.html` |
 
 ## Conversational flow
 
-1. 解析 `--repo` 或 `--entry-url`，判断是 PR 入口还是仓库入口。
-2. `init` → `collect`，确认仓库身份。
-3. （仓库入口）选一个迭代 → 二次 `collect --entry-url` 拉全量。
+1. 解析 repo 或 entry-url，判断是 PR 入口还是仓库入口。
+2. 建工作区 → `gh` 采集，确认仓库身份。
+3. （仓库入口）选一个迭代 → 深采选中 PR。
 4. Tavily 搜索 + opencli 采集传播内容。
 5. 重建决策 + 分析表达/反馈 + 关联反馈与开发 + 提炼学习卡。
-6. 写 `narrative`（5 问叙事）+ 标 2 篇 featured 传播内容 → `analysis.json` → `validate` → `render`。
+6. 写 `narrative` + featured 传播内容 → `analysis.json` → 自检 → 渲染 HTML。
 7. 交付报告路径 + 简短摘要，问是否深挖或 refine。
