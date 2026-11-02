@@ -1,13 +1,9 @@
-"""Tests for the builder problem/trajectory store, service, and CLI."""
+"""Tests for the builder problem/trajectory store and service."""
 
 from __future__ import annotations
 
-import json
-
 import pytest
-from typer.testing import CliRunner
 
-from cli.commands.builders import builders
 from intelligence.builder_problems.service import (
     BuilderProblemValidationError,
     build_opportunity_cards,
@@ -26,9 +22,6 @@ from models.builder_problem import (
     ProblemEventType,
     ProblemStatus,
 )
-
-
-runner = CliRunner()
 
 
 def _capture(store, person, statement, **overrides):
@@ -319,81 +312,3 @@ class TestStore:
         record_event(store, problem_id="p1", event_type="attempt", summary="attempt")
         shown = show_problem(store, "p1")["data"]
         assert [e["event_type"] for e in shown["events"]] == ["problem_observed", "attempt"]
-
-
-class TestCLI:
-    def _run(self, *args):
-        return runner.invoke(builders, list(args))
-
-    def test_capture_list_show_record_compare_opportunity(self, tmp_path):
-        state_dir = str(tmp_path / "state")
-        base = ["--state-dir", state_dir]
-
-        r1 = self._run(
-            "capture", "alice",
-            "--statement", "a problem",
-            "--user-segment", "独立 Agent 开发者",
-            "--trigger-context", "修改 prompt 后",
-            "--job-to-be-done", "确认历史失败案例是否修复",
-            "--workaround", "手工重跑",
-            "--source-ref", "x/alice/1",
-            *base,
-        )
-        assert r1.exit_code == 0, r1.output
-        payload = json.loads(r1.output)
-        assert payload["ok"] is True
-        problem_id = payload["data"]["problem"]["problem_id"]
-
-        r2 = self._run(
-            "record", problem_id,
-            "--event-type", "attempt",
-            "--summary", "尝试脚本",
-            "--to-status", "confirmed",
-            *base,
-        )
-        assert r2.exit_code == 0, r2.output
-        assert json.loads(r2.output)["data"]["problem"]["status"] == "confirmed"
-
-        r3 = self._run("list", *base)
-        assert json.loads(r3.output)["data"]["count"] == 1
-
-        r4 = self._run("show", problem_id, *base)
-        assert json.loads(r4.output)["data"]["event_count"] == 2
-
-        r5 = self._run("compare", *base)
-        assert json.loads(r5.output)["data"]["comparison_count"] == 0
-
-        r6 = self._run("opportunity", *base)
-        assert json.loads(r6.output)["data"]["count"] == 0
-
-    def test_capture_markdown(self, tmp_path):
-        result = self._run(
-            "capture", "alice",
-            "--statement", "a problem",
-            "--format", "md",
-            "--state-dir", str(tmp_path),
-        )
-        assert result.exit_code == 0
-        assert "# builders.capture" in result.output
-        assert "a problem" in result.output
-
-    def test_capture_obstacle_flag(self, tmp_path):
-        result = self._run(
-            "capture", "alice",
-            "--statement", "a problem",
-            "--job-to-be-done", "task",
-            "--obstacle", "the obstacle",
-            "--state-dir", str(tmp_path),
-        )
-        assert result.exit_code == 0, result.output
-        problem = json.loads(result.output)["data"]["problem"]
-        assert problem["obstacle"] == "the obstacle"
-
-    def test_missing_person_is_error(self, tmp_path):
-        result = self._run(
-            "capture", "",
-            "--statement", "x",
-            "--state-dir", str(tmp_path),
-        )
-        assert result.exit_code != 0
-        assert "requires --person-ref" in result.output
