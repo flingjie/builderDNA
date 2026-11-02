@@ -25,7 +25,7 @@ parsing `payload`. Bump on breaking changes to the payload contract.
 ### errors (unified error structure)
 
 Recoverable per-source/per-item failures are recorded in `errors`, not raised. Each entry:
-- `code` — stable machine-readable code (`rate_limited`, `source_unavailable`, `schema_validation`, …)
+- `code` — stable machine-readable code (`rate_limited`, `source_unavailable`, `validation_failed`, …)
 - `message` — human-readable description
 - `source` — which step/source/item produced it (empty when global)
 - `recoverable` — whether the command could continue past it

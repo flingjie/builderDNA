@@ -94,12 +94,12 @@ Inbox ──► Watch ──► Verify ──► Build ──► Drop（或持�
 需要跑一轮完整雷达时，按下面顺序手工编排——状态与门槛在 CLI，检索与语义判断在本 skill。中断后从最近未完成步骤继续；不另设 checkpoint 引擎。
 
 1. **Capture / Import** — 用专家 skill 采集证据，经 `builderdna concept capture` 写入候选卡片（必要时 `--into <ID>` 合并）。
-2. **Scan** — `builderdna radar scan --radar <name>` 按雷达配置聚合证据。
+2. **Scan** — `builderdna radar scan <name>` 按雷达配置聚合证据。
 3. **Verify** — `builderdna radar verify <CONCEPT_ID>` 过硬门槛；缺口由 `repo-trend` / `reddit-opportunity` / `twitter-learning` 补证据后再 verify。
 4. **Decide** — `builderdna concept move` / `score` / `outcome` 推进或否决；Build 前必须满足硬门槛。
 5. **Experiment** — `builderdna radar experiment <CONCEPT_ID> --format fde-gym` 生成有界最小实验。
 6. **Review** — `builderdna radar review`（或 `concept review`）做周回顾与校准。
-7. **Source-audit** — `builderdna radar source-audit --radar <name>` 审计覆盖与独立性。
+7. **Source-audit** — `builderdna radar source-audit <name>` 审计覆盖与独立性。
 
 停止条件（不要伪造证据、不要盲重试）：认证失败、CLI 返回 `ok: false`、模糊合并候选需用户消歧、任何外部平台写操作（发帖/PR/推送）一律禁止。本 skill 不自调度 cron/daemon。
 

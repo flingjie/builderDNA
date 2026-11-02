@@ -17,11 +17,12 @@ PYTHONPATH=. uv run builderdna config --show
 
 # Concept lifecycle + radar (deterministic gates; Claude owns semantic orchestration)
 PYTHONPATH=. uv run builderdna concept capture --title "..." --problem "..."
-PYTHONPATH=. uv run builderdna radar scan --radar agent-reliability
+PYTHONPATH=. uv run builderdna radar scan agent-reliability
 PYTHONPATH=. uv run builderdna radar verify <CONCEPT_ID>
 
 # Reddit investigation control plane
-PYTHONPATH=. uv run builderdna investigate start --preset production-agent-failures
+PYTHONPATH=. uv run builderdna investigate init --topic "production agent failures"
+PYTHONPATH=. uv run builderdna investigate --help
 
 # Run all tests
 uv run pytest tests/ -v
