@@ -5,9 +5,8 @@ from pathlib import Path
 import typer
 
 from config import load_config
-import time as _time
 
-from observability import OutputLevel, vprint, record_command
+from observability import OutputLevel, vprint
 
 
 def _mask_token(token: str) -> str:
@@ -24,19 +23,9 @@ def config(
     config_path: str = typer.Option("config.yaml", "--config", "-c", help="Config file path"),
 ) -> None:
     """Inspect BuilderDNA configuration."""
-    t0 = _time.time()
     if not show:
         vprint("[yellow]Use --show to display resolved configuration[/yellow]",
                level=OutputLevel.NORMAL)
-        record_command(
-            command="config",
-            domain="",
-            flags={"show": False, "config_path": config_path},
-            output_path="",
-            user_dna_used=False,
-            elapsed_seconds=round(_time.time() - t0, 2),
-            status="success",
-        )
         return
 
     cfg_path = Path(config_path)
@@ -96,13 +85,3 @@ def config(
     vprint("[bold]Collect[/bold]", level=OutputLevel.NORMAL)
     vprint(f"  Time Range: {cfg.collect.time_range_days} days", level=OutputLevel.NORMAL)
     vprint("─" * 50, level=OutputLevel.NORMAL)
-
-    record_command(
-        command="config",
-        domain="",
-        flags={"show": True, "config_path": config_path},
-        output_path="",
-        user_dna_used=False,
-        elapsed_seconds=round(_time.time() - t0, 2),
-        status="success",
-    )
